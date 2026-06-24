@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Exploring Town — 街を歩く</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="loading">
+      <div class="loading-inner">
+        <p class="loading-title">街を歩く</p>
+        <p class="loading-sub">Loading town…</p>
+        <div class="loading-bar"><div class="loading-fill"></div></div>
+      </div>
+    </div>
+
+    <div id="hud">
+      <div id="top-bar">
+        <div id="location-tag">静かな町 · Quiet Town</div>
+        <button id="menu-btn" class="hud-btn" aria-label="Menu">☰</button>
+      </div>
+
+      <div id="controls-hint">
+        <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk ·
+        <kbd>Shift</kbd> run · drag to look
+      </div>
+
+      <div id="bottom-right">
+        <button id="music-btn" class="hud-btn" aria-label="Toggle music">♪</button>
+        <button id="custom-btn" class="hud-btn" aria-label="Customize">👕</button>
+      </div>
+
+      <div id="menu-panel" class="hidden">
+        <h2>Menu</h2>
+        <p>Explore the winding streets of a small Japanese town.</p>
+        <ul>
+          <li><kbd>W A S D</kbd> — Move</li>
+          <li><kbd>Shift</kbd> — Run</li>
+          <li>Mouse drag — Rotate camera</li>
+          <li>Scroll — Zoom camera</li>
+        </ul>
+        <button id="close-menu" class="panel-btn">Close</button>
+      </div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
