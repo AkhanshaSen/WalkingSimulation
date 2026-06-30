@@ -16,10 +16,17 @@ body {
   touch-action: none;
 }
 
+/* Global fallback — any element with .hidden is invisible */
+.hidden {
+  display: none !important;
+}
+
 #game-canvas {
-  display: block;
+  position: fixed;
+  inset: 0;
   width: 100%;
   height: 100%;
+  z-index: 0;
 }
 
 #loading {
@@ -34,6 +41,7 @@ body {
 }
 
 #loading.hidden {
+  display: flex !important; /* keep in flow so transition plays */
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
