@@ -85,7 +85,6 @@ export class Game {
     this.isMusicPlaying = false;
 
     // Post-processing: FXAA anti-aliasing only — no bloom (bloom washes out labels)
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.composer.addPass(new OutputPass());
@@ -158,38 +157,20 @@ export class Game {
       game.interactables.registerAll(game.npcs, game.animals, game.worldProps);
 
       // ── GPU performance pass ──────────────────────────────────────────────
-      // Step 1: Force every object's local matrix to be computed from its
-      // position/rotation/scale BEFORE we freeze matrixAutoUpdate.
-      // Without this, objects whose matrices haven't been flushed yet (i.e.
-      // before the first renderer.render() call) would all render at the origin.
+      // Shadow culling: only the player, NPCs and animals cast shadows.
+      // Static scene objects (buildings, road, ground, props, trees) only
+      // receive shadows. This cuts the shadow-map draw list from ~thousands
+      // of objects down to a handful of moving characters.
       game.scene.traverse((obj) => {
-        obj.updateMatrix();
-      });
-      game.scene.updateMatrixWorld(true);  // propagate down the hierarchy
-
-      // Step 2: Freeze world matrices on every non-dynamic object.
-      //   Eliminates per-frame matrix recalculation + upload for the
-      //   thousands of static scene objects (buildings, road, ground, props).
-      // Step 3: Only player/NPC/animal meshes cast shadows.
-      game.scene.traverse((obj) => {
-        if (obj.userData.dynamic) return;
-        obj.matrixAutoUpdate = false;
-        if (obj.isMesh) {
+        if (obj.isMesh && !obj.userData.dynamic) {
           obj.castShadow    = false;
           obj.receiveShadow = true;
         }
       });
-      // Re-enable matrixAutoUpdate and shadow casting for animated characters
       [...game.npcs, ...game.animals].forEach((e) => {
-        e.mesh.traverse((c) => {
-          c.matrixAutoUpdate = true;
-          if (c.isMesh) c.castShadow = true;
-        });
+        e.mesh.traverse((c) => { if (c.isMesh) c.castShadow = true; });
       });
-      game.player.mesh.traverse((c) => {
-        c.matrixAutoUpdate = true;
-        if (c.isMesh) c.castShadow = true;
-      });
+      game.player.mesh.traverse((c) => { if (c.isMesh) c.castShadow = true; });
 
       game.ready = true;
       return game;

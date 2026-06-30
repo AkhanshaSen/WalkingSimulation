@@ -1011,7 +1011,6 @@ export class Town {
     skyCtx.fillStyle = grad;
     skyCtx.fillRect(0, 0, 1, 64);
     const skyTex = new THREE.CanvasTexture(skyCanvas);
-    skyTex.mapping = THREE.EquirectangularReflectionMapping;
     const skyMat = new THREE.MeshBasicMaterial({
       map: skyTex,
       side: THREE.BackSide,
