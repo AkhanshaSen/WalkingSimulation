@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Town } from './town.js';
 import { Player, NPC, InputManager } from './character.js';
 import { NPC_PROFILES } from './npcData.js';
+import { AMBIENT_NPCS } from './ambientNpcs.js';
 import { DialogueManager, InteractionSystem } from './dialogue.js';
 import { Minimap } from './minimap.js';
 
@@ -21,12 +22,15 @@ function closestPointOnPath(path, point, samples = 100) {
 }
 
 const LOCATION_ZONES = [
-  { tMax: 0.12, label: '静かな入口 · Town Entrance' },
-  { tMax: 0.28, label: '桜通り · Sakura Street' },
-  { tMax: 0.45, label: '鳥居坂 · Torii Slope' },
-  { tMax: 0.62, label: '神社の参道 · Shrine Approach' },
-  { tMax: 0.82, label: '旧町並み · Old Town Row' },
-  { tMax: 1.0, label: '港の見晴台 · Harbor View' },
+  { tMax: 0.10, label: '静かな入口 · Town Entrance' },
+  { tMax: 0.20, label: '本屋通り · Bookshop Row' },
+  { tMax: 0.34, label: '桜通り · Sakura Street' },
+  { tMax: 0.46, label: '鳥居坂 · Torii Slope' },
+  { tMax: 0.58, label: '朝市 · Morning Market' },
+  { tMax: 0.70, label: '神社の参道 · Shrine Approach' },
+  { tMax: 0.82, label: '公園 · Town Park' },
+  { tMax: 0.93, label: '港の見晴台 · Harbor View' },
+  { tMax: 1.0, label: '漁港 · Fishing Port' },
 ];
 
 export class Game {
@@ -53,7 +57,7 @@ export class Game {
       50,
       window.innerWidth / window.innerHeight,
       0.1,
-      180,
+      200,
     );
 
     this.input = new InputManager(canvas);
@@ -83,7 +87,7 @@ export class Game {
 
       onProgress?.('Spawning characters…');
       game.player = new Player(game.scene, game.path);
-      game.npcs = NPC_PROFILES.map(
+      game.npcs = [...NPC_PROFILES, ...AMBIENT_NPCS].map(
         (profile) => new NPC(game.scene, game.path, profile),
       );
 

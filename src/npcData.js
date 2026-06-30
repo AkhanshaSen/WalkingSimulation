@@ -12,8 +12,9 @@ export const NPC_PROFILES = [
     shirtColor: 0xf0e8f8,
     backpackColor: 0x8060c0,
     hairColor: 0x2a2030,
-    startT: 0.10,
+    startT: 0.07,
     defaultExpression: 'shy',
+    routine: 'sit',
     firstMeet: {
       greeting: {
         expression: 'shy',
@@ -129,8 +130,10 @@ export const NPC_PROFILES = [
     shirtColor: 0xe85050,
     backpackColor: 0xf0c040,
     hairColor: 0x1a1a1a,
-    startT: 0.28,
+    startT: 0.20,
     defaultExpression: 'happy',
+    routine: 'jog',
+    patrolTs: [0.16, 0.24, 0.20],
     firstMeet: {
       greeting: {
         expression: 'happy',
@@ -247,8 +250,9 @@ export const NPC_PROFILES = [
     shirtColor: 0xe8d8c8,
     backpackColor: 0x60a060,
     hairColor: 0x606060,
-    startT: 0.52,
+    startT: 0.62,
     defaultExpression: 'happy',
+    routine: 'work',
     firstMeet: {
       greeting: {
         expression: 'happy',
@@ -368,8 +372,9 @@ export const NPC_PROFILES = [
     shirtColor: 0xc8e8f0,
     backpackColor: 0xf080a0,
     hairColor: 0x4a3020,
-    startT: 0.78,
+    startT: 0.74,
     defaultExpression: 'thinking',
+    routine: 'work',
     firstMeet: {
       greeting: {
         expression: 'surprised',

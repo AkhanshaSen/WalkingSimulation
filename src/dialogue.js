@@ -95,7 +95,7 @@ export class DialogueManager {
       : this.approachInitiated
         ? p.approachInvite
         : p.tagline;
-    this.approachWalkBtn?.classList.toggle('hidden', isCompanion);
+    this.approachWalkBtn?.classList.toggle('hidden', isCompanion || npc.profile.isAmbient);
     this.approachPartBtn?.classList.toggle('hidden', !isCompanion);
     this.approachIgnoreBtn?.classList.toggle('hidden', isCompanion);
     this.approachModal.classList.remove('hidden');
@@ -408,6 +408,7 @@ export class InteractionSystem {
       npc.setPlayerNearby(inTalkRange, this.player.position);
 
       if (
+        !npc.profile.isAmbient &&
         !npc.isIgnored() &&
         !npc.isTalking &&
         npc.state === 'idle' &&

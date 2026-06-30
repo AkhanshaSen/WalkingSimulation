@@ -585,6 +585,122 @@ function createGardenPatch() {
   return group;
 }
 
+function createShopSign(labelJa, labelEn, boardColor = 0xc84040) {
+  const group = new THREE.Group();
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 80;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fffef8';
+  ctx.fillRect(4, 4, 248, 72);
+  ctx.fillStyle = '#2a4a4a';
+  ctx.font = 'bold 22px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(labelJa, 128, 32);
+  ctx.fillStyle = '#666';
+  ctx.font = '14px sans-serif';
+  ctx.fillText(labelEn, 128, 56);
+  const tex = new THREE.CanvasTexture(canvas);
+  const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  sign.scale.set(2.0, 0.6, 1);
+  sign.position.y = 4.2;
+  group.add(sign);
+
+  const board = createOutlinedMesh(new THREE.BoxGeometry(2.0, 0.75, 0.08), createToonMaterial(boardColor));
+  board.position.y = 3.6;
+  group.add(board);
+  return group;
+}
+
+function createNamedShop(w, d, h, wall, roof, style, labelJa, labelEn, signColor) {
+  const group = new THREE.Group();
+  const building = createBuilding(w, d, h, wall, roof, style);
+  group.add(building);
+  const sign = createShopSign(labelJa, labelEn, signColor);
+  sign.position.set(0, 0, d / 2 + 0.6);
+  group.add(sign);
+  return group;
+}
+
+function createMarketStalls() {
+  const group = new THREE.Group();
+  const colors = [0xc04040, 0x4080a0, 0x40a060, 0xf0a030];
+  [-3.5, -1.2, 1.2, 3.5].forEach((x, i) => {
+    const stall = createOutlinedMesh(new THREE.BoxGeometry(1.6, 0.85, 1.1), createToonMaterial(0xd0c0a0));
+    stall.position.set(x, 0.42, 0);
+    group.add(stall);
+    const awning = createOutlinedMesh(new THREE.BoxGeometry(1.8, 0.06, 1.3), createToonMaterial(colors[i]));
+    awning.position.set(x, 1.05, 0.25);
+    group.add(awning);
+    const goods = createOutlinedMesh(
+      new THREE.BoxGeometry(0.45, 0.25, 0.35),
+      createToonMaterial([0xf0a040, 0xf06060, 0x80c080, 0xf0e060][i]),
+    );
+    goods.position.set(x, 0.92, 0.1);
+    group.add(goods);
+  });
+  const sign = createShopSign('朝市', 'Morning Market', 0xe85050);
+  sign.position.set(0, 0, 2.2);
+  group.add(sign);
+  return group;
+}
+
+function createParkGazebo() {
+  const group = new THREE.Group();
+  const floor = createOutlinedMesh(new THREE.CylinderGeometry(1.8, 1.8, 0.1, 8), createToonMaterial(0x989080));
+  floor.position.y = 0.05;
+  group.add(floor);
+  const roof = createOutlinedMesh(new THREE.ConeGeometry(2.2, 1.2, 6), createToonMaterial(0x5a8a6a));
+  roof.position.y = 2.8;
+  group.add(roof);
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    const post = createOutlinedMesh(new THREE.CylinderGeometry(0.08, 0.08, 2.6, 6), createToonMaterial(0xf0e8d8));
+    post.position.set(Math.sin(angle) * 1.5, 1.3, Math.cos(angle) * 1.5);
+    group.add(post);
+  }
+  const sign = createShopSign('小さな公園', 'Town Park', 0x5a8a6a);
+  sign.position.set(0, 0, 2.5);
+  sign.scale.setScalar(0.85);
+  group.add(sign);
+  return group;
+}
+
+function createCafePatio() {
+  const group = new THREE.Group();
+  const cafe = createNamedShop(3.5, 3, 3.2, 0xf0e8d8, 0x6a5040, 'shop', '喫茶 木漏れ', 'Komorebi Cafe', 0x6a5040);
+  group.add(cafe);
+  [-0.8, 0.8].forEach((x) => {
+    const table = createOutlinedMesh(new THREE.CylinderGeometry(0.35, 0.35, 0.06, 8), createToonMaterial(0x806040));
+    table.position.set(x, 0.45, 2.2);
+    group.add(table);
+    const chair = createBench();
+    chair.position.set(x, 0, 2.8);
+    chair.scale.setScalar(0.55);
+    group.add(chair);
+  });
+  return group;
+}
+
+function createFishMarket() {
+  const group = new THREE.Group();
+  const shed = createOutlinedMesh(new THREE.BoxGeometry(4, 2.5, 2.5), createToonMaterial(0xc8d0d8));
+  shed.position.y = 1.25;
+  group.add(shed);
+  const counter = createOutlinedMesh(new THREE.BoxGeometry(3.5, 0.15, 0.8), createToonMaterial(0x989080));
+  counter.position.set(0, 0.8, 1.5);
+  group.add(counter);
+  for (let i = 0; i < 3; i++) {
+    const crate = createOutlinedMesh(new THREE.BoxGeometry(0.6, 0.4, 0.5), createToonMaterial(0x806040));
+    crate.position.set(-1 + i * 1, 0.2, 1.2);
+    group.add(crate);
+  }
+  const sign = createShopSign('魚屋 水樹', 'Mizuki Fish', 0x4080a0);
+  sign.position.set(0, 0, 2.0);
+  group.add(sign);
+  return group;
+}
+
 export class Town {
   constructor(scene) {
     this.scene = scene;
@@ -608,6 +724,7 @@ export class Town {
     onProgress?.('Placing buildings…');
     this._createBuildings();
     this._createLandmarks();
+    this._createShopsAndPlaces();
     await nextFrame();
 
     onProgress?.('Adding details…');
@@ -635,32 +752,40 @@ export class Town {
 
   _createPath() {
     const points = [
-      new THREE.Vector3(0, 0, 12),
-      new THREE.Vector3(-2, 0, 8),
-      new THREE.Vector3(-3, 0, 4),
-      new THREE.Vector3(-2, 0, 0),
-      new THREE.Vector3(0, 0, -4),
-      new THREE.Vector3(3, 0, -8),
-      new THREE.Vector3(5, 0, -12),
-      new THREE.Vector3(4, 0, -18),
-      new THREE.Vector3(0, 0, -22),
-      new THREE.Vector3(-4, 0, -26),
-      new THREE.Vector3(-7, 0, -30),
-      new THREE.Vector3(-5, 0, -36),
-      new THREE.Vector3(-2, 0, -40),
-      new THREE.Vector3(2, 0, -44),
-      new THREE.Vector3(6, 0, -48),
-      new THREE.Vector3(10, 0, -52),
-      new THREE.Vector3(12, 0, -56),
-      new THREE.Vector3(10, 0, -60),
-      new THREE.Vector3(6, 0, -64),
-      new THREE.Vector3(2, 0, -68),
+      new THREE.Vector3(0, 0, 14),
+      new THREE.Vector3(-2, 0, 10),
+      new THREE.Vector3(-3, 0, 6),
+      new THREE.Vector3(-2, 0, 2),
+      new THREE.Vector3(0, 0, -2),
+      new THREE.Vector3(3, 0, -6),
+      new THREE.Vector3(5, 0, -10),
+      new THREE.Vector3(4, 0, -14),
+      new THREE.Vector3(0, 0, -18),
+      new THREE.Vector3(-4, 0, -22),
+      new THREE.Vector3(-7, 0, -26),
+      new THREE.Vector3(-5, 0, -32),
+      new THREE.Vector3(-2, 0, -36),
+      new THREE.Vector3(3, 0, -40),
+      new THREE.Vector3(7, 0, -44),
+      new THREE.Vector3(9, 0, -48),
+      new THREE.Vector3(7, 0, -52),
+      new THREE.Vector3(3, 0, -56),
+      new THREE.Vector3(-1, 0, -60),
+      new THREE.Vector3(-5, 0, -64),
+      new THREE.Vector3(-3, 0, -68),
+      new THREE.Vector3(1, 0, -72),
+      new THREE.Vector3(6, 0, -76),
+      new THREE.Vector3(11, 0, -80),
+      new THREE.Vector3(13, 0, -84),
+      new THREE.Vector3(11, 0, -88),
+      new THREE.Vector3(7, 0, -92),
+      new THREE.Vector3(3, 0, -96),
     ];
     return new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.5);
   }
 
   _createSky() {
-    this.scene.fog = new THREE.Fog(PALETTE.sky, 40, 130);
+    this.scene.fog = new THREE.Fog(PALETTE.sky, 45, 155);
     this.scene.background = new THREE.Color(PALETTE.sky);
   }
 
@@ -670,11 +795,11 @@ export class Town {
 
   _createGround() {
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(220, 220),
+      new THREE.PlaneGeometry(280, 280),
       createToonMaterial(PALETTE.green),
     );
     ground.rotation.x = -Math.PI / 2;
-    ground.position.set(2, -0.05, -28);
+    ground.position.set(2, -0.05, -42);
     ground.receiveShadow = true;
     this.scene.add(ground);
     this.groundMeshes.push(ground);
@@ -686,6 +811,8 @@ export class Town {
       [14, -48, 8, 6, 0x6a9a8a],
       [18, -62, 10, 8, 0x5a8aaa],
       [-10, -55, 5, 4, 0x7aaa7a],
+      [8, -78, 12, 8, 0x7aba8a],
+      [-8, -88, 8, 6, 0x6a9a7a],
     ];
     patches.forEach(([x, z, w, d, color]) => {
       const patch = new THREE.Mesh(
@@ -698,12 +825,16 @@ export class Town {
     });
 
     const harborWater = createHarborWater();
-    harborWater.position.set(22, -0.08, -62);
+    harborWater.position.set(24, -0.08, -88);
     this.scene.add(harborWater);
+    const harborWater2 = createHarborWater();
+    harborWater2.position.set(20, -0.08, -96);
+    harborWater2.scale.set(0.8, 1, 0.7);
+    this.scene.add(harborWater2);
   }
 
   _createRoad() {
-    const divisions = 80;
+    const divisions = 110;
     const roadWidth = 3.5;
     const points = this.path.getSpacedPoints(divisions);
     const roadMat = createToonMaterial(PALETTE.road);
@@ -769,19 +900,22 @@ export class Town {
 
   _createBuildings() {
     const buildingDefs = [
-      { t: 0.04, side: 1, w: 3, d: 4, h: 3.5, wall: PALETTE.wall, roof: PALETTE.roof, style: 'house' },
-      { t: 0.08, side: -1, w: 4, d: 3.5, h: 3.2, wall: 0xd0c8b8, roof: PALETTE.roofDark, style: 'shop' },
-      { t: 0.14, side: 1, w: 3.5, d: 3, h: 4.2, wall: 0xc8d0c0, roof: 0x5a7a6a, style: 'apartment' },
-      { t: 0.22, side: -1, w: 5, d: 4, h: 4.5, wall: PALETTE.wallDark, roof: PALETTE.roof, style: 'house' },
-      { t: 0.30, side: 1, w: 3, d: 3.5, h: 3.2, wall: 0xe0d8c8, roof: 0x6a9a7a, style: 'shop' },
-      { t: 0.38, side: -1, w: 4, d: 3, h: 3.8, wall: 0xd8d0c0, roof: PALETTE.roofDark, style: 'apartment' },
-      { t: 0.46, side: 1, w: 3.5, d: 4, h: 3.5, wall: PALETTE.wall, roof: PALETTE.roof, style: 'house' },
-      { t: 0.54, side: -1, w: 4.5, d: 3.5, h: 4.2, wall: 0xc0b8a8, roof: 0x5a8a6a, style: 'shop' },
-      { t: 0.62, side: 1, w: 3, d: 3, h: 3.0, wall: 0xe8e0d0, roof: PALETTE.roofDark, style: 'house' },
+      { t: 0.03, side: 1, w: 3, d: 4, h: 3.5, wall: PALETTE.wall, roof: PALETTE.roof, style: 'house' },
+      { t: 0.06, side: -1, w: 3.5, d: 3, h: 3.4, wall: 0xe8e0d0, roof: 0x6a5040, style: 'shop' },
+      { t: 0.11, side: 1, w: 3.5, d: 3, h: 4.2, wall: 0xc8d0c0, roof: 0x5a7a6a, style: 'apartment' },
+      { t: 0.17, side: -1, w: 5, d: 4, h: 4.5, wall: PALETTE.wallDark, roof: PALETTE.roof, style: 'house' },
+      { t: 0.24, side: 1, w: 3, d: 3.5, h: 3.2, wall: 0xe0d8c8, roof: 0x6a9a7a, style: 'shop' },
+      { t: 0.31, side: -1, w: 4, d: 3, h: 3.8, wall: 0xd8d0c0, roof: PALETTE.roofDark, style: 'apartment' },
+      { t: 0.38, side: 1, w: 3.5, d: 4, h: 3.5, wall: PALETTE.wall, roof: PALETTE.roof, style: 'house' },
+      { t: 0.44, side: -1, w: 4.5, d: 3.5, h: 4.2, wall: 0xc0b8a8, roof: 0x5a8a6a, style: 'shop' },
+      { t: 0.52, side: 1, w: 4, d: 3.5, h: 3.6, wall: 0xf0e8d8, roof: PALETTE.roofDark, style: 'house' },
+      { t: 0.58, side: -1, w: 3.5, d: 3, h: 3.2, wall: 0xd0c8b8, roof: PALETTE.roof, style: 'shop' },
+      { t: 0.64, side: 1, w: 3, d: 3, h: 3.0, wall: 0xe8e0d0, roof: PALETTE.roofDark, style: 'house' },
       { t: 0.70, side: -1, w: 4, d: 3.5, h: 3.6, wall: 0xd0c8b8, roof: PALETTE.roof, style: 'apartment' },
-      { t: 0.78, side: 1, w: 3.5, d: 3.2, h: 3.4, wall: 0xd8e0d0, roof: 0x6a8a7a, style: 'shop' },
-      { t: 0.86, side: -1, w: 4.2, d: 3.8, h: 3.8, wall: 0xc8c0b0, roof: PALETTE.roofDark, style: 'house' },
-      { t: 0.94, side: 1, w: 3.2, d: 3, h: 3.2, wall: 0xe0d8c8, roof: PALETTE.roof, style: 'apartment' },
+      { t: 0.76, side: 1, w: 3.5, d: 3.2, h: 3.4, wall: 0xd8e0d0, roof: 0x6a8a7a, style: 'house' },
+      { t: 0.82, side: -1, w: 4.2, d: 3.8, h: 3.8, wall: 0xc8c0b0, roof: PALETTE.roofDark, style: 'house' },
+      { t: 0.88, side: 1, w: 3.2, d: 3, h: 3.2, wall: 0xe0d8c8, roof: PALETTE.roof, style: 'apartment' },
+      { t: 0.94, side: -1, w: 4, d: 3.5, h: 3.5, wall: 0xc8d0d8, roof: 0x5080a0, style: 'shop' },
     ];
 
     buildingDefs.forEach(({ t, side, w, d, h, wall, roof, style }) => {
@@ -815,34 +949,64 @@ export class Town {
 
   _createLandmarks() {
     const shrine = createShrine();
-    placeAlongPath(shrine, this.path, 0.58, 1, 7.5);
+    placeAlongPath(shrine, this.path, 0.64, 1, 7.5);
     this.scene.add(shrine);
 
     const steps = createStoneSteps(5);
-    placeAlongPath(steps, this.path, 0.56, 1, 5.5);
+    placeAlongPath(steps, this.path, 0.62, 1, 5.5);
     this.scene.add(steps);
 
     const torii = createTorii();
-    placeAlongPath(torii, this.path, 0.38, -1, 6);
+    placeAlongPath(torii, this.path, 0.36, -1, 6);
     this.scene.add(torii);
 
     const garden = createGardenPatch();
-    placeAlongPath(garden, this.path, 0.20, 1, 7);
+    placeAlongPath(garden, this.path, 0.14, 1, 7);
     this.scene.add(garden);
 
     const lookout = createLookoutDeck();
-    placeAlongPath(lookout, this.path, 0.72, -1, 6.5);
+    placeAlongPath(lookout, this.path, 0.86, -1, 6.5);
     this.scene.add(lookout);
 
     const pier = createHarborPier();
-    placeAlongPath(pier, this.path, 0.92, 1, 5);
+    placeAlongPath(pier, this.path, 0.97, 1, 5);
     pier.rotation.y += Math.PI / 6;
     this.scene.add(pier);
 
     const harborTorii = createTorii();
-    placeAlongPath(harborTorii, this.path, 0.88, -1, 7);
+    placeAlongPath(harborTorii, this.path, 0.93, -1, 7);
     harborTorii.scale.setScalar(0.65);
     this.scene.add(harborTorii);
+
+    const park = createParkGazebo();
+    placeAlongPath(park, this.path, 0.80, 1, 8);
+    this.scene.add(park);
+  }
+
+  _createShopsAndPlaces() {
+    const bookshop = createNamedShop(3, 3.2, 3.4, 0xf0e8f8, 0x6a5040, 'shop', '書店 文房', 'Bunbou Books', 0x8060a0);
+    placeAlongPath(bookshop, this.path, 0.08, -1, 5.5);
+    this.scene.add(bookshop);
+
+    const ramen = createNamedShop(3.5, 3, 3.2, 0xf0e0c8, 0xc04040, 'shop', '麺処 山田', 'Yamada Ramen', 0xc04040);
+    placeAlongPath(ramen, this.path, 0.22, 1, 5.8);
+    this.scene.add(ramen);
+
+    const florist = createNamedShop(3, 3, 3.0, 0xf0f0d8, 0xe08090, 'shop', '花屋 はな', 'Hana Florist', 0xe08090);
+    placeAlongPath(florist, this.path, 0.50, -1, 5.5);
+    this.scene.add(florist);
+
+    const cafe = createCafePatio();
+    placeAlongPath(cafe, this.path, 0.46, 1, 6.5);
+    this.scene.add(cafe);
+
+    const market = createMarketStalls();
+    placeAlongPath(market, this.path, 0.54, -1, 7);
+    this.scene.add(market);
+
+    const fishMarket = createFishMarket();
+    placeAlongPath(fishMarket, this.path, 0.95, -1, 6);
+    this.scene.add(fishMarket);
   }
 
   _createProps() {
@@ -980,8 +1144,8 @@ export class Town {
       this.scene.add(tree);
     });
 
-    for (let i = 0; i < 18; i++) {
-      const t = 0.06 + Math.random() * 0.9;
+    for (let i = 0; i < 24; i++) {
+      const t = 0.04 + Math.random() * 0.92;
       const pos = this.path.getPointAt(t);
       const tangent = this.path.getTangentAt(t);
       const side = Math.random() > 0.5 ? 1 : -1;
@@ -1031,11 +1195,11 @@ export class Town {
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
     sun.shadow.camera.near = 0.5;
-    sun.shadow.camera.far = 100;
-    sun.shadow.camera.left = -50;
-    sun.shadow.camera.right = 50;
-    sun.shadow.camera.top = 50;
-    sun.shadow.camera.bottom = -70;
+    sun.shadow.camera.far = 120;
+    sun.shadow.camera.left = -55;
+    sun.shadow.camera.right = 55;
+    sun.shadow.camera.top = 55;
+    sun.shadow.camera.bottom = -95;
     this.scene.add(sun);
     this.sun = sun;
 
@@ -1047,9 +1211,13 @@ export class Town {
     warm.position.set(-3, 2.5, -20);
     this.scene.add(warm);
 
-    const harborLight = new THREE.PointLight(0x80c0e0, 0.35, 16);
-    harborLight.position.set(18, 3, -58);
+    const harborLight = new THREE.PointLight(0x80c0e0, 0.35, 18);
+    harborLight.position.set(20, 3, -88);
     this.scene.add(harborLight);
+
+    const marketLight = new THREE.PointLight(0xffc080, 0.3, 14);
+    marketLight.position.set(6, 3, -48);
+    this.scene.add(marketLight);
   }
 
   getPath() {

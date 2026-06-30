@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createToonMaterial, createOutlinedMesh, PALETTE } from './materials.js';
+import { setupNpcRoutine, updateNpcRoutine } from './npcRoutines.js';
 
 export class InputManager {
   constructor(canvas) {
@@ -379,8 +380,8 @@ export function animateCharacter(character, speed, dt) {
   });
 }
 
-export const MAX_DIST_FROM_PATH = 8.5;
-export const MAP_BOUNDS = { minX: -32, maxX: 40, minZ: -84, maxZ: 20 };
+export const MAX_DIST_FROM_PATH = 9.5;
+export const MAP_BOUNDS = { minX: -42, maxX: 50, minZ: -108, maxZ: 22 };
 
 export class Player {
   constructor(scene, path) {
@@ -566,6 +567,8 @@ export class NPC {
     setExpression(this.mesh, profile.defaultExpression);
     this._placeOnPath();
     this.homePos.copy(this.mesh.position);
+    this.homeFacing = this.mesh.rotation.y;
+    setupNpcRoutine(this);
     this.nameTag = this.mesh.children.find((c) => c.userData?.isNameTag) ?? null;
     if (this.nameTag) {
       this.nameTag.userData.interactNpc = this;
@@ -656,6 +659,7 @@ export class NPC {
     setExpression(this.mesh, this.profile.defaultExpression);
     if (returnHome) {
       this.mesh.position.copy(this.homePos);
+      setupNpcRoutine(this);
     }
   }
 
@@ -742,7 +746,6 @@ export class NPC {
       return;
     }
 
-    this.idlePhase += dt * 1.5;
-    this.mesh.position.y = this.homePos.y + Math.sin(this.idlePhase) * 0.015;
+    updateNpcRoutine(this, dt);
   }
 }
