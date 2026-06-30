@@ -77,16 +77,6 @@ export class InteractionSystem {
 
       npc.setPlayerNearby(inTalkRange, this.player.position);
 
-      if (
-        !npc.profile.isAmbient &&
-        !npc.isIgnored() &&
-        !npc.isTalking &&
-        npc.state === 'idle' &&
-        dist < this.spotRange &&
-        dist > this.approachRange + 1
-      ) {
-        npc.startApproaching();
-      }
     }
 
     // Closest NPC drives approach modal visibility

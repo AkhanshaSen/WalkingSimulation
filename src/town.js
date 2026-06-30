@@ -13,76 +13,238 @@ function placeAlongPath(group, path, t, side, offset, y = 0) {
 
 function createBuilding(width, depth, height, wallColor, roofColor, style = 'house') {
   const group = new THREE.Group();
-  const wallMat = createToonMaterial(wallColor);
-  const roofMat = createToonMaterial(roofColor);
+  const wallMat  = createToonMaterial(wallColor);
+  const roofMat  = createToonMaterial(roofColor);
+  const faceZ    = depth / 2;  // front-face Z offset
 
+  // ── main walls ──────────────────────────────────────────────────────────────
   const walls = createOutlinedMesh(new THREE.BoxGeometry(width, height, depth), wallMat);
   walls.position.y = height / 2;
   group.add(walls);
 
+  // Ground-floor band (slightly darker)
+  const bandH = Math.min(1.4, height * 0.35);
+  const band = createOutlinedMesh(
+    new THREE.BoxGeometry(width + 0.02, bandH, depth + 0.02),
+    createToonMaterial(new THREE.Color(wallColor).offsetHSL(0, 0, -0.08).getHex()),
+  );
+  band.position.y = bandH / 2;
+  group.add(band);
+
+  // Horizontal floor-separation strips
+  const floors = style === 'apartment' ? Math.max(2, Math.round(height / 1.6)) : 1;
+  for (let f = 1; f < floors; f++) {
+    const strip = createOutlinedMesh(
+      new THREE.BoxGeometry(width + 0.06, 0.1, depth + 0.06),
+      createToonMaterial(new THREE.Color(roofColor).offsetHSL(0, 0, 0.1).getHex()),
+    );
+    strip.position.y = (height / floors) * f;
+    group.add(strip);
+  }
+
+  // ── windows ─────────────────────────────────────────────────────────────────
+  const winGlass = createToonMaterial(0xb8e0f0);
+  const winFrame = createToonMaterial(new THREE.Color(wallColor).offsetHSL(0, 0, -0.15).getHex());
+  const winW = 0.52, winH = 0.58;
+  const winCount = Math.max(1, Math.floor(width / 1.3));
+  const winSpacing = width / (winCount + 1);
+
+  const floorHeights = [];
+  for (let f = 0; f < floors; f++) {
+    const flH = height / floors;
+    floorHeights.push(bandH + (f === 0 ? flH * 0.6 : (height / floors) * f + flH * 0.55));
+  }
+
+  floorHeights.forEach((wy, fi) => {
+    if (fi === 0 && style === 'shop') return;  // ground floor handled separately for shops
+    for (let wi = 0; wi < winCount; wi++) {
+      const wx = -width / 2 + winSpacing * (wi + 1);
+      // Frame
+      const frame = new THREE.Mesh(
+        new THREE.BoxGeometry(winW + 0.1, winH + 0.1, 0.06),
+        winFrame,
+      );
+      frame.position.set(wx, wy, faceZ + 0.02);
+      group.add(frame);
+      // Glass
+      const glass = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), winGlass);
+      glass.position.set(wx, wy, faceZ + 0.06);
+      group.add(glass);
+      // Sill ledge
+      const sill = new THREE.Mesh(
+        new THREE.BoxGeometry(winW + 0.14, 0.07, 0.14),
+        createToonMaterial(0xd0c8b8),
+      );
+      sill.position.set(wx, wy - winH / 2 - 0.02, faceZ + 0.08);
+      group.add(sill);
+    }
+  });
+
+  // ── style-specific front facade ─────────────────────────────────────────────
   if (style === 'shop') {
-    const awning = createOutlinedMesh(
-      new THREE.BoxGeometry(width + 0.4, 0.08, 1.2),
-      createToonMaterial(0xc84040),
+    // Large display window
+    const dispFrame = createOutlinedMesh(
+      new THREE.BoxGeometry(width * 0.65, bandH - 0.15, 0.08),
+      winFrame,
     );
-    awning.position.set(0, height * 0.72, depth / 2 + 0.55);
-    group.add(awning);
-
-    const awningStripe = new THREE.Mesh(
-      new THREE.BoxGeometry(width + 0.2, 0.04, 1.0),
-      createToonMaterial(0xf0f0f0),
+    dispFrame.position.set(0, bandH * 0.5 + 0.08, faceZ + 0.03);
+    group.add(dispFrame);
+    const disp = new THREE.Mesh(
+      new THREE.PlaneGeometry(width * 0.6, bandH - 0.22),
+      createToonMaterial(0x90d0e8),
     );
-    awningStripe.position.set(0, height * 0.72, depth / 2 + 0.5);
-    group.add(awningStripe);
+    disp.position.set(0, bandH * 0.5 + 0.08, faceZ + 0.07);
+    group.add(disp);
 
-    const door = createOutlinedMesh(
-      new THREE.BoxGeometry(0.9, 1.5, 0.08),
+    // Door
+    const doorFrame = createOutlinedMesh(
+      new THREE.BoxGeometry(0.82, 1.55, 0.07),
       createToonMaterial(0x5a4030),
     );
-    door.position.set(0, 0.75, depth / 2 + 0.05);
+    doorFrame.position.set(width * 0.28, 0.78, faceZ + 0.03);
+    group.add(doorFrame);
+    const doorGlass = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.55, 1.1),
+      createToonMaterial(0x80c8e8),
+    );
+    doorGlass.position.set(width * 0.28, 0.9, faceZ + 0.07);
+    group.add(doorGlass);
+
+    // Awning with stripes
+    const awningColors = [0xc84040, 0x4060c0, 0x408040, 0xc09030];
+    const awningColor  = awningColors[Math.floor(Math.random() * awningColors.length)];
+    const awning = createOutlinedMesh(
+      new THREE.BoxGeometry(width + 0.5, 0.08, 1.3),
+      createToonMaterial(awningColor),
+    );
+    awning.position.set(0, height * 0.72, faceZ + 0.6);
+    group.add(awning);
+    // Stripe
+    for (let s = 0; s < 3; s++) {
+      const stripe = new THREE.Mesh(
+        new THREE.BoxGeometry((width + 0.4) / 6, 0.06, 1.25),
+        createToonMaterial(0xffffff),
+      );
+      stripe.position.set(-width / 3 + s * (width / 3), height * 0.72, faceZ + 0.6);
+      group.add(stripe);
+    }
+
+    // Under-awning fringe
+    const fringe = new THREE.Mesh(
+      new THREE.BoxGeometry(width + 0.5, 0.18, 0.06),
+      createToonMaterial(awningColor),
+    );
+    fringe.position.set(0, height * 0.72 - 0.09, faceZ + 1.22);
+    group.add(fringe);
+  }
+
+  if (style === 'house') {
+    // Door
+    const door = createOutlinedMesh(
+      new THREE.BoxGeometry(0.75, 1.45, 0.08),
+      createToonMaterial(0x5a4030),
+    );
+    door.position.set(-width * 0.2, 0.73, faceZ + 0.03);
     group.add(door);
+    const doorKnob = new THREE.Mesh(
+      new THREE.SphereGeometry(0.05, 5, 4),
+      createToonMaterial(0xc8a840),
+    );
+    doorKnob.position.set(-width * 0.2 + 0.26, 0.72, faceZ + 0.09);
+    group.add(doorKnob);
+
+    // Nameplate beside door
+    const plate = createOutlinedMesh(
+      new THREE.BoxGeometry(0.3, 0.14, 0.04),
+      createToonMaterial(0xf0e8c0),
+    );
+    plate.position.set(-width * 0.2 - 0.52, 1.1, faceZ + 0.04);
+    group.add(plate);
   }
 
   if (style === 'apartment') {
-    const balcony = createOutlinedMesh(
-      new THREE.BoxGeometry(width * 0.5, 0.08, 0.6),
-      createToonMaterial(0x888888),
+    // Central entrance
+    const entryArch = createOutlinedMesh(
+      new THREE.BoxGeometry(1.4, 2.0, 0.1),
+      createToonMaterial(new THREE.Color(wallColor).offsetHSL(0, 0, -0.12).getHex()),
     );
-    balcony.position.set(0, height * 0.45, depth / 2 + 0.35);
-    group.add(balcony);
+    entryArch.position.set(0, 1.0, faceZ + 0.04);
+    group.add(entryArch);
+    const entryGlass = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.9, 1.6),
+      createToonMaterial(0x80c0e0),
+    );
+    entryGlass.position.set(0, 1.0, faceZ + 0.1);
+    group.add(entryGlass);
 
-    const rail = createOutlinedMesh(
-      new THREE.BoxGeometry(width * 0.5, 0.35, 0.05),
-      createToonMaterial(0x666666),
-    );
-    rail.position.set(0, height * 0.62, depth / 2 + 0.62);
-    group.add(rail);
+    // Balconies per floor
+    for (let f = 1; f < floors; f++) {
+      const by = (height / floors) * f + 0.18;
+      const balcony = createOutlinedMesh(
+        new THREE.BoxGeometry(width * 0.45, 0.09, 0.65),
+        createToonMaterial(0x909090),
+      );
+      balcony.position.set(width * 0.22, by, faceZ + 0.36);
+      group.add(balcony);
+      const rail = createOutlinedMesh(
+        new THREE.BoxGeometry(width * 0.45, 0.32, 0.05),
+        createToonMaterial(0x707070),
+      );
+      rail.position.set(width * 0.22, by + 0.2, faceZ + 0.67);
+      group.add(rail);
+    }
+
+    // A/C units on side wall
+    [height * 0.35, height * 0.65].forEach((ay) => {
+      const ac = createOutlinedMesh(
+        new THREE.BoxGeometry(0.35, 0.2, 0.25),
+        createToonMaterial(0xc8c8c0),
+      );
+      ac.position.set(width / 2 + 0.1, ay, 0);
+      group.add(ac);
+    });
   }
 
-  const roof =
-    style === 'shrine'
-      ? createOutlinedMesh(
-          new THREE.ConeGeometry(width * 0.55, 0.9, 4),
-          roofMat,
-        )
-      : createOutlinedMesh(new THREE.BoxGeometry(width + 0.3, 0.15, depth + 0.3), roofMat);
+  // ── roof ────────────────────────────────────────────────────────────────────
+  if (style === 'shrine') {
+    const r1 = createOutlinedMesh(new THREE.BoxGeometry(width + 0.5, 0.12, depth + 0.5), roofMat);
+    r1.position.y = height + 0.06;
+    group.add(r1);
+    const r2 = createOutlinedMesh(new THREE.ConeGeometry(width * 0.58, 1.0, 4), roofMat);
+    r2.position.y = height + 0.6;
+    r2.rotation.y = Math.PI / 4;
+    group.add(r2);
+  } else {
+    // Parapet
+    const parapet = createOutlinedMesh(
+      new THREE.BoxGeometry(width + 0.3, 0.22, depth + 0.3),
+      roofMat,
+    );
+    parapet.position.y = height + 0.11;
+    group.add(parapet);
 
-  roof.position.y = style === 'shrine' ? height + 0.45 : height + 0.08;
-  if (style === 'shrine') roof.rotation.y = Math.PI / 4;
-  group.add(roof);
+    // Roof lip (slightly taller outer edge)
+    const lip = createOutlinedMesh(
+      new THREE.BoxGeometry(width + 0.5, 0.1, depth + 0.5),
+      createToonMaterial(new THREE.Color(roofColor).offsetHSL(0, 0, -0.07).getHex()),
+    );
+    lip.position.y = height + 0.05;
+    group.add(lip);
 
-  const windowMat = createToonMaterial(0xc8e8f0);
-  const windowGeo = new THREE.PlaneGeometry(0.5, 0.6);
-  const windowCount = Math.max(1, Math.floor(width / 1.2));
-  for (let i = 0; i < windowCount; i++) {
-    const win = new THREE.Mesh(windowGeo, windowMat);
-    win.position.set(-width / 2 + 0.6 + i * 1.2, height * 0.55, depth / 2 + 0.01);
-    group.add(win);
-
-    if (style === 'apartment' && i % 2 === 0) {
-      const upperWin = win.clone();
-      upperWin.position.y = height * 0.78;
-      group.add(upperWin);
+    // Rooftop water tank (on taller buildings)
+    if (height > 3.2 && style !== 'shop') {
+      const tank = createOutlinedMesh(
+        new THREE.CylinderGeometry(0.22, 0.24, 0.5, 7),
+        createToonMaterial(0x8a8a8a),
+      );
+      tank.position.set(width * 0.3, height + 0.45, 0);
+      group.add(tank);
+      const tankRoof = createOutlinedMesh(
+        new THREE.ConeGeometry(0.28, 0.2, 7),
+        createToonMaterial(0x6a6a6a),
+      );
+      tankRoof.position.set(width * 0.3, height + 0.8, 0);
+      group.add(tankRoof);
     }
   }
 
@@ -1168,10 +1330,15 @@ export class Town {
       }
 
       placeAlongPath(prop, this.path, t, side, offset);
-      this.scene.add(prop);
+
+      // Vending machines should face the road, not run parallel to it
       if (type === 'vending') {
+        const roadCenter = this.path.getPointAt(t);
+        prop.lookAt(roadCenter.x, prop.position.y, roadCenter.z);
         this._recordSpawn('vending', prop.position, prop.rotation.y);
       }
+
+      this.scene.add(prop);
     });
 
     const polePositions = [0.12, 0.28, 0.44, 0.60, 0.76, 0.90].map((t) => this.path.getPointAt(t));

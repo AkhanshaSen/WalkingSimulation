@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { Town } from './town.js';
 import { Player, NPC, InputManager } from './character.js';
@@ -82,17 +83,18 @@ export class Game {
     this.cameraTarget = new THREE.Vector3();
     this.isMusicPlaying = false;
 
-    // Post-processing
+    // Post-processing: FXAA anti-aliasing only — no bloom (bloom washes out labels)
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    const bloom = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.28,   // strength — subtle glow on lanterns/windows
-      0.5,    // radius
-      0.72,   // threshold
-    );
-    this.composer.addPass(bloom);
     this.composer.addPass(new OutputPass());
+    // FXAA must come after OutputPass so it reads the final sRGB buffer
+    this._fxaaPass = new ShaderPass(FXAAShader);
+    this._fxaaPass.material.uniforms.resolution.value.set(
+      1 / (window.innerWidth  * Math.min(window.devicePixelRatio, 2)),
+      1 / (window.innerHeight * Math.min(window.devicePixelRatio, 2)),
+    );
+    this.composer.addPass(this._fxaaPass);
 
     window.addEventListener('resize', () => this._onResize());
   }
@@ -330,10 +332,14 @@ export class Game {
   _onResize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
+    const dpr = Math.min(window.devicePixelRatio, 2);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     this.composer.setSize(w, h);
+    if (this._fxaaPass) {
+      this._fxaaPass.material.uniforms.resolution.value.set(1 / (w * dpr), 1 / (h * dpr));
+    }
   }
 
   _updateCamera() {
