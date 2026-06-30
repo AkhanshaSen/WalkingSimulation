@@ -203,7 +203,7 @@ export class Game {
         }
       }
     } else {
-      this.interaction?.update(this.input);
+      this.interaction?.update(this.input, this.camera, this.canvas);
     }
 
     this.player.update(this.input, dt, this.town.getGroundMeshes());

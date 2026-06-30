@@ -13,6 +13,9 @@ export class InputManager {
     this.justPressed = new Set();
     this.interactRequested = false;
     this.dialogueOpen = false;
+    this.tap = null;
+    this.pointerStart = null;
+    this.touchStart = null;
 
     window.addEventListener('keydown', (e) => {
       if (!this.keys[e.code]) this.justPressed.add(e.code);
@@ -28,8 +31,17 @@ export class InputManager {
     canvas.addEventListener('pointerdown', (e) => {
       this.isDragging = true;
       this.lastPointer = { x: e.clientX, y: e.clientY };
+      this.pointerStart = { x: e.clientX, y: e.clientY, id: e.pointerId };
     });
-    window.addEventListener('pointerup', () => {
+    window.addEventListener('pointerup', (e) => {
+      if (this.pointerStart?.id === e.pointerId) {
+        const dx = e.clientX - this.pointerStart.x;
+        const dy = e.clientY - this.pointerStart.y;
+        if (Math.hypot(dx, dy) < 12) {
+          this.tap = { x: e.clientX, y: e.clientY };
+        }
+        this.pointerStart = null;
+      }
       this.isDragging = false;
     });
     window.addEventListener('pointermove', (e) => {
@@ -54,6 +66,7 @@ export class InputManager {
     canvas.addEventListener('touchstart', (e) => {
       if (e.touches.length === 1) {
         const t = e.touches[0];
+        this.touchStart = { x: t.clientX, y: t.clientY };
         if (t.clientX < window.innerWidth * 0.4) {
           joystick.active = true;
           joystick.origin = { x: t.clientX, y: t.clientY };
@@ -82,7 +95,16 @@ export class InputManager {
       }
     }, { passive: true });
 
-    canvas.addEventListener('touchend', () => {
+    canvas.addEventListener('touchend', (e) => {
+      const t = e.changedTouches[0];
+      if (t && this.touchStart) {
+        const dx = t.clientX - this.touchStart.x;
+        const dy = t.clientY - this.touchStart.y;
+        if (Math.hypot(dx, dy) < 14) {
+          this.tap = { x: t.clientX, y: t.clientY };
+        }
+      }
+      this.touchStart = null;
       joystick.active = false;
       this.isDragging = false;
     });
@@ -137,6 +159,12 @@ export class InputManager {
       return true;
     }
     return false;
+  }
+
+  consumeTap() {
+    const tap = this.tap;
+    this.tap = null;
+    return tap;
   }
 
   endFrame() {
@@ -318,9 +346,23 @@ function createNameTag(name, nameJa) {
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
   const sprite = new THREE.Sprite(material);
   sprite.position.y = 1.85;
-  sprite.scale.set(1.4, 0.35, 1);
-  sprite.userData.isNameTag = true;
-  return sprite;
+  sprite.scale.set(1.5, 0.38, 1);
+
+  const hitMaterial = new THREE.SpriteMaterial({
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+  });
+  const hitArea = new THREE.Sprite(hitMaterial);
+  hitArea.position.y = 1.85;
+  hitArea.scale.set(2.2, 0.75, 1);
+  hitArea.userData.isNameTagHit = true;
+
+  const group = new THREE.Group();
+  group.add(sprite);
+  group.add(hitArea);
+  group.userData.isNameTag = true;
+  return group;
 }
 
 export function animateCharacter(character, speed, dt) {
@@ -524,6 +566,13 @@ export class NPC {
     setExpression(this.mesh, profile.defaultExpression);
     this._placeOnPath();
     this.homePos.copy(this.mesh.position);
+    this.nameTag = this.mesh.children.find((c) => c.userData?.isNameTag) ?? null;
+    if (this.nameTag) {
+      this.nameTag.userData.interactNpc = this;
+      this.nameTag.children.forEach((child) => {
+        child.userData.interactNpc = this;
+      });
+    }
   }
 
   _placeOnPath() {
