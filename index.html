@@ -39,8 +39,8 @@
         }, 12000);
       }
     </script>
-    <script type="module" crossorigin src="/WalkingSimulation/assets/index-CCJAmmGE.js"></script>
-    <link rel="stylesheet" crossorigin href="/WalkingSimulation/assets/index-Cvgj2Bx6.css">
+    <script type="module" crossorigin src="/WalkingSimulation/assets/index-CH3nUVTt.js"></script>
+    <link rel="stylesheet" crossorigin href="/WalkingSimulation/assets/index-DemX54Fc.css">
   </head>
   <body>
     <div id="loading">
@@ -63,12 +63,16 @@
           <span id="companion-label">Walking with...</span>
           <button id="companion-part" type="button" class="companion-part-btn" title="Part ways">Part ways</button>
         </div>
+        <div id="pet-companion-tag" class="hidden">
+          <span id="pet-companion-label">Pet following...</span>
+          <button id="pet-companion-part" type="button" class="companion-part-btn" title="Part ways">Part ways</button>
+        </div>
         <button id="menu-btn" class="hud-btn" aria-label="Menu">☰</button>
       </div>
 
       <div id="controls-hint">
         <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk ·
-        <kbd>Shift</kbd> run · <kbd>E</kbd> talk · tap NPC name on mobile
+        <kbd>Shift</kbd> run · <kbd>E</kbd> interact · tap names & animals on mobile
       </div>
 
       <div id="approach-modal" class="hidden">
@@ -87,6 +91,22 @@
       </div>
 
       <div id="reward-toast" class="hidden"></div>
+
+      <div id="pet-modal" class="hidden">
+        <div class="pet-card">
+          <div class="pet-portrait" id="pet-portrait">🐱</div>
+          <h3 id="pet-name">もち · Mochi</h3>
+          <p id="pet-personality" class="pet-role">cat · friendly</p>
+          <div id="pet-hearts" class="pet-hearts"></div>
+          <div class="pet-actions">
+            <button id="pet-action-pet" class="approach-btn chat">🤚 Pet</button>
+            <button id="pet-action-sit" class="approach-btn walk">🪑 Sit nearby</button>
+            <button id="pet-action-shoo" class="approach-btn ignore">👋 Shoo</button>
+            <button id="pet-action-invite" class="approach-btn part hidden">🐾 Invite to follow</button>
+            <button id="pet-action-leave" class="approach-btn ignore">✕ Leave</button>
+          </div>
+        </div>
+      </div>
 
       <div id="dialogue-box" class="hidden">
         <div class="dialogue-portrait" id="dialogue-portrait">📖</div>
@@ -123,6 +143,8 @@
           <li><kbd>W A S D</kbd> — Move</li>
           <li><kbd>Shift</kbd> — Run</li>
           <li>Walk near NPCs — Chat or Ignore popup</li>
+          <li><kbd>E</kbd> — Interact with benches, trees, animals</li>
+          <li>Build affinity with animals to befriend them</li>
           <li><kbd>1 2 3</kbd> — Pick dialogue options</li>
           <li><kbd>Esc</kbd> — Close dialogue</li>
           <li>Mouse drag — Rotate camera</li>
