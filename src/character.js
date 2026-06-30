@@ -217,24 +217,52 @@ export function createCharacter(options = {}) {
   group.add(backpack);
 
   const legGeo = new THREE.CylinderGeometry(0.07, 0.08, 0.35, 6);
+  const legGroups = [];
   [-0.12, 0.12].forEach((x) => {
+    const legGroup = new THREE.Group();
+    legGroup.position.set(x, 0.18, 0);
+
     const leg = createOutlinedMesh(legGeo, createToonMaterial(PALETTE.pants));
-    leg.position.set(x, 0.18, 0);
-    group.add(leg);
+    legGroup.add(leg);
 
     const shoe = createOutlinedMesh(
       new THREE.BoxGeometry(0.12, 0.06, 0.18),
       createToonMaterial(0xf0f0f0),
     );
-    shoe.position.set(x, 0.03, 0.03);
-    group.add(shoe);
+    shoe.position.set(0, -0.15, 0.03);
+    legGroup.add(shoe);
+
+    group.add(legGroup);
+    legGroups.push(legGroup);
+  });
+
+  // Arms
+  const armGeo = new THREE.CylinderGeometry(0.048, 0.052, 0.3, 6);
+  const armGroups = [];
+  [-0.28, 0.28].forEach((x) => {
+    const armGroup = new THREE.Group();
+    armGroup.position.set(x, 0.92, 0);
+    armGroup.rotation.z = x > 0 ? -0.18 : 0.18;
+
+    const arm = createOutlinedMesh(armGeo, createToonMaterial(shirtColor));
+    armGroup.add(arm);
+
+    const hand = createOutlinedMesh(
+      new THREE.SphereGeometry(0.052, 6, 4),
+      createToonMaterial(PALETTE.skin),
+    );
+    hand.position.y = -0.18;
+    armGroup.add(hand);
+
+    group.add(armGroup);
+    armGroups.push(armGroup);
   });
 
   group.userData.face = createFaceParts(group);
-  group.userData.legs = group.children.filter(
-    (c) => c.geometry?.type === 'CylinderGeometry' && c.position.y < 0.3,
-  );
+  group.userData.legs = legGroups;
+  group.userData.arms = armGroups;
   group.userData.walkPhase = 0;
+  group.userData.sitBlend = 0;
 
   if (options.nameTag) {
     group.add(createNameTag(options.nameTag, options.nameTagJa));
@@ -368,16 +396,56 @@ function createNameTag(name, nameJa) {
 }
 
 export function animateCharacter(character, speed, dt) {
+  const ud = character.userData;
+
+  // Sitting blend — lerp toward sit or stand
+  const sitTarget = ud.isSitting ? 1 : 0;
+  ud.sitBlend = THREE.MathUtils.lerp(ud.sitBlend ?? 0, sitTarget, 0.1);
+  _applySitBlend(character, ud.sitBlend);
+
+  if (ud.isSitting) return; // no walk while sitting
+
   if (speed < 0.1) {
-    character.userData.legs?.forEach((leg, i) => {
-      leg.rotation.x = THREE.MathUtils.lerp(leg.rotation.x, 0, 0.1);
+    ud.legs?.forEach((leg) => {
+      leg.rotation.x = THREE.MathUtils.lerp(leg.rotation.x, 0, 0.12);
+    });
+    ud.arms?.forEach((arm) => {
+      arm.rotation.x = THREE.MathUtils.lerp(arm.rotation.x, 0, 0.12);
     });
     return;
   }
 
-  character.userData.walkPhase += dt * speed * 8;
+  ud.walkPhase += dt * speed * 7.5;
+  const amp = Math.min(speed / 3, 1.5);
+  ud.legs?.forEach((leg, i) => {
+    leg.rotation.x = Math.sin(ud.walkPhase + i * Math.PI) * 0.42 * amp;
+  });
+  // Arms swing opposite to legs
+  ud.arms?.forEach((arm, i) => {
+    arm.rotation.x = Math.sin(ud.walkPhase + i * Math.PI + Math.PI) * 0.28 * amp;
+  });
+}
+
+function _applySitBlend(character, t) {
+  if (t < 0.001) return;
+  const children = character.children;
+
+  // Find torso (tallest cylinder above y 0.7)
+  const torso = children.find(
+    (c) => c.geometry?.type === 'CylinderGeometry' && c.position.y > 0.7,
+  );
+  if (torso) torso.position.y = THREE.MathUtils.lerp(0.85, 0.62, t);
+
+  // Leg groups — bend forward
   character.userData.legs?.forEach((leg, i) => {
-    leg.rotation.x = Math.sin(character.userData.walkPhase + i * Math.PI) * 0.4 * Math.min(speed / 3, 1.5);
+    const targetX = i === 0 ? -0.9 : 0.9;
+    leg.rotation.x = THREE.MathUtils.lerp(0, targetX, t);
+    leg.position.z = THREE.MathUtils.lerp(0, 0.18, t);
+  });
+
+  // Arms — rest on knees
+  character.userData.arms?.forEach((arm) => {
+    arm.rotation.x = THREE.MathUtils.lerp(0, 0.6, t);
   });
 }
 
@@ -420,9 +488,13 @@ export class Player {
       this.velocity.set(0, 0, 0);
       if (this.restTimer > 0) {
         this.restTimer -= dt;
+        this.mesh.userData.isSitting = true;
         if (this.restPos) {
           this.mesh.position.lerp(this.restPos, 0.08);
           this.mesh.position.y = 0.01;
+        }
+        if (this.restTimer <= 0) {
+          this.mesh.userData.isSitting = false;
         }
       }
     } else {

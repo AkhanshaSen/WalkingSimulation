@@ -5,17 +5,16 @@ let toonGradient = null;
 function getToonGradient() {
   if (toonGradient) return toonGradient;
 
+  // 4-step cel-shade: deep shadow → shadow → lit → bright highlight
+  const pixels = ['#111', '#111', '#555', '#555', '#bbb', '#bbb', '#e8e8e8', '#ffffff'];
   const gradientCanvas = document.createElement('canvas');
-  gradientCanvas.width = 4;
+  gradientCanvas.width = pixels.length;
   gradientCanvas.height = 1;
   const ctx = gradientCanvas.getContext('2d');
-  const grad = ctx.createLinearGradient(0, 0, 4, 0);
-  grad.addColorStop(0, '#444');
-  grad.addColorStop(0.45, '#888');
-  grad.addColorStop(0.55, '#ccc');
-  grad.addColorStop(1, '#fff');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 4, 1);
+  pixels.forEach((color, i) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(i, 0, 1, 1);
+  });
   toonGradient = new THREE.CanvasTexture(gradientCanvas);
   toonGradient.minFilter = THREE.NearestFilter;
   toonGradient.magFilter = THREE.NearestFilter;

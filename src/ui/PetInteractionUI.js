@@ -77,13 +77,16 @@ export class PetInteractionUI {
   _action(action) {
     if (!this.animal) return;
     const result = this.onAction?.(this.animal, action);
-    if (result?.message) {
-      // toast handled by callback
+
+    if (action === 'pet') {
+      this.animal.spawnHearts?.(5, '#ff4488');
+    } else if (action === 'sit') {
+      this.animal.spawnHearts?.(2, '#ffcc00');
+    } else if (action === 'shoo') {
+      setTimeout(() => this.hide(), 500);
     }
+
     this._render();
-    if (action === 'shoo') {
-      setTimeout(() => this.hide(), 600);
-    }
   }
 
   _invite() {

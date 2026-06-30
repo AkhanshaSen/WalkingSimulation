@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { Town } from './town.js';
 import { Player, NPC, InputManager } from './character.js';
 import { NPC_PROFILES } from './npcData.js';
@@ -62,6 +66,8 @@ export class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.08;
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xa8d8d8);
@@ -75,6 +81,18 @@ export class Game {
     this.input = new InputManager(canvas);
     this.cameraTarget = new THREE.Vector3();
     this.isMusicPlaying = false;
+
+    // Post-processing
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    const bloom = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.28,   // strength — subtle glow on lanterns/windows
+      0.5,    // radius
+      0.72,   // threshold
+    );
+    this.composer.addPass(bloom);
+    this.composer.addPass(new OutputPass());
 
     window.addEventListener('resize', () => this._onResize());
   }
@@ -218,21 +236,44 @@ export class Game {
 
   setCompanion(npc) {
     if (this.companion && this.companion !== npc) {
+      this._removeCompanionRing(this.companion);
       this.companion.stopFollowing(true);
     }
     this.companion = npc;
     npc.startFollowing();
+    this._addCompanionRing(npc);
     this.dialogue.setCompanionTag(npc);
     this.minimap?.setCompanion(npc);
   }
 
   clearCompanion() {
     if (this.companion) {
+      this._removeCompanionRing(this.companion);
       this.companion.stopFollowing(true);
       this.companion = null;
       this.dialogue.setCompanionTag(null);
       this.minimap?.setCompanion(null);
     }
+  }
+
+  _addCompanionRing(npc) {
+    if (npc.mesh.userData.companionRing) {
+      npc.mesh.userData.companionRing.visible = true;
+      return;
+    }
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.52, 0.045, 6, 24),
+      new THREE.MeshBasicMaterial({ color: 0x60e8d8, transparent: true, opacity: 0.82 }),
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.06;
+    npc.mesh.add(ring);
+    npc.mesh.userData.companionRing = ring;
+  }
+
+  _removeCompanionRing(npc) {
+    const ring = npc.mesh?.userData?.companionRing;
+    if (ring) ring.visible = false;
   }
 
   setPetCompanion(animal) {
@@ -292,6 +333,7 @@ export class Game {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    this.composer.setSize(w, h);
   }
 
   _updateCamera() {
@@ -348,6 +390,13 @@ export class Game {
 
     this.player.update(this.input, dt, this.town.getGroundMeshes());
     this.npcs.forEach((npc) => npc.update(dt, this.player.position, this.player.facing));
+
+    // Pulse companion ring
+    if (this.companion?.mesh?.userData?.companionRing) {
+      const ring = this.companion.mesh.userData.companionRing;
+      ring.material.opacity = 0.5 + Math.sin(this.clock.elapsedTime * 3) * 0.3;
+      ring.rotation.z += dt * 0.8;
+    }
     this.animals?.forEach((a) => a.update(dt, this.player.position, this.player.facing));
     this._updateLocationTag();
     this.minimap?.update();
@@ -357,7 +406,7 @@ export class Game {
   }
 
   render() {
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
   }
 
   start() {

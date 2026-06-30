@@ -3,6 +3,27 @@ import { FRIEND_THRESHOLD } from '../data/animalData.js';
 import { createAnimalMesh, createNameLabel } from './animalMeshes.js';
 import { followPlayer } from './FollowerBehavior.js';
 
+let heartTexture = null;
+function getHeartTexture() {
+  if (heartTexture) return heartTexture;
+  const c = document.createElement('canvas');
+  c.width = 32; c.height = 32;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#ff4488';
+  // Simple heart via two circles + triangle
+  ctx.beginPath();
+  ctx.arc(10, 11, 8, 0, Math.PI * 2);
+  ctx.arc(22, 11, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(2, 15);
+  ctx.lineTo(16, 29);
+  ctx.lineTo(30, 15);
+  ctx.fill();
+  heartTexture = new THREE.CanvasTexture(c);
+  return heartTexture;
+}
+
 export class Animal {
   constructor(scene, path, definition) {
     this.type = 'animal';
@@ -29,10 +50,32 @@ export class Animal {
     this.homePos = this.mesh.position.clone();
     this.homeFacing = this.mesh.rotation.y;
 
+    this.heartParticles = [];
+
     this.mesh.userData.interactable = this;
     this.mesh.traverse((child) => {
       child.userData.interactable = this;
     });
+  }
+
+  spawnHearts(count = 4, color = '#ff4488') {
+    const tex = getHeartTexture();
+    for (let i = 0; i < count; i++) {
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 1, color });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(0.18, 0.18, 1);
+      // Position in local space of the (scaled 3.5×) mesh group
+      sprite.position.set(
+        (Math.random() - 0.5) * 0.25,
+        0.35 + Math.random() * 0.1,
+        (Math.random() - 0.5) * 0.2,
+      );
+      sprite.userData.vy = 0.012 + Math.random() * 0.01;
+      sprite.userData.vx = (Math.random() - 0.5) * 0.006;
+      sprite.userData.life = 1.0;
+      this.mesh.add(sprite);
+      this.heartParticles.push(sprite);
+    }
   }
 
   _placeOnPath() {
@@ -120,6 +163,20 @@ export class Animal {
   }
 
   update(dt, playerPos = null, playerFacing = 0) {
+    // Animate heart particles
+    for (let i = this.heartParticles.length - 1; i >= 0; i--) {
+      const h = this.heartParticles[i];
+      h.userData.life -= dt;
+      h.position.y += h.userData.vy;
+      h.position.x += h.userData.vx;
+      h.material.opacity = Math.max(0, h.userData.life);
+      h.scale.setScalar(0.18 * (0.5 + h.userData.life * 0.7));
+      if (h.userData.life <= 0) {
+        this.mesh.remove(h);
+        this.heartParticles.splice(i, 1);
+      }
+    }
+
     if (this.scaredTimer > 0) {
       this.scaredTimer -= dt;
       this.idlePhase += dt * 8;
