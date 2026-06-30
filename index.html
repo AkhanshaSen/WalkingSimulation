@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Exploring Town — 街を歩く</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      if (location.protocol === 'file:') {
+        document.addEventListener('DOMContentLoaded', function () {
+          var sub = document.querySelector('.loading-sub');
+          var bar = document.querySelector('.loading-bar');
+          if (sub) {
+            sub.innerHTML =
+              'This game must run through a local server.<br><br>' +
+              '1. Open Terminal in the project folder<br>' +
+              '2. Run: <b>npm run dev</b><br>' +
+              '3. Open: <b>http://localhost:5173</b>';
+          }
+          if (bar) bar.style.display = 'none';
+        });
+      } else {
+        setTimeout(function () {
+          if (!window.__gameBooted) {
+            var sub = document.querySelector('.loading-sub');
+            var bar = document.querySelector('.loading-bar');
+            if (sub && !window.__gameBooted) {
+              sub.innerHTML =
+                'Game failed to start. Press F12 and check the Console for errors.<br><br>' +
+                'Make sure you ran <b>npm run dev</b> and opened the localhost URL.';
+            }
+            if (bar) bar.style.display = 'none';
+          }
+        }, 12000);
+      }
+    </script>
+    <script type="module" crossorigin src="/WalkingSimulation/assets/index-CKzTrEwu.js"></script>
+    <link rel="stylesheet" crossorigin href="/WalkingSimulation/assets/index-Cvgj2Bx6.css">
+  </head>
+  <body>
+    <div id="loading">
+      <div class="loading-inner">
+        <p class="loading-title">街を歩く</p>
+        <p class="loading-sub">Loading town…</p>
+        <div class="loading-bar"><div class="loading-fill"></div></div>
+      </div>
+    </div>
+
+    <div id="hud">
+      <div id="top-bar">
+        <div id="top-left-hud">
+          <div id="minimap-wrap">
+            <canvas id="minimap" width="128" height="128" aria-label="Town minimap"></canvas>
+          </div>
+          <div id="location-tag">静かな町 · Sakura Street</div>
+        </div>
+        <div id="companion-tag" class="hidden">
+          <span id="companion-label">Walking with...</span>
+          <button id="companion-part" type="button" class="companion-part-btn" title="Part ways">Part ways</button>
+        </div>
+        <button id="menu-btn" class="hud-btn" aria-label="Menu">☰</button>
+      </div>
+
+      <div id="controls-hint">
+        <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk ·
+        <kbd>Shift</kbd> run · <kbd>E</kbd> talk · companion: <kbd>Part ways</kbd> in HUD
+      </div>
+
+      <div id="approach-modal" class="hidden">
+        <div class="approach-card">
+          <div class="approach-portrait" id="approach-portrait">📖</div>
+          <h3 id="approach-name">田中 雪 · Yuki Tanaka</h3>
+          <p id="approach-personality" class="approach-role">Shy bookworm</p>
+          <p id="approach-tagline" class="approach-tagline">Someone wants to talk...</p>
+          <div class="approach-actions">
+            <button id="approach-chat" class="approach-btn chat">💬 Chat</button>
+            <button id="approach-walk" class="approach-btn walk">🚶 Walk together</button>
+            <button id="approach-part" class="approach-btn part hidden">👋 Part ways</button>
+            <button id="approach-ignore" class="approach-btn ignore">✕ Ignore</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="reward-toast" class="hidden"></div>
+
+      <div id="dialogue-box" class="hidden">
+        <div class="dialogue-portrait" id="dialogue-portrait">📖</div>
+        <div class="dialogue-content">
+          <div class="dialogue-header">
+            <div>
+              <div id="dialogue-name">田中 雪 · Yuki Tanaka</div>
+              <div id="dialogue-personality">📖 Shy bookworm</div>
+            </div>
+            <span id="dialogue-expression" class="dialogue-expression">😳</span>
+          </div>
+          <p id="dialogue-text">...</p>
+          <div id="dialogue-choices" class="dialogue-choices hidden"></div>
+          <button id="dialogue-next" class="dialogue-next">▶ Continue</button>
+        </div>
+      </div>
+
+      <div id="journal-panel" class="hidden">
+        <h2>📓 Journal</h2>
+        <ul id="journal-list"></ul>
+        <button id="close-journal" class="panel-btn">Close</button>
+      </div>
+
+      <div id="bottom-right">
+        <button id="journal-btn" class="hud-btn" aria-label="Journal">📓</button>
+        <button id="music-btn" class="hud-btn" aria-label="Toggle music">♪</button>
+        <button id="custom-btn" class="hud-btn" aria-label="Customize">👕</button>
+      </div>
+
+      <div id="menu-panel" class="hidden">
+        <h2>Menu</h2>
+        <p>Explore the winding streets of a small Japanese town.</p>
+        <ul>
+          <li><kbd>W A S D</kbd> — Move</li>
+          <li><kbd>Shift</kbd> — Run</li>
+          <li>Walk near NPCs — Chat or Ignore popup</li>
+          <li><kbd>1 2 3</kbd> — Pick dialogue options</li>
+          <li><kbd>Esc</kbd> — Close dialogue</li>
+          <li>Mouse drag — Rotate camera</li>
+        </ul>
+        <button id="close-menu" class="panel-btn">Close</button>
+      </div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+  </body>
+</html>
