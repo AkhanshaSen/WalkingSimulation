@@ -39,8 +39,8 @@
         }, 12000);
       }
     </script>
-    <script type="module" crossorigin src="/WalkingSimulation/assets/index-8HTuX4sj.js"></script>
-    <link rel="stylesheet" crossorigin href="/WalkingSimulation/assets/index-DUdHdhz1.css">
+    <script type="module" crossorigin src="/WalkingSimulation/assets/index-COhdgzY_.js"></script>
+    <link rel="stylesheet" crossorigin href="/WalkingSimulation/assets/index-BHLP_Xr8.css">
   </head>
   <body>
     <div id="loading">
@@ -55,9 +55,13 @@
 
       <!-- ── Top-left: minimap + status info ─────────────────────────── -->
       <div id="minimap-panel">
-        <div id="minimap-compass">N</div>
+        <div id="minimap-header">
+          <span id="minimap-title">Map</span>
+          <span id="minimap-compass">N</span>
+        </div>
         <div id="minimap-wrap">
           <canvas id="minimap" width="180" height="180" aria-label="Town minimap"></canvas>
+          <p id="minimap-fallback" class="hidden" aria-live="polite">Map unavailable</p>
         </div>
         <div id="minimap-legend" aria-label="Minimap legend">
           <span class="legend-item" data-type="player"><i></i>You</span>
