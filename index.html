@@ -55,8 +55,9 @@
           <div id="minimap-wrap">
             <canvas id="minimap" width="128" height="128" aria-label="Town minimap"></canvas>
           </div>
-          <div id="location-tag">静かな町 · Sakura Street</div>
-        </div>
+        <div id="location-tag">静かな町 · Sakura Street</div>
+        <div id="yen-display">💴 ¥1000</div>
+      </div>
         <div id="companion-tag" class="hidden">
           <span id="companion-label">Walking with...</span>
           <button id="companion-part" type="button" class="companion-part-btn" title="Part ways">Part ways</button>
@@ -67,6 +68,10 @@
         </div>
         <button id="menu-btn" class="hud-btn" aria-label="Menu">☰</button>
       </div>
+
+      <button id="interact-hint" class="hidden" type="button">
+        Interact? with …
+      </button>
 
       <div id="controls-hint">
         <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk ·
@@ -119,6 +124,20 @@
           <p id="dialogue-text">...</p>
           <div id="dialogue-choices" class="dialogue-choices hidden"></div>
           <button id="dialogue-next" class="dialogue-next">▶ Continue</button>
+        </div>
+      </div>
+
+      <div id="shop-modal" class="hidden">
+        <div class="shop-card">
+          <div class="shop-header">
+            <div id="shop-portrait" class="shop-portrait">📚</div>
+            <div class="shop-header-info">
+              <h3 id="shop-name">Shop</h3>
+              <div id="shop-yen" class="shop-yen-badge">💴 ¥1000</div>
+            </div>
+            <button id="shop-close" class="shop-close-btn" type="button">✕</button>
+          </div>
+          <div id="shop-items" class="shop-items"></div>
         </div>
       </div>
 

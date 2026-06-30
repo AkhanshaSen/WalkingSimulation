@@ -1,17 +1,21 @@
 import { RaycastPicker } from './RaycastPicker.js';
 
 export class InteractionSystem {
-  constructor(player, registry, dialogue, game, petUI) {
+  constructor(player, registry, dialogue, game, petUI, shopUI) {
     this.player = player;
     this.registry = registry;
     this.dialogue = dialogue;
     this.game = game;
     this.petUI = petUI;
+    this.shopUI = shopUI;
     this.picker = new RaycastPicker();
     this.approachRange = 9;
     this.spotRange = 20;
-    this.wasInRange = false;
-    this.initiatedNpc = null;
+
+    // Wire hint-button click back to this system
+    dialogue.onHintClick = () => {
+      if (dialogue.hintItem) this._interactWithItem(dialogue.hintItem);
+    };
   }
 
   setRewardHandler(handler) {
@@ -19,7 +23,7 @@ export class InteractionSystem {
   }
 
   isBlocking() {
-    return this.dialogue.isBlocking() || this.petUI?.isOpen();
+    return this.dialogue.isBlocking() || this.petUI?.isOpen() || this.shopUI?.isOpen();
   }
 
   _interactWithNpc(npc) {
@@ -50,20 +54,17 @@ export class InteractionSystem {
       game: this.game,
       dialogue: this.dialogue,
       petUI: this.petUI,
+      shopUI: this.shopUI,
       player: this.player,
     });
     return true;
   }
 
-  _resolveTarget(preferred = null) {
-    if (preferred) return preferred;
-    return this.registry.findNearest(this.player.position, this.approachRange + 2, {
-      includeIgnored: true,
-    });
-  }
-
   update(input, camera, canvas) {
-    if (this.isBlocking()) return;
+    if (this.isBlocking()) {
+      this.dialogue.hideInteractHint();
+      return;
+    }
 
     const npcs = this.registry.getNpcs();
     const companion = this.game.companion;
@@ -86,19 +87,9 @@ export class InteractionSystem {
       ) {
         npc.startApproaching();
       }
-
-      if (
-        npc.state === 'approaching' &&
-        dist < this.approachRange &&
-        !npc.isIgnored()
-      ) {
-        if (!this.dialogue.approachOpen && this.initiatedNpc !== npc) {
-          this.dialogue.showApproach(npc, { initiated: true });
-          this.initiatedNpc = npc;
-        }
-      }
     }
 
+    // Closest NPC drives approach modal visibility
     const closestNpc = this.registry.findNearest(this.player.position, this.approachRange, {
       types: ['npc'],
     });
@@ -106,8 +97,14 @@ export class InteractionSystem {
 
     if (this.dialogue.approachOpen && !inRange && !this.dialogue.approachInitiated) {
       this.dialogue.hideApproach();
-    } else if (inRange && !this.wasInRange && !this.dialogue.approachOpen) {
-      this.dialogue.showApproach(closestNpc, { initiated: false });
+    }
+
+    // Closest interactable (any type) drives the hint pill
+    const hintTarget = this.registry.findNearest(this.player.position, this.approachRange, {});
+    if (hintTarget) {
+      this.dialogue.showInteractHint(hintTarget);
+    } else {
+      this.dialogue.hideInteractHint();
     }
 
     const tap = input.consumeTap();
@@ -119,7 +116,6 @@ export class InteractionSystem {
     }
 
     if (input.consumeKey('KeyE')) {
-      const hitTargets = this.registry.getHitTargets();
       let tapped = null;
       if (companion) {
         tapped = companion;
@@ -135,8 +131,5 @@ export class InteractionSystem {
         this.dialogue._showToast('Nothing nearby to interact with.');
       }
     }
-
-    if (!inRange) this.initiatedNpc = null;
-    this.wasInRange = inRange;
   }
 }

@@ -960,6 +960,7 @@ export class Town {
     const shrine = createShrine();
     placeAlongPath(shrine, this.path, 0.64, 1, 7.5);
     this.scene.add(shrine);
+    this._recordSpawn('shrine', shrine.position, shrine.rotation.y);
 
     const steps = createStoneSteps(5);
     placeAlongPath(steps, this.path, 0.62, 1, 5.5);
@@ -996,26 +997,32 @@ export class Town {
     const bookshop = createNamedShop(3, 3.2, 3.4, 0xf0e8f8, 0x6a5040, 'shop', '書店 文房', 'Bunbou Books', 0x8060a0);
     placeAlongPath(bookshop, this.path, 0.08, -1, 5.5);
     this.scene.add(bookshop);
+    this._recordSpawn('shop_bookshop', bookshop.position, bookshop.rotation.y);
 
     const ramen = createNamedShop(3.5, 3, 3.2, 0xf0e0c8, 0xc04040, 'shop', '麺処 山田', 'Yamada Ramen', 0xc04040);
     placeAlongPath(ramen, this.path, 0.22, 1, 5.8);
     this.scene.add(ramen);
+    this._recordSpawn('shop_ramen', ramen.position, ramen.rotation.y);
 
     const florist = createNamedShop(3, 3, 3.0, 0xf0f0d8, 0xe08090, 'shop', '花屋 はな', 'Hana Florist', 0xe08090);
     placeAlongPath(florist, this.path, 0.50, -1, 5.5);
     this.scene.add(florist);
+    this._recordSpawn('shop_florist', florist.position, florist.rotation.y);
 
     const cafe = createCafePatio();
     placeAlongPath(cafe, this.path, 0.46, 1, 6.5);
     this.scene.add(cafe);
+    this._recordSpawn('shop_cafe', cafe.position, cafe.rotation.y);
 
     const market = createMarketStalls();
     placeAlongPath(market, this.path, 0.54, -1, 7);
     this.scene.add(market);
+    this._recordSpawn('shop_market', market.position, market.rotation.y);
 
     const fishMarket = createFishMarket();
     placeAlongPath(fishMarket, this.path, 0.95, -1, 6);
     this.scene.add(fishMarket);
+    this._recordSpawn('shop_fishmarket', fishMarket.position, fishMarket.rotation.y);
   }
 
   _createProps() {
@@ -1073,6 +1080,9 @@ export class Town {
 
       placeAlongPath(prop, this.path, t, side, offset);
       this.scene.add(prop);
+      if (type === 'vending') {
+        this._recordSpawn('vending', prop.position, prop.rotation.y);
+      }
     });
 
     const polePositions = [0.12, 0.28, 0.44, 0.60, 0.76, 0.90].map((t) => this.path.getPointAt(t));

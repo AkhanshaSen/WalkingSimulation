@@ -17,7 +17,10 @@ export class Animal {
     this.range = 5;
 
     this.mesh = createAnimalMesh(definition.species);
+    this.mesh.scale.setScalar(3.5);
     const label = createNameLabel(definition.emoji, definition.name);
+    // Compensate scale so the label renders at its intended world size
+    label.scale.divideScalar(3.5);
     this.mesh.add(label);
     this.nameLabel = label;
 

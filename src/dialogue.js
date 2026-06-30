@@ -27,8 +27,11 @@ export class DialogueManager {
     this.journalList = elements.journalList;
     this.journalBtn = elements.journalBtn;
     this.closeJournalBtn = elements.closeJournalBtn;
+    this.interactHint = elements.interactHint;
 
     this.active = false;
+    this.hintItem = null;
+    this.onHintClick = null;
     this.approachOpen = false;
     this.approachInitiated = false;
     this.npc = null;
@@ -45,6 +48,9 @@ export class DialogueManager {
     this.companionPartBtn?.addEventListener('click', () => this._onCompanionPartClicked());
     this.journalBtn?.addEventListener('click', () => this.journalPanel?.classList.remove('hidden'));
     this.closeJournalBtn?.addEventListener('click', () => this.journalPanel?.classList.add('hidden'));
+    this.interactHint?.addEventListener('click', () => {
+      this.onHintClick?.();
+    });
   }
 
   setRewardHandler(handler) {
@@ -61,6 +67,44 @@ export class DialogueManager {
 
   isBlocking() {
     return this.active || this.approachOpen;
+  }
+
+  showInteractHint(item) {
+    if (!this.interactHint || !item || this.isBlocking()) {
+      this.hideInteractHint();
+      return;
+    }
+    this.hintItem = item;
+
+    let label = '<kbd>E</kbd> Interact';
+    if (item.type === 'npc') {
+      const name = item.profile?.nameJa || item.profile?.name || 'Someone';
+      label = `<kbd>E</kbd> Interact? with ${name}`;
+    } else if (item.type === 'animal') {
+      const d = item.definition;
+      label = `<kbd>E</kbd> ${d.emoji} Meet ${d.nameJa || d.name}`;
+    } else if (item.type === 'prop') {
+      const def = item.definition;
+      if (def.shopId) {
+        label = `<kbd>E</kbd> 🏪 ${def.label}`;
+      } else if (def.id === 'shrine') {
+        label = `<kbd>E</kbd> ⛩️ Pray at Shrine`;
+      } else if (def.id === 'bench') {
+        label = `<kbd>E</kbd> 🪑 Rest on Bench`;
+      } else if (def.id === 'cherry_tree') {
+        label = `<kbd>E</kbd> 🌸 Admire Cherry Tree`;
+      } else if (def.id === 'shrine_tree') {
+        label = `<kbd>E</kbd> 🌿 Listen to the Wind`;
+      }
+    }
+
+    this.interactHint.innerHTML = label;
+    this.interactHint.classList.remove('hidden');
+  }
+
+  hideInteractHint() {
+    this.hintItem = null;
+    this.interactHint?.classList.add('hidden');
   }
 
   setCompanionTag(npc) {
@@ -80,6 +124,8 @@ export class DialogueManager {
   showApproach(npc, options = {}) {
     if (this.isBlocking() || !npc) return;
 
+    this.hintItem = null;
+    this.interactHint?.classList.add('hidden');
     this.approachOpen = true;
     this.approachInitiated = options.initiated ?? false;
     this.npc = npc;

@@ -2,6 +2,8 @@ import './styles.css';
 import { Game } from './game.js';
 import { DialogueManager } from './dialogue.js';
 import { PetInteractionUI } from './ui/PetInteractionUI.js';
+import { ShopUI } from './ui/ShopUI.js';
+import { SHOP_CATALOG } from './data/shopData.js';
 
 const canvas = document.getElementById('game-canvas');
 const loading = document.getElementById('loading');
@@ -88,6 +90,7 @@ function setupUI(game) {
     journalList: document.getElementById('journal-list'),
     journalBtn: document.getElementById('journal-btn'),
     closeJournalBtn: document.getElementById('close-journal'),
+    interactHint: document.getElementById('interact-hint'),
   });
   dialogue._updateJournalUI();
 
@@ -104,7 +107,19 @@ function setupUI(game) {
     inviteBtn: document.getElementById('pet-action-invite'),
   });
 
-  game.initInteraction(dialogue, petUI);
+  const shopUI = new ShopUI(
+    {
+      modal:    document.getElementById('shop-modal'),
+      portrait: document.getElementById('shop-portrait'),
+      name:     document.getElementById('shop-name'),
+      yen:      document.getElementById('shop-yen'),
+      items:    document.getElementById('shop-items'),
+      closeBtn: document.getElementById('shop-close'),
+    },
+    SHOP_CATALOG,
+  );
+
+  game.initInteraction(dialogue, petUI, shopUI);
 
   menuBtn.addEventListener('click', () => menuPanel.classList.remove('hidden'));
   closeMenu.addEventListener('click', () => menuPanel.classList.add('hidden'));
@@ -128,7 +143,9 @@ function setupUI(game) {
 
   document.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') {
-      if (game.petUI?.isOpen()) {
+      if (game.shopUI?.isOpen()) {
+        game.shopUI.close();
+      } else if (game.petUI?.isOpen()) {
         game.petUI.hide();
       } else if (game.dialogue?.isOpen()) {
         game.dialogue.close();

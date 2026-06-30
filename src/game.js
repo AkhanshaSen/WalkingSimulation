@@ -8,7 +8,14 @@ import { InteractionSystem } from './interaction/InteractionSystem.js';
 import { InteractableRegistry } from './interaction/InteractableRegistry.js';
 import { Minimap } from './minimap.js';
 import { Animal } from './entities/Animal.js';
-import { createBenchProp, createTreeProp } from './entities/WorldProp.js';
+import {
+  createBenchProp,
+  createTreeProp,
+  createShrineProp,
+  createShopProp,
+  createVendingProp,
+} from './entities/WorldProp.js';
+import { SHOP_CATALOG } from './data/shopData.js';
 import { ANIMAL_DEFINITIONS } from './data/animalData.js';
 
 function closestPointOnPath(path, point, samples = 100) {
@@ -103,10 +110,21 @@ export class Game {
 
       game.worldProps = [];
       for (const spawn of game.town.getInteractableSpawns()) {
-        if (spawn.propId === 'bench') {
-          game.worldProps.push(createBenchProp(game.scene, spawn.position, spawn.rotationY));
-        } else if (spawn.propId === 'cherry_tree' || spawn.propId === 'shrine_tree') {
-          game.worldProps.push(createTreeProp(game.scene, spawn.position, spawn.propId));
+        const { propId, position, rotationY } = spawn;
+        if (propId === 'bench') {
+          game.worldProps.push(createBenchProp(game.scene, position, rotationY));
+        } else if (propId === 'cherry_tree' || propId === 'shrine_tree') {
+          game.worldProps.push(createTreeProp(game.scene, position, propId));
+        } else if (propId === 'shrine') {
+          game.worldProps.push(createShrineProp(game.scene, position, rotationY));
+        } else if (propId === 'vending') {
+          game.worldProps.push(createVendingProp(game.scene, position, rotationY));
+        } else if (propId.startsWith('shop_')) {
+          const shopId = propId.slice(5);
+          const shopDef = SHOP_CATALOG[shopId];
+          if (shopDef) {
+            game.worldProps.push(createShopProp(game.scene, position, rotationY, shopId, shopDef.label));
+          }
         }
       }
 
@@ -120,23 +138,30 @@ export class Game {
     }
   }
 
-  initInteraction(dialogue, petUI) {
+  initInteraction(dialogue, petUI, shopUI) {
     this.dialogue = dialogue;
     this.petUI = petUI;
+    this.shopUI = shopUI;
     this.companion = null;
     this.petCompanion = null;
+    this.yen = 1000;
     this.locationTag = document.getElementById('location-tag');
     this.petTag = document.getElementById('pet-companion-tag');
     this.petLabel = document.getElementById('pet-companion-label');
     this.petPartBtn = document.getElementById('pet-companion-part');
 
     dialogue.setGame(this);
+    if (shopUI) {
+      shopUI.setGame(this);
+    }
+
     this.interaction = new InteractionSystem(
       this.player,
       this.interactables,
       dialogue,
       this,
       petUI,
+      shopUI,
     );
     this.interaction.setRewardHandler((reward) => this._handleReward(reward));
 
@@ -147,12 +172,33 @@ export class Game {
 
     this.petPartBtn?.addEventListener('click', () => this.clearPetCompanion());
 
+    this.yenEl = document.getElementById('yen-display');
+    this._updateYenHUD();
+
     const minimapCanvas = document.getElementById('minimap');
     if (minimapCanvas) {
       this.minimap = new Minimap(minimapCanvas, this.path);
       this.minimap.setPlayer(this.player);
       this.minimap.setNpcs(this.npcs);
     }
+  }
+
+  spendYen(amount) {
+    this.yen = Math.max(0, this.yen - amount);
+    this._updateYenHUD();
+  }
+
+  earnYen(amount) {
+    this.yen += amount;
+    this._updateYenHUD();
+  }
+
+  _updateYenHUD() {
+    if (this.yenEl) this.yenEl.textContent = `💴 ¥${this.yen}`;
+  }
+
+  openShop(shopId) {
+    if (this.shopUI && shopId) this.shopUI.open(shopId);
   }
 
   playerRest(duration, position) {
@@ -223,10 +269,13 @@ export class Game {
   _handleReward(reward) {
     if (reward.type === 'speedBoost') {
       this.player.applySpeedBoost(reward.amount, reward.duration);
+      if (reward.message) this.dialogue?.showToast(reward.message);
     } else if (reward.type === 'companion') {
       this.setCompanion(reward.npc);
     } else if (reward.type === 'dismissCompanion') {
       this.clearCompanion();
+    } else if (reward.type === 'journal') {
+      this.dialogue?.addJournalEntry?.(reward.title, reward.body, '購入 · Purchase');
     }
   }
 
@@ -270,7 +319,7 @@ export class Game {
     const dt = Math.min(this.clock.getDelta(), 0.05);
     this.input.update();
 
-    const blocking = this.interaction?.isBlocking() ?? this.dialogue?.isBlocking() ?? false;
+    const blocking = this.interaction?.isBlocking() ?? this.dialogue?.isBlocking() ?? this.shopUI?.isOpen() ?? false;
     this.input.dialogueOpen = blocking;
 
     if (blocking) {

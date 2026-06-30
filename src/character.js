@@ -705,7 +705,7 @@ export class NPC {
       this.facePoint(playerPos);
     }
     if (!this.isTalking && !this.isCompanion && this.state !== 'approaching') {
-      this.alertBubble.visible = nearby;
+      this.alertBubble.visible = false;
     }
   }
 

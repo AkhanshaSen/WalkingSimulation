@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createToonMaterial } from '../materials.js';
-import { PROP_DEFINITIONS } from '../data/propData.js';
+import { PROP_DEFINITIONS, drawFortune } from '../data/propData.js';
 
 function createHitVolume(radius = 1.2, height = 2) {
   const mesh = new THREE.Mesh(
@@ -41,12 +41,33 @@ export class WorldProp {
   }
 
   interact(context) {
-    const action = this.definition.defaultAction ?? 'interact';
-    const actionDef = this.definition.actions?.[action];
+    const def = this.definition;
+
+    // Shop prop — open shop UI
+    if (def.shopId) {
+      context.game?.openShop(def.shopId);
+      return;
+    }
+
+    // Shrine prop — draw a fortune
+    if (def.id === 'shrine') {
+      const fortune = drawFortune();
+      context.dialogue?._showToast(`⛩️ ${fortune}`);
+      context.dialogue?.addJournalEntry?.(
+        '御神籤 · Fortune',
+        fortune,
+        '神社 · Shrine',
+      );
+      return;
+    }
+
+    // Default prop (bench, tree, etc.)
+    const action = def.defaultAction ?? 'interact';
+    const actionDef = def.actions?.[action];
     if (!actionDef) return;
 
     if (actionDef.sitDuration) {
-    context.game?.playerRest?.(actionDef.sitDuration, this.mesh.position);
+      context.game?.playerRest?.(actionDef.sitDuration, this.mesh.position);
     }
 
     context.dialogue?._showToast(actionDef.message);
@@ -55,18 +76,14 @@ export class WorldProp {
       context.dialogue?.addJournalEntry?.(
         actionDef.journal.title,
         actionDef.journal.body,
-        this.definition.label,
+        def.label,
       );
     }
   }
 }
 
 export function createBenchProp(scene, position, rotationY = 0) {
-  const def = {
-    ...PROP_DEFINITIONS.bench,
-    defaultAction: 'sit',
-    hitRadius: 1.4,
-  };
+  const def = { ...PROP_DEFINITIONS.bench, defaultAction: 'sit', hitRadius: 1.4 };
   return new WorldProp(scene, def, position, rotationY);
 }
 
@@ -77,6 +94,27 @@ export function createTreeProp(scene, position, treeType = 'cherry_tree') {
     hitRadius: 1.8,
   };
   return new WorldProp(scene, def, position, 0);
+}
+
+export function createShrineProp(scene, position, rotationY = 0) {
+  const def = { ...PROP_DEFINITIONS.shrine };
+  return new WorldProp(scene, def, position, rotationY);
+}
+
+export function createShopProp(scene, position, rotationY, shopId, label) {
+  const def = {
+    id: `shop_${shopId}`,
+    label,
+    shopId,
+    range: 7,
+    hitRadius: 2.5,
+  };
+  return new WorldProp(scene, def, position, rotationY);
+}
+
+export function createVendingProp(scene, position, rotationY = 0) {
+  const def = { ...PROP_DEFINITIONS.vending };
+  return new WorldProp(scene, def, position, rotationY);
 }
 
 export function createPropHitMarker(scene, position) {

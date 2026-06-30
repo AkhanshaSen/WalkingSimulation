@@ -175,6 +175,19 @@ body {
   background: rgba(255, 255, 255, 0.28);
 }
 
+#yen-display {
+  background: rgba(255, 240, 200, 0.92);
+  border: 1.5px solid #c8a040;
+  padding: 0.3rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: #5a3a00;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-top: 0.3rem;
+}
+
 #location-tag {
   background: rgba(255, 255, 255, 0.85);
   padding: 0.4rem 0.9rem;
@@ -205,6 +218,50 @@ body {
 
 .hud-btn:active {
   transform: scale(0.95);
+}
+
+#interact-hint {
+  pointer-events: auto;
+  position: absolute;
+  bottom: 3.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.94);
+  color: #2a4a4a;
+  border: 2px solid #3a8a8a;
+  padding: 0.55rem 1.1rem;
+  border-radius: 24px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+  transition: transform 0.15s, background 0.15s;
+}
+
+#interact-hint:hover {
+  background: #fff;
+  transform: translateX(-50%) scale(1.03);
+}
+
+#interact-hint:active {
+  transform: translateX(-50%) scale(0.97);
+}
+
+#interact-hint.hidden {
+  display: none;
+}
+
+#interact-hint kbd {
+  display: inline-block;
+  background: rgba(58, 138, 138, 0.15);
+  color: #2a6a6a;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 0.7rem;
+  margin-right: 0.35rem;
 }
 
 #controls-hint {
@@ -318,6 +375,175 @@ body {
 #approach-modal.hidden {
   display: none;
 }
+
+/* ─── Shop Modal ─────────────────────────────────────────── */
+
+#shop-modal {
+  pointer-events: auto;
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 40, 40, 0.52);
+  backdrop-filter: blur(5px);
+}
+
+#shop-modal.hidden {
+  display: none;
+}
+
+.shop-card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 1.5rem 1.75rem 1.75rem;
+  max-width: 440px;
+  width: 94%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 14px 55px rgba(0, 0, 0, 0.22);
+  animation: approach-pop 0.28s ease;
+}
+
+.shop-header {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+.shop-portrait {
+  font-size: 2.2rem;
+  background: linear-gradient(135deg, #e8f8f0, #d0f0e0);
+  width: 56px;
+  height: 56px;
+  line-height: 56px;
+  border-radius: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.shop-header-info {
+  flex: 1;
+}
+
+.shop-header-info h3 {
+  font-size: 0.95rem;
+  color: #2a4a3a;
+  margin: 0 0 0.25rem;
+}
+
+.shop-yen-badge {
+  display: inline-block;
+  background: rgba(255, 240, 200, 0.95);
+  border: 1.5px solid #c8a040;
+  color: #5a3a00;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 20px;
+}
+
+.shop-close-btn {
+  background: rgba(0, 0, 0, 0.06);
+  border: none;
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #555;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.shop-close-btn:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.shop-items {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.shop-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  background: #f8f8f6;
+  border-radius: 10px;
+  border: 1.5px solid #e8e8e0;
+}
+
+.shop-item-left {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex: 1;
+}
+
+.shop-item-emoji {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.shop-item-info {
+  flex: 1;
+}
+
+.shop-item-name {
+  font-size: 0.87rem;
+  font-weight: 700;
+  color: #2a4a3a;
+}
+
+.shop-item-ja {
+  font-size: 0.75rem;
+  color: #6a8a7a;
+  margin-left: 0.3rem;
+}
+
+.shop-item-desc {
+  font-size: 0.74rem;
+  color: #778;
+  margin-top: 0.12rem;
+}
+
+.shop-buy-btn {
+  pointer-events: auto;
+  background: #2a8a6a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.shop-buy-btn:hover:not(.disabled) {
+  background: #228a5a;
+}
+
+.shop-buy-btn:active:not(.disabled) {
+  transform: scale(0.96);
+}
+
+.shop-buy-btn.disabled {
+  background: #ccc;
+  color: #888;
+  cursor: not-allowed;
+}
+
+/* ─── End Shop Modal ─────────────────────────────────────── */
 
 #pet-modal {
   pointer-events: auto;
