@@ -272,42 +272,79 @@ export function createCharacter(options = {}) {
 }
 
 function createFaceParts(group) {
-  const eyeMat = createToonMaterial(0x222222);
+  const whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const irisMat  = new THREE.MeshBasicMaterial({ color: 0x1a3a7a });
+  const pupilMat = new THREE.MeshBasicMaterial({ color: 0x111122 });
+  const hlMat    = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const mouthMat = createToonMaterial(0xd09090);
+  const noseMat  = new THREE.MeshBasicMaterial({ color: 0xd09878 });
 
-  const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.028, 6, 6), eyeMat);
-  leftEye.position.set(-0.065, 1.38, 0.19);
-  group.add(leftEye);
+  // White sclera
+  const leftSclera  = new THREE.Mesh(new THREE.CircleGeometry(0.032, 10), whiteMat);
+  const rightSclera = new THREE.Mesh(new THREE.CircleGeometry(0.032, 10), whiteMat);
+  leftSclera.position.set(-0.065, 1.38, 0.195);
+  rightSclera.position.set(0.065, 1.38, 0.195);
+  group.add(leftSclera, rightSclera);
 
-  const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.028, 6, 6), eyeMat);
-  rightEye.position.set(0.065, 1.38, 0.19);
-  group.add(rightEye);
+  // Iris
+  const leftIris  = new THREE.Mesh(new THREE.CircleGeometry(0.022, 10), irisMat);
+  const rightIris = new THREE.Mesh(new THREE.CircleGeometry(0.022, 10), irisMat);
+  leftIris.position.set(-0.065, 1.38, 0.196);
+  rightIris.position.set(0.065, 1.38, 0.196);
+  group.add(leftIris, rightIris);
 
-  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.015, 0.02), mouthMat);
-  mouth.position.set(0, 1.29, 0.2);
+  // Pupils
+  const leftEye  = new THREE.Mesh(new THREE.CircleGeometry(0.014, 8), pupilMat);
+  const rightEye = new THREE.Mesh(new THREE.CircleGeometry(0.014, 8), pupilMat);
+  leftEye.position.set(-0.065, 1.38, 0.197);
+  rightEye.position.set(0.065, 1.38, 0.197);
+  group.add(leftEye, rightEye);
+
+  // Highlights
+  const hlL = new THREE.Mesh(new THREE.CircleGeometry(0.006, 6), hlMat);
+  const hlR = new THREE.Mesh(new THREE.CircleGeometry(0.006, 6), hlMat);
+  hlL.position.set(-0.056, 1.39, 0.198);
+  hlR.position.set(0.074, 1.39, 0.198);
+  group.add(hlL, hlR);
+
+  // Nose
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.013, 6, 5), noseMat);
+  nose.scale.set(1.2, 0.75, 0.6);
+  nose.position.set(0, 1.31, 0.205);
+  group.add(nose);
+
+  // Mouth
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.013, 0.015), mouthMat);
+  mouth.position.set(0, 1.275, 0.2);
   group.add(mouth);
 
-  const blushMat = createToonMaterial(0xf0a0a0);
-  const blushL = new THREE.Mesh(new THREE.CircleGeometry(0.04, 8), blushMat);
-  blushL.position.set(-0.12, 1.32, 0.17);
-  blushL.rotation.y = 0.3;
+  // Blush
+  const blushMat = new THREE.MeshBasicMaterial({ color: 0xf0a0a8, transparent: true, opacity: 0.65 });
+  const blushL = new THREE.Mesh(new THREE.CircleGeometry(0.04, 10), blushMat);
+  blushL.position.set(-0.115, 1.315, 0.175);
+  blushL.rotation.y = 0.28;
   blushL.visible = false;
   group.add(blushL);
 
-  const blushR = new THREE.Mesh(new THREE.CircleGeometry(0.04, 8), blushMat);
-  blushR.position.set(0.12, 1.32, 0.17);
-  blushR.rotation.y = -0.3;
+  const blushR = new THREE.Mesh(new THREE.CircleGeometry(0.04, 10), blushMat);
+  blushR.position.set(0.115, 1.315, 0.175);
+  blushR.rotation.y = -0.28;
   blushR.visible = false;
   group.add(blushR);
 
   return {
-    leftEye,
+    leftEye,  // pupil — used for expression scaling
     rightEye,
     mouth,
     blushL,
     blushR,
-    baseMouthY: 1.29,
-    baseEyeY: 1.38,
+    baseMouthY: 1.275,
+    baseEyeY:   1.38,
+    // also keep refs to sclera for expression changes
+    _leftSclera: leftSclera,
+    _rightSclera: rightSclera,
+    _leftIris: leftIris,
+    _rightIris: rightIris,
   };
 }
 
@@ -315,40 +352,54 @@ export function setExpression(group, expression) {
   const face = group.userData.face;
   if (!face) return;
 
-  const { leftEye, rightEye, mouth, blushL, blushR, baseMouthY, baseEyeY } = face;
+  const {
+    leftEye, rightEye, mouth, blushL, blushR,
+    baseMouthY, baseEyeY,
+    _leftSclera, _rightSclera, _leftIris, _rightIris,
+  } = face;
 
-  leftEye.scale.set(1, 1, 1);
-  rightEye.scale.set(1, 1, 1);
-  leftEye.position.set(-0.065, baseEyeY, 0.19);
-  rightEye.position.set(0.065, baseEyeY, 0.19);
+  // Reset all layers
+  for (const m of [leftEye, rightEye, _leftSclera, _rightSclera, _leftIris, _rightIris]) {
+    if (m) m.scale.set(1, 1, 1);
+  }
+  leftEye.position.set(-0.065, baseEyeY, 0.197);
+  rightEye.position.set(0.065, baseEyeY, 0.197);
+  if (_leftSclera)  _leftSclera.position.set(-0.065, baseEyeY, 0.195);
+  if (_rightSclera) _rightSclera.position.set(0.065,  baseEyeY, 0.195);
+  if (_leftIris)    _leftIris.position.set(-0.065, baseEyeY, 0.196);
+  if (_rightIris)   _rightIris.position.set(0.065,  baseEyeY, 0.196);
   mouth.scale.set(1, 1, 1);
   mouth.position.set(0, baseMouthY, 0.2);
   blushL.visible = false;
   blushR.visible = false;
 
+  // Helper — squish all eye layers
+  const squishEyes = (sx, sy) => {
+    for (const m of [leftEye, rightEye, _leftSclera, _rightSclera, _leftIris, _rightIris]) {
+      if (m) m.scale.set(sx, sy, 1);
+    }
+  };
+
   switch (expression) {
     case 'happy':
-      leftEye.scale.y = 0.45;
-      rightEye.scale.y = 0.45;
-      mouth.scale.set(1.4, 2.5, 1);
+      squishEyes(1, 0.38);   // crescent happy eyes
+      mouth.scale.set(1.5, 2.4, 1);
       break;
     case 'surprised':
-      leftEye.scale.set(1.35, 1.35, 1);
-      rightEye.scale.set(1.35, 1.35, 1);
-      mouth.scale.set(0.7, 3, 1);
-      mouth.position.y = baseMouthY - 0.01;
+      squishEyes(1.3, 1.3);
+      mouth.scale.set(0.75, 2.8, 1);
+      mouth.position.y = baseMouthY - 0.012;
       break;
     case 'thinking':
-      leftEye.position.set(-0.04, baseEyeY + 0.02, 0.19);
-      rightEye.position.set(0.08, baseEyeY + 0.02, 0.19);
-      mouth.scale.set(0.8, 0.8, 1);
+      leftEye.position.set(-0.04, baseEyeY + 0.02, 0.197);
+      rightEye.position.set(0.08, baseEyeY + 0.02, 0.197);
+      if (_leftIris)  _leftIris.position.set(-0.04, baseEyeY + 0.02, 0.196);
+      if (_rightIris) _rightIris.position.set(0.08,  baseEyeY + 0.02, 0.196);
+      mouth.scale.set(0.75, 0.75, 1);
       break;
     case 'shy':
-      leftEye.position.set(-0.065, baseEyeY - 0.025, 0.19);
-      rightEye.position.set(0.065, baseEyeY - 0.025, 0.19);
-      leftEye.scale.y = 0.7;
-      rightEye.scale.y = 0.7;
-      mouth.scale.set(0.6, 1, 1);
+      squishEyes(1, 0.65);
+      mouth.scale.set(0.55, 1, 1);
       blushL.visible = true;
       blushR.visible = true;
       break;

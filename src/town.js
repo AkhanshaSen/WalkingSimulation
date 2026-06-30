@@ -399,14 +399,30 @@ function createTree(variant = 'normal') {
   tree.add(trunk);
 
   if (variant === 'cherry') {
-    const blossomMat = createToonMaterial(0xf0a0b8);
-    [[0, 1.1, 0, 0.55], [-0.3, 1.0, 0.1, 0.4], [0.3, 1.05, -0.1, 0.45], [0, 1.3, 0.15, 0.35]].forEach(
-      ([x, y, z, s]) => {
-        const puff = createOutlinedMesh(new THREE.SphereGeometry(s, 8, 6), blossomMat);
-        puff.position.set(x, y, z);
-        tree.add(puff);
-      },
-    );
+    // Multiple overlapping blossom puffs with slight color variation
+    const puffs = [
+      [0, 1.1, 0, 0.58, 0xf0a0b8],
+      [-0.32, 1.0, 0.12, 0.42, 0xf8b8cc],
+      [0.32, 1.05, -0.12, 0.46, 0xf0a0c0],
+      [0, 1.35, 0.18, 0.38, 0xffc0d0],
+      [-0.18, 1.22, -0.22, 0.35, 0xf8aabf],
+      [0.22, 1.28, 0.25, 0.32, 0xffb8cc],
+    ];
+    puffs.forEach(([x, y, z, s, c]) => {
+      const puff = createOutlinedMesh(new THREE.SphereGeometry(s, 9, 7), createToonMaterial(c));
+      puff.position.set(x, y, z);
+      tree.add(puff);
+    });
+    // Add a few visible petal sprites hanging at the edges
+    const petalMat = new THREE.MeshBasicMaterial({ color: 0xffc8d8, side: THREE.DoubleSide });
+    for (let i = 0; i < 8; i++) {
+      const petal = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.06), petalMat);
+      const angle = (i / 8) * Math.PI * 2;
+      petal.position.set(Math.cos(angle) * 0.5, 0.9 + Math.random() * 0.3, Math.sin(angle) * 0.5);
+      petal.rotation.set(Math.random(), Math.random() * Math.PI, Math.random());
+      tree.add(petal);
+    }
+    tree.userData.isCherry = true;
   } else if (variant === 'pine') {
     [0.55, 0.4, 0.28].forEach((r, i) => {
       const layer = createOutlinedMesh(
@@ -746,6 +762,9 @@ export class Town {
   }
 
   update(elapsed) {
+    const dt = Math.min(elapsed - (this._lastElapsed ?? elapsed), 0.05);
+    this._lastElapsed = elapsed;
+
     this.animatedClouds.forEach((cloud) => {
       cloud.position.x += Math.sin(elapsed * cloud.userData.driftSpeed + cloud.userData.driftPhase) * 0.003;
     });
@@ -757,6 +776,25 @@ export class Town {
       }
       lantern.material.color.copy(lantern.userData.baseColor).multiplyScalar(pulse);
     });
+
+    // Animate falling cherry petals
+    if (this._petals) {
+      this._petals.forEach((p) => {
+        const v = p.userData.vel;
+        // Gentle drift
+        p.position.x += (v.x + Math.sin(elapsed * 0.7 + p.position.z) * 0.12) * dt;
+        p.position.y += v.y * dt;
+        p.position.z += (v.z + Math.cos(elapsed * 0.5 + p.position.x) * 0.08) * dt;
+        p.rotation.z += p.userData.spin * dt;
+        p.rotation.x += p.userData.spin * 0.5 * dt;
+        // Reset when fallen below ground
+        if (p.position.y < -0.5) {
+          p.position.y = p.userData.resetY;
+          p.position.x = -4 + Math.random() * 16;
+          p.position.z = -5 + Math.random() * -35;
+        }
+      });
+    }
   }
 
   _createPath() {
@@ -794,8 +832,59 @@ export class Town {
   }
 
   _createSky() {
-    this.scene.fog = new THREE.Fog(PALETTE.sky, 45, 155);
-    this.scene.background = new THREE.Color(PALETTE.sky);
+    this.scene.fog = new THREE.Fog(0xb8dce8, 50, 160);
+    this.scene.background = new THREE.Color(0xa0d0e8);
+
+    // Gradient sky dome: horizon warm → zenith blue
+    const skyGeo = new THREE.SphereGeometry(145, 16, 12);
+    const skyCanvas = document.createElement('canvas');
+    skyCanvas.width = 1; skyCanvas.height = 64;
+    const skyCtx = skyCanvas.getContext('2d');
+    const grad = skyCtx.createLinearGradient(0, 0, 0, 64);
+    grad.addColorStop(0,   '#68b0d8');   // zenith — deep blue
+    grad.addColorStop(0.5, '#a8d8ec');   // mid sky
+    grad.addColorStop(0.8, '#d8eef8');   // horizon haze
+    grad.addColorStop(1,   '#f0f0e8');   // ground-line warm
+    skyCtx.fillStyle = grad;
+    skyCtx.fillRect(0, 0, 1, 64);
+    const skyTex = new THREE.CanvasTexture(skyCanvas);
+    skyTex.mapping = THREE.EquirectangularReflectionMapping;
+    const skyMat = new THREE.MeshBasicMaterial({
+      map: skyTex,
+      side: THREE.BackSide,
+    });
+    const skyDome = new THREE.Mesh(skyGeo, skyMat);
+    skyDome.position.set(0, -10, -40);
+    this.scene.add(skyDome);
+
+    // Floating petal system for cherry blossom areas
+    this._spawnGlobalPetals();
+  }
+
+  _spawnGlobalPetals() {
+    const count = 80;
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffb8cc, side: THREE.DoubleSide });
+    const petals = [];
+    for (let i = 0; i < count; i++) {
+      const petal = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.09), mat);
+      // Random positions centred on the cherry blossom area of the town
+      petal.position.set(
+        -4 + Math.random() * 16,
+        1.5 + Math.random() * 5,
+        -5 + Math.random() * -35,
+      );
+      petal.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      petal.userData.vel = new THREE.Vector3(
+        (Math.random() - 0.5) * 0.3,
+        -(0.25 + Math.random() * 0.35),
+        (Math.random() - 0.5) * 0.2,
+      );
+      petal.userData.spin = (Math.random() - 0.5) * 2.5;
+      petal.userData.resetY = 4 + Math.random() * 5;
+      this.scene.add(petal);
+      petals.push(petal);
+    }
+    this._petals = petals;
   }
 
   _createBackdrop() {
@@ -1214,37 +1303,51 @@ export class Town {
   }
 
   _createLighting() {
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-    this.scene.add(ambient);
+    // Warm hemisphere: sky colour from top, bounced ground from below
+    const hemi = new THREE.HemisphereLight(0xc8e8ff, 0x8ab88a, 0.6);
+    this.scene.add(hemi);
 
-    const sun = new THREE.DirectionalLight(0xfff0d0, 1.15);
-    sun.position.set(15, 25, 10);
+    // Main directional sun — slightly warmer, stronger
+    const sun = new THREE.DirectionalLight(0xfff4d0, 1.35);
+    sun.position.set(18, 28, 12);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.camera.near = 0.5;
-    sun.shadow.camera.far = 120;
-    sun.shadow.camera.left = -55;
-    sun.shadow.camera.right = 55;
-    sun.shadow.camera.top = 55;
-    sun.shadow.camera.bottom = -95;
+    sun.shadow.camera.far = 130;
+    sun.shadow.camera.left   = -60;
+    sun.shadow.camera.right  = 60;
+    sun.shadow.camera.top    = 60;
+    sun.shadow.camera.bottom = -100;
+    sun.shadow.bias = -0.0005;
     this.scene.add(sun);
     this.sun = sun;
 
-    const fill = new THREE.DirectionalLight(0xc8e8f0, 0.35);
-    fill.position.set(-10, 8, -5);
+    // Cool fill from opposite side — gives nice rim lighting
+    const fill = new THREE.DirectionalLight(0xb8d8f8, 0.45);
+    fill.position.set(-14, 10, -8);
     this.scene.add(fill);
 
-    const warm = new THREE.PointLight(0xffa060, 0.4, 14);
-    warm.position.set(-3, 2.5, -20);
-    this.scene.add(warm);
+    // Street-level warm point lights along the road
+    [[-3, 2.5, -10], [-5, 2.5, -22], [4, 2.5, -34], [-2, 2.5, -46]].forEach(([x, y, z]) => {
+      const pl = new THREE.PointLight(0xffa858, 0.55, 12);
+      pl.position.set(x, y, z);
+      this.scene.add(pl);
+    });
 
-    const harborLight = new THREE.PointLight(0x80c0e0, 0.35, 18);
+    // Harbor blue-green ambience
+    const harborLight = new THREE.PointLight(0x80c8e8, 0.5, 22);
     harborLight.position.set(20, 3, -88);
     this.scene.add(harborLight);
 
-    const marketLight = new THREE.PointLight(0xffc080, 0.3, 14);
+    // Market warm glow
+    const marketLight = new THREE.PointLight(0xffb868, 0.45, 16);
     marketLight.position.set(6, 3, -48);
     this.scene.add(marketLight);
+
+    // Shrine cool-purple ambience
+    const shrineLight = new THREE.PointLight(0xb890e8, 0.4, 14);
+    shrineLight.position.set(-8, 3, -68);
+    this.scene.add(shrineLight);
   }
 
   getInteractableSpawns() {

@@ -5,10 +5,10 @@ let toonGradient = null;
 function getToonGradient() {
   if (toonGradient) return toonGradient;
 
-  // 4-step cel-shade: deep shadow → shadow → lit → bright highlight
-  const pixels = ['#111', '#111', '#555', '#555', '#bbb', '#bbb', '#e8e8e8', '#ffffff'];
+  // 5-step cel-shade: deep shadow → warm shadow → mid-tone → lit → bright highlight
+  const pixels = ['#0e0e12', '#0e0e12', '#3a3040', '#3a3040', '#808090', '#808090', '#d8d0e0', '#d8d0e0', '#f0f0f8', '#ffffff'];
   const gradientCanvas = document.createElement('canvas');
-  gradientCanvas.width = pixels.length;
+  gradientCanvas.width = pixels.length; // 10 px → 5 discrete steps
   gradientCanvas.height = 1;
   const ctx = gradientCanvas.getContext('2d');
   pixels.forEach((color, i) => {
