@@ -158,19 +158,28 @@ export class Game {
       game.interactables.registerAll(game.npcs, game.animals, game.worldProps);
 
       // ── GPU performance pass ──────────────────────────────────────────────
-      // 1. Freeze world matrices on every non-dynamic object.
-      //    This eliminates the per-frame matrix recalculation + upload for the
-      //    ~thousands of static scene objects (buildings, road, ground, props).
-      // 2. Only player/NPC/animal meshes cast shadows — others just receive.
+      // Step 1: Force every object's local matrix to be computed from its
+      // position/rotation/scale BEFORE we freeze matrixAutoUpdate.
+      // Without this, objects whose matrices haven't been flushed yet (i.e.
+      // before the first renderer.render() call) would all render at the origin.
       game.scene.traverse((obj) => {
-        if (obj.userData.dynamic) return;          // skip characters
+        obj.updateMatrix();
+      });
+      game.scene.updateMatrixWorld(true);  // propagate down the hierarchy
+
+      // Step 2: Freeze world matrices on every non-dynamic object.
+      //   Eliminates per-frame matrix recalculation + upload for the
+      //   thousands of static scene objects (buildings, road, ground, props).
+      // Step 3: Only player/NPC/animal meshes cast shadows.
+      game.scene.traverse((obj) => {
+        if (obj.userData.dynamic) return;
         obj.matrixAutoUpdate = false;
         if (obj.isMesh) {
-          obj.castShadow    = false;               // static objects don't move so no shadow update needed
+          obj.castShadow    = false;
           obj.receiveShadow = true;
         }
       });
-      // Characters cast shadows; force their matrices to still auto-update
+      // Re-enable matrixAutoUpdate and shadow casting for animated characters
       [...game.npcs, ...game.animals].forEach((e) => {
         e.mesh.traverse((c) => {
           c.matrixAutoUpdate = true;
@@ -181,8 +190,6 @@ export class Game {
         c.matrixAutoUpdate = true;
         if (c.isMesh) c.castShadow = true;
       });
-      // Also mark petal particles (dynamic) — created after town.build
-      // They are handled in town.update so we call matrixAutoUpdate there.
 
       game.ready = true;
       return game;
