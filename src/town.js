@@ -632,6 +632,7 @@ function createCloud(x, y, z, scale) {
   group.scale.setScalar(scale);
   group.userData.driftSpeed = 0.15 + Math.random() * 0.2;
   group.userData.driftPhase = Math.random() * Math.PI * 2;
+  group.userData.dynamic = true;
   return group;
 }
 
@@ -1017,6 +1018,7 @@ export class Town {
     });
     const skyDome = new THREE.Mesh(skyGeo, skyMat);
     skyDome.position.set(0, -10, -40);
+    skyDome.userData.dynamic = true;   // treated as static but excluded from castShadow rules
     this.scene.add(skyDome);
 
     // Floating petal system for cherry blossom areas
@@ -1036,6 +1038,7 @@ export class Town {
         -5 + Math.random() * -35,
       );
       petal.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      petal.userData.dynamic = true;
       petal.userData.vel = new THREE.Vector3(
         (Math.random() - 0.5) * 0.3,
         -(0.25 + Math.random() * 0.35),

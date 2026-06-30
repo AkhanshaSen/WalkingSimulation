@@ -58,6 +58,8 @@ export class WorldProp {
         fortune,
         '神社 · Shrine',
       );
+      context.game?.mood?.boost(18, 'Blessed ⛩️');
+      context.game?._updateMoodHUD?.();
       return;
     }
 
@@ -68,6 +70,8 @@ export class WorldProp {
 
     if (actionDef.sitDuration) {
       context.game?.playerRest?.(actionDef.sitDuration, this.mesh.position);
+      context.game?.mood?.boost(6, 'Taking a rest');
+      context.game?._updateMoodHUD?.();
     }
 
     context.dialogue?._showToast(actionDef.message);

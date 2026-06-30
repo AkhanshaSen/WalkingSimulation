@@ -85,6 +85,7 @@ export class ShopUI {
     if (item.reward) {
       this._game._handleReward(item.reward);
     }
+    this.onPurchase?.();
     this._refreshYen();
     if (this._currentShop) this._renderItems(this._currentShop);
   }

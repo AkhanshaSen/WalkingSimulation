@@ -346,6 +346,7 @@ export class DialogueManager {
     if (this.npc) {
       this.npc.endConversation();
       if (!this.npc.isCompanion) this.npc = null;
+      this.onConversationEnd?.();
     }
   }
 

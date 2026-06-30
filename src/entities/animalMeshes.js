@@ -406,16 +406,33 @@ export function createDuckMesh() {
 
 // ─── dispatch ─────────────────────────────────────────────────────────────────
 const MESH_BUILDERS = {
-  cat:   createCatMesh,
-  shiba: createShibaMesh,
+  cat:    createCatMesh,
+  shiba:  createShibaMesh,
   rabbit: createRabbitMesh,
-  fox:   createFoxMesh,
-  duck:  createDuckMesh,
+  fox:    createFoxMesh,
+  duck:   createDuckMesh,
 };
 
+/**
+ * Each species builder places the head at local +X.
+ * Game code uses rotation.y = Math.atan2(dx, dz), which makes the +Z axis face
+ * the movement direction.  We wrap the inner model in a pivot and rotate it
+ * -90° around Y so the head (inner +X) aligns with the wrapper's +Z (forward).
+ * This way the animal always looks where it's going without changing any callers.
+ */
 export function createAnimalMesh(species, color) {
   const builder = MESH_BUILDERS[species] ?? createCatMesh;
-  return builder(color);
+  const inner   = builder(color);
+
+  // Rotate so inner +X (head direction) → wrapper +Z (forward direction)
+  inner.rotation.y = -Math.PI / 2;
+
+  const wrapper = new THREE.Group();
+  wrapper.add(inner);
+  // Forward runtime references so Animal.js can access them via this.mesh
+  wrapper.userData.tail = inner.userData.tail;
+
+  return wrapper;
 }
 
 // ─── Name label (improved: rounded pill, coloured) ───────────────────────────

@@ -12,6 +12,8 @@ import { DialogueManager } from './dialogue.js';
 import { InteractionSystem } from './interaction/InteractionSystem.js';
 import { InteractableRegistry } from './interaction/InteractableRegistry.js';
 import { Minimap } from './minimap.js';
+import { MoodSystem } from './MoodSystem.js';
+import { setExpression } from './character.js';
 import { Animal } from './entities/Animal.js';
 import {
   createBenchProp,
@@ -118,14 +120,19 @@ export class Game {
 
       onProgress?.('Spawning characters…');
       game.player = new Player(game.scene, game.path);
+      // Mark all character meshes as dynamic so the static freeze pass skips them
+      game.player.mesh.traverse((c) => { c.userData.dynamic = true; });
+
       game.npcs = [...NPC_PROFILES, ...AMBIENT_NPCS].map(
         (profile) => new NPC(game.scene, game.path, profile),
       );
+      game.npcs.forEach((npc) => npc.mesh.traverse((c) => { c.userData.dynamic = true; }));
 
       onProgress?.('Spawning animals…');
       game.animals = ANIMAL_DEFINITIONS.map(
         (def) => new Animal(game.scene, game.path, def),
       );
+      game.animals.forEach((a) => a.mesh.traverse((c) => { c.userData.dynamic = true; }));
 
       game.worldProps = [];
       for (const spawn of game.town.getInteractableSpawns()) {
@@ -150,6 +157,33 @@ export class Game {
       game.interactables = new InteractableRegistry();
       game.interactables.registerAll(game.npcs, game.animals, game.worldProps);
 
+      // ── GPU performance pass ──────────────────────────────────────────────
+      // 1. Freeze world matrices on every non-dynamic object.
+      //    This eliminates the per-frame matrix recalculation + upload for the
+      //    ~thousands of static scene objects (buildings, road, ground, props).
+      // 2. Only player/NPC/animal meshes cast shadows — others just receive.
+      game.scene.traverse((obj) => {
+        if (obj.userData.dynamic) return;          // skip characters
+        obj.matrixAutoUpdate = false;
+        if (obj.isMesh) {
+          obj.castShadow    = false;               // static objects don't move so no shadow update needed
+          obj.receiveShadow = true;
+        }
+      });
+      // Characters cast shadows; force their matrices to still auto-update
+      [...game.npcs, ...game.animals].forEach((e) => {
+        e.mesh.traverse((c) => {
+          c.matrixAutoUpdate = true;
+          if (c.isMesh) c.castShadow = true;
+        });
+      });
+      game.player.mesh.traverse((c) => {
+        c.matrixAutoUpdate = true;
+        if (c.isMesh) c.castShadow = true;
+      });
+      // Also mark petal particles (dynamic) — created after town.build
+      // They are handled in town.update so we call matrixAutoUpdate there.
+
       game.ready = true;
       return game;
     } catch (error) {
@@ -170,8 +204,18 @@ export class Game {
     this.petPartBtn = document.getElementById('pet-companion-part');
 
     dialogue.setGame(this);
+    // Mood boost whenever a full conversation ends
+    dialogue.onConversationEnd = () => {
+      this.mood?.boost(9, 'Good chat!');
+      this._updateMoodHUD();
+    };
     if (shopUI) {
       shopUI.setGame(this);
+      // Mood boost on successful purchase (shop calls game.onPurchase)
+      shopUI.onPurchase = () => {
+        this.mood?.boost(7, 'Treat yourself!');
+        this._updateMoodHUD();
+      };
     }
 
     this.interaction = new InteractionSystem(
@@ -199,7 +243,17 @@ export class Game {
       this.minimap = new Minimap(minimapCanvas, this.path);
       this.minimap.setPlayer(this.player);
       this.minimap.setNpcs(this.npcs);
+      this.minimap.setAnimals(this.animals);
+      this.minimap.setWorldProps(this.worldProps);
     }
+
+    // Mood system
+    this.mood = new MoodSystem();
+    this.moodEl     = document.getElementById('mood-display');
+    this.moodBar    = document.getElementById('mood-bar-fill');
+    this.moodFloat  = document.getElementById('mood-float');
+    if (this.moodFloat) this.mood.setFloatContainer(this.moodFloat);
+    this._updateMoodHUD();
   }
 
   spendYen(amount) {
@@ -214,6 +268,23 @@ export class Game {
 
   _updateYenHUD() {
     if (this.yenEl) this.yenEl.textContent = `💴 ¥${this.yen}`;
+  }
+
+  _updateMoodHUD() {
+    if (!this.mood) return;
+    const m = this.mood.getMood();
+    if (this.moodEl) {
+      this.moodEl.textContent = `${m.emoji} ${m.name}`;
+      this.moodEl.style.borderColor = m.color;
+    }
+    if (this.moodBar) {
+      this.moodBar.style.width = `${this.mood.getPercent()}%`;
+      this.moodBar.style.background = m.color;
+    }
+    // Update player expression to reflect mood
+    if (this.player?.mesh && m.expression) {
+      setExpression(this.player.mesh, m.expression);
+    }
   }
 
   openShop(shopId) {
@@ -231,6 +302,13 @@ export class Game {
     }
     if (result.isFriend && action !== 'shoo') {
       this.dialogue.showToast(`${animal.definition.name} seems to really like you! ♥`);
+    }
+    // Mood impact from pet interactions
+    if (this.mood) {
+      if (action === 'pet')  this.mood.boost(10, 'Petted a friend!');
+      else if (action === 'sit')  this.mood.boost(7,  'Cozy moment');
+      else if (action === 'shoo') this.mood.drain(5);
+      this._updateMoodHUD();
     }
     return result;
   }
@@ -282,6 +360,9 @@ export class Game {
       this.petCompanion.stopFollowing(true);
     }
     this.petCompanion = animal;
+    this.minimap?.setPetCompanion(animal);
+    this.mood?.boost(12, `${animal.definition.name} joined!`);
+    this._updateMoodHUD();
     animal.startFollowing();
     this._setPetCompanionTag(animal);
     this.dialogue.showToast(animal.definition.reactions?.friend ?? `${animal.definition.name} is following you!`);
@@ -312,12 +393,16 @@ export class Game {
     if (reward.type === 'speedBoost') {
       this.player.applySpeedBoost(reward.amount, reward.duration);
       if (reward.message) this.dialogue?.showToast(reward.message);
+      this.mood?.boost(6, 'Energy boost!');
     } else if (reward.type === 'companion') {
       this.setCompanion(reward.npc);
+      this.mood?.boost(14, 'New friend!');
     } else if (reward.type === 'dismissCompanion') {
       this.clearCompanion();
+      this.mood?.drain(4);
     } else if (reward.type === 'journal') {
       this.dialogue?.addJournalEntry?.(reward.title, reward.body, '購入 · Purchase');
+      this.mood?.boost(8, 'Memory made');
     }
   }
 
@@ -404,6 +489,10 @@ export class Game {
     }
     this.animals?.forEach((a) => a.update(dt, this.player.position, this.player.facing));
     this._updateLocationTag();
+    if (this.mood) {
+      this.mood.update(dt);
+      this._updateMoodHUD();
+    }
     this.minimap?.update();
     this.town.update(this.clock.elapsedTime);
     this._updateCamera();
