@@ -420,11 +420,11 @@ export function createAnimalMesh(species, color) {
 
 // ─── Name label (improved: rounded pill, coloured) ───────────────────────────
 const SPECIES_LABEL_COLORS = {
-  cat:   { bg: '#fff0f5', border: '#f090a8' },
-  shiba: { bg: '#fff8e8', border: '#e8a050' },
-  rabbit:{ bg: '#f8f0ff', border: '#cc88cc' },
-  fox:   { bg: '#fff4ec', border: '#e87040' },
-  duck:  { bg: '#fffffO', border: '#f0c030' },
+  cat:   { bg: 'rgba(40,18,28,0.82)', border: '#d06888', text: '#f8d0dc' },
+  shiba: { bg: 'rgba(40,28,10,0.82)', border: '#c88040', text: '#f8ddb0' },
+  rabbit:{ bg: 'rgba(30,18,40,0.82)', border: '#aa70c8', text: '#e8c8f8' },
+  fox:   { bg: 'rgba(42,20,10,0.82)', border: '#d06030', text: '#f8ccb0' },
+  duck:  { bg: 'rgba(34,30,10,0.82)', border: '#c8a820', text: '#f0e890' },
 };
 
 export function createNameLabel(emoji, name, species = 'cat') {
@@ -433,10 +433,10 @@ export function createNameLabel(emoji, name, species = 'cat') {
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
-  const col = SPECIES_LABEL_COLORS[species] ?? { bg: '#ffffff', border: '#3a8a8a' };
+  const col = SPECIES_LABEL_COLORS[species] ?? { bg: 'rgba(18,26,34,0.82)', border: '#5ababa', text: '#e8f4f4' };
   const r = 12;
 
-  // Rounded rect background
+  // Dark pill — no white to glow
   ctx.fillStyle = col.bg;
   ctx.strokeStyle = col.border;
   ctx.lineWidth = 2.5;
@@ -453,7 +453,7 @@ export function createNameLabel(emoji, name, species = 'cat') {
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = '#2a3a2a';
+  ctx.fillStyle = col.text;
   ctx.font = 'bold 15px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

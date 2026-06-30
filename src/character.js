@@ -413,13 +413,30 @@ function createNameTag(name, nameJa) {
   canvas.width = 256;
   canvas.height = 64;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = 'rgba(255,255,255,0.92)';
-  ctx.fillRect(8, 8, 240, 48);
-  ctx.fillStyle = '#2a4a4a';
+
+  // Dark pill — no white to glow under any tone mapping
+  const r = 14;
+  ctx.fillStyle = 'rgba(18,26,34,0.82)';
+  ctx.strokeStyle = 'rgba(120,200,200,0.7)';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(r + 6, 6); ctx.lineTo(250 - r, 6);
+  ctx.quadraticCurveTo(250, 6, 250, 6 + r);
+  ctx.lineTo(250, 58 - r);
+  ctx.quadraticCurveTo(250, 58, 250 - r, 58);
+  ctx.lineTo(r + 6, 58);
+  ctx.quadraticCurveTo(6, 58, 6, 58 - r);
+  ctx.lineTo(6, 6 + r);
+  ctx.quadraticCurveTo(6, 6, r + 6, 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#e8f4f4';
   ctx.font = 'bold 18px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(nameJa || name, 128, 28);
-  ctx.fillStyle = '#666';
+  ctx.fillStyle = '#90b8b8';
   ctx.font = '13px sans-serif';
   ctx.fillText(name || '', 128, 48);
 
@@ -651,11 +668,11 @@ function createWaveBubble() {
   canvas.width = 64;
   canvas.height = 64;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = 'rgba(18,40,40,0.85)';
   ctx.beginPath();
   ctx.arc(32, 36, 22, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#3a8a8a';
+  ctx.strokeStyle = '#5ababa';
   ctx.lineWidth = 3;
   ctx.stroke();
   ctx.font = '28px sans-serif';
