@@ -26,8 +26,9 @@ Pushing to the `main` branch automatically rebuilds and publishes the game to Gi
 **One-time setup** (if Pages is not enabled yet):
 
 1. Open [github.com/AkhanshaSen/WalkingSimulation/settings/pages](https://github.com/AkhanshaSen/WalkingSimulation/settings/pages)
-2. Under **Build and deployment → Source**, choose **GitHub Actions**
-3. Push this repo to `main` — the deploy workflow runs and the site goes live
+2. Under **Build and deployment → Source**, choose **Deploy from a branch**
+3. Set **Branch** to `gh-pages` and folder to **`/ (root)`**
+4. Save — after the GitHub Action finishes, the game is live
 
 After the first successful deploy, the game is at:
 `https://akhanshasen.github.io/WalkingSimulation/`
