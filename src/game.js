@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { Town } from './town.js';
 import { Player, NPC, InputManager } from './character.js';
+import { NPC_PROFILES } from './npcData.js';
+import { DialogueManager, InteractionSystem } from './dialogue.js';
+import { Minimap } from './minimap.js';
 
 function closestPointOnPath(path, point, samples = 100) {
   let closestT = 0;
@@ -16,6 +19,15 @@ function closestPointOnPath(path, point, samples = 100) {
   }
   return closestT;
 }
+
+const LOCATION_ZONES = [
+  { tMax: 0.12, label: '静かな入口 · Town Entrance' },
+  { tMax: 0.28, label: '桜通り · Sakura Street' },
+  { tMax: 0.45, label: '鳥居坂 · Torii Slope' },
+  { tMax: 0.62, label: '神社の参道 · Shrine Approach' },
+  { tMax: 0.82, label: '旧町並み · Old Town Row' },
+  { tMax: 1.0, label: '港の見晴台 · Harbor View' },
+];
 
 export class Game {
   constructor(canvas) {
@@ -41,7 +53,7 @@ export class Game {
       50,
       window.innerWidth / window.innerHeight,
       0.1,
-      120,
+      180,
     );
 
     this.input = new InputManager(canvas);
@@ -52,10 +64,17 @@ export class Game {
   }
 
   static async create(canvas, onProgress) {
-    const game = new Game(canvas);
+    onProgress?.('Initializing WebGL…');
+
+    let game;
+    try {
+      game = new Game(canvas);
+    } catch (error) {
+      throw new Error(`WebGL failed: ${error.message}`);
+    }
 
     try {
-      onProgress?.('Starting renderer…');
+      onProgress?.('Building town…');
       game.town = new Town(game.scene);
       await game.town.build(onProgress);
 
@@ -64,17 +83,67 @@ export class Game {
 
       onProgress?.('Spawning characters…');
       game.player = new Player(game.scene, game.path);
-      game.npcs = [
-        new NPC(game.scene, game.path, 0.35, 1.0),
-        new NPC(game.scene, game.path, 0.65, 1.3),
-      ];
+      game.npcs = NPC_PROFILES.map(
+        (profile) => new NPC(game.scene, game.path, profile),
+      );
 
       game.ready = true;
       return game;
     } catch (error) {
-      game.dispose?.();
       throw error;
     }
+  }
+
+  initInteraction(dialogue) {
+    this.dialogue = dialogue;
+    this.companion = null;
+    this.locationTag = document.getElementById('location-tag');
+    dialogue.setGame(this);
+    this.interaction = new InteractionSystem(this.player, this.npcs, dialogue, this);
+    this.interaction.setRewardHandler((reward) => this._handleReward(reward));
+
+    const minimapCanvas = document.getElementById('minimap');
+    if (minimapCanvas) {
+      this.minimap = new Minimap(minimapCanvas, this.path);
+      this.minimap.setPlayer(this.player);
+      this.minimap.setNpcs(this.npcs);
+    }
+  }
+
+  setCompanion(npc) {
+    if (this.companion && this.companion !== npc) {
+      this.companion.stopFollowing(true);
+    }
+    this.companion = npc;
+    npc.startFollowing();
+    this.dialogue.setCompanionTag(npc);
+    this.minimap?.setCompanion(npc);
+  }
+
+  clearCompanion() {
+    if (this.companion) {
+      this.companion.stopFollowing(true);
+      this.companion = null;
+      this.dialogue.setCompanionTag(null);
+      this.minimap?.setCompanion(null);
+    }
+  }
+
+  _handleReward(reward) {
+    if (reward.type === 'speedBoost') {
+      this.player.applySpeedBoost(reward.amount, reward.duration);
+    } else if (reward.type === 'companion') {
+      this.setCompanion(reward.npc);
+    } else if (reward.type === 'dismissCompanion') {
+      this.clearCompanion();
+    }
+  }
+
+  _updateLocationTag() {
+    if (!this.locationTag || !this.path) return;
+    const t = this.path.getClosestPointT(this.player.position);
+    const zone = LOCATION_ZONES.find((z) => t <= z.tMax) ?? LOCATION_ZONES[LOCATION_ZONES.length - 1];
+    this.locationTag.textContent = zone.label;
   }
 
   _onResize() {
@@ -109,9 +178,41 @@ export class Game {
 
     const dt = Math.min(this.clock.getDelta(), 0.05);
     this.input.update();
+
+    const inDialogue = this.dialogue?.isBlocking() ?? false;
+    this.input.dialogueOpen = inDialogue;
+
+    if (inDialogue) {
+      if (this.dialogue.isOpen()) {
+        if (this.input.consumeKey('KeyE') || this.input.consumeKey('Space') || this.input.consumeKey('Enter')) {
+          this.dialogue.tryAdvanceFromKey();
+        }
+      } else if (this.dialogue.approachOpen) {
+        if (this.input.consumeKey('KeyE') || this.input.consumeKey('Enter')) {
+          this.dialogue._onChatClicked();
+        }
+        if (this.input.consumeKey('KeyW') && (this.input.keys['AltLeft'] || this.input.keys['AltRight'])) {
+          this.dialogue._onWalkClicked();
+        }
+        if (this.input.consumeKey('KeyX') || this.input.consumeKey('Backspace')) {
+          if (this.companion && this.dialogue.npc?.isCompanion) {
+            this.dialogue._onPartClicked();
+          } else {
+            this.dialogue._onIgnoreClicked();
+          }
+        }
+      }
+    } else {
+      this.interaction?.update(this.input);
+    }
+
     this.player.update(this.input, dt, this.town.getGroundMeshes());
-    this.npcs.forEach((npc) => npc.update(dt));
+    this.npcs.forEach((npc) => npc.update(dt, this.player.position, this.player.facing));
+    this._updateLocationTag();
+    this.minimap?.update();
+    this.town.update(this.clock.elapsedTime);
     this._updateCamera();
+    this.input.endFrame();
   }
 
   render() {

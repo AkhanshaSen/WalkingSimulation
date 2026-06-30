@@ -1,4 +1,5 @@
 import { Game } from './game.js';
+import { DialogueManager } from './dialogue.js';
 
 const canvas = document.getElementById('game-canvas');
 const loading = document.getElementById('loading');
@@ -28,30 +29,67 @@ function showLoadError(message) {
 
 async function boot() {
   if (window.location.protocol === 'file:') {
-    showLoadError('Open via the dev server: run npm run dev, then visit http://localhost:5173');
     return;
   }
+
+  window.addEventListener('error', (e) => {
+    showLoadError(`Error: ${e.message}. Check the browser console (F12).`);
+  });
 
   let game;
 
   try {
-    setProgress('Loading town…', 10);
-    game = await Game.create(canvas, (label) => setProgress(label, 75));
+    setProgress('Starting…', 15);
+    game = await Game.create(canvas, (label) => setProgress(label, 40 + Math.random() * 40));
     setProgress('Ready!', 100);
+    window.__gameBooted = true;
 
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 200));
     loading.classList.add('hidden');
-    game.start();
     setupUI(game);
+    game.start();
   } catch (error) {
     console.error('Failed to start game:', error);
+    window.__gameBooted = true;
     showLoadError(
-      'Could not start the game. Run npm run dev in the project folder, then open http://localhost:5173',
+      error?.message?.includes('WebGL')
+        ? 'WebGL is not available. Try Chrome or Firefox, or enable hardware acceleration.'
+        : `Could not start: ${error.message}. Run npm run dev, then open http://localhost:5173`,
     );
   }
 }
 
 function setupUI(game) {
+  const dialogue = new DialogueManager({
+    box: document.getElementById('dialogue-box'),
+    approachModal: document.getElementById('approach-modal'),
+    approachPortrait: document.getElementById('approach-portrait'),
+    approachName: document.getElementById('approach-name'),
+    approachPersonality: document.getElementById('approach-personality'),
+    approachTagline: document.getElementById('approach-tagline'),
+    approachChatBtn: document.getElementById('approach-chat'),
+    approachWalkBtn: document.getElementById('approach-walk'),
+    approachPartBtn: document.getElementById('approach-part'),
+    approachIgnoreBtn: document.getElementById('approach-ignore'),
+    companionTag: document.getElementById('companion-tag'),
+    companionLabel: document.getElementById('companion-label'),
+    companionPartBtn: document.getElementById('companion-part'),
+    name: document.getElementById('dialogue-name'),
+    personality: document.getElementById('dialogue-personality'),
+    text: document.getElementById('dialogue-text'),
+    expression: document.getElementById('dialogue-expression'),
+    portrait: document.getElementById('dialogue-portrait'),
+    next: document.getElementById('dialogue-next'),
+    choices: document.getElementById('dialogue-choices'),
+    toast: document.getElementById('reward-toast'),
+    journalPanel: document.getElementById('journal-panel'),
+    journalList: document.getElementById('journal-list'),
+    journalBtn: document.getElementById('journal-btn'),
+    closeJournalBtn: document.getElementById('close-journal'),
+  });
+  dialogue._updateJournalUI();
+  game.initInteraction(dialogue);
+
   menuBtn.addEventListener('click', () => menuPanel.classList.remove('hidden'));
   closeMenu.addEventListener('click', () => menuPanel.classList.add('hidden'));
 
@@ -74,7 +112,21 @@ function setupUI(game) {
 
   document.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') {
-      menuPanel.classList.toggle('hidden');
+      if (game.dialogue?.isOpen()) {
+        game.dialogue.close();
+      } else if (game.dialogue?.approachOpen) {
+        game.dialogue._onIgnoreClicked();
+      } else if (!document.getElementById('journal-panel').classList.contains('hidden')) {
+        document.getElementById('journal-panel').classList.add('hidden');
+      } else {
+        menuPanel.classList.toggle('hidden');
+      }
+    }
+
+    if (game.dialogue?.isOpen() && ['Digit1', 'Digit2', 'Digit3'].includes(e.code)) {
+      const index = parseInt(e.code.replace('Digit', ''), 10) - 1;
+      const choices = document.querySelectorAll('.dialogue-choice');
+      if (choices[index]) choices[index].click();
     }
   });
 }

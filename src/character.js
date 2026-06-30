@@ -10,8 +10,12 @@ export class InputManager {
     this.cameraDistance = 7;
     this.isDragging = false;
     this.lastPointer = { x: 0, y: 0 };
+    this.justPressed = new Set();
+    this.interactRequested = false;
+    this.dialogueOpen = false;
 
     window.addEventListener('keydown', (e) => {
+      if (!this.keys[e.code]) this.justPressed.add(e.code);
       this.keys[e.code] = true;
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
         e.preventDefault();
@@ -114,12 +118,37 @@ export class InputManager {
     this.move = { x, z };
     this.isRunning = this.keys['ShiftLeft'] || this.keys['ShiftRight'];
   }
+
+  requestInteract() {
+    this.interactRequested = true;
+  }
+
+  consumeInteractRequest() {
+    if (this.interactRequested) {
+      this.interactRequested = false;
+      return true;
+    }
+    return false;
+  }
+
+  consumeKey(code) {
+    if (this.justPressed.has(code)) {
+      this.justPressed.delete(code);
+      return true;
+    }
+    return false;
+  }
+
+  endFrame() {
+    this.justPressed.clear();
+  }
 }
 
 export function createCharacter(options = {}) {
   const group = new THREE.Group();
   const shirtColor = options.shirtColor ?? PALETTE.shirt;
   const backpackColor = options.backpackColor ?? PALETTE.backpack;
+  const hairColor = options.hairColor ?? PALETTE.hair;
 
   const body = createOutlinedMesh(
     new THREE.CylinderGeometry(0.22, 0.26, 0.55, 8),
@@ -144,7 +173,7 @@ export function createCharacter(options = {}) {
 
   const hair = createOutlinedMesh(
     new THREE.SphereGeometry(0.24, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55),
-    createToonMaterial(PALETTE.hair),
+    createToonMaterial(hairColor),
   );
   hair.position.y = 1.42;
   hair.scale.set(1, 0.8, 1);
@@ -171,12 +200,127 @@ export function createCharacter(options = {}) {
     group.add(shoe);
   });
 
+  group.userData.face = createFaceParts(group);
   group.userData.legs = group.children.filter(
     (c) => c.geometry?.type === 'CylinderGeometry' && c.position.y < 0.3,
   );
   group.userData.walkPhase = 0;
 
+  if (options.nameTag) {
+    group.add(createNameTag(options.nameTag, options.nameTagJa));
+  }
+
   return group;
+}
+
+function createFaceParts(group) {
+  const eyeMat = createToonMaterial(0x222222);
+  const mouthMat = createToonMaterial(0xd09090);
+
+  const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.028, 6, 6), eyeMat);
+  leftEye.position.set(-0.065, 1.38, 0.19);
+  group.add(leftEye);
+
+  const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.028, 6, 6), eyeMat);
+  rightEye.position.set(0.065, 1.38, 0.19);
+  group.add(rightEye);
+
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.015, 0.02), mouthMat);
+  mouth.position.set(0, 1.29, 0.2);
+  group.add(mouth);
+
+  const blushMat = createToonMaterial(0xf0a0a0);
+  const blushL = new THREE.Mesh(new THREE.CircleGeometry(0.04, 8), blushMat);
+  blushL.position.set(-0.12, 1.32, 0.17);
+  blushL.rotation.y = 0.3;
+  blushL.visible = false;
+  group.add(blushL);
+
+  const blushR = new THREE.Mesh(new THREE.CircleGeometry(0.04, 8), blushMat);
+  blushR.position.set(0.12, 1.32, 0.17);
+  blushR.rotation.y = -0.3;
+  blushR.visible = false;
+  group.add(blushR);
+
+  return {
+    leftEye,
+    rightEye,
+    mouth,
+    blushL,
+    blushR,
+    baseMouthY: 1.29,
+    baseEyeY: 1.38,
+  };
+}
+
+export function setExpression(group, expression) {
+  const face = group.userData.face;
+  if (!face) return;
+
+  const { leftEye, rightEye, mouth, blushL, blushR, baseMouthY, baseEyeY } = face;
+
+  leftEye.scale.set(1, 1, 1);
+  rightEye.scale.set(1, 1, 1);
+  leftEye.position.set(-0.065, baseEyeY, 0.19);
+  rightEye.position.set(0.065, baseEyeY, 0.19);
+  mouth.scale.set(1, 1, 1);
+  mouth.position.set(0, baseMouthY, 0.2);
+  blushL.visible = false;
+  blushR.visible = false;
+
+  switch (expression) {
+    case 'happy':
+      leftEye.scale.y = 0.45;
+      rightEye.scale.y = 0.45;
+      mouth.scale.set(1.4, 2.5, 1);
+      break;
+    case 'surprised':
+      leftEye.scale.set(1.35, 1.35, 1);
+      rightEye.scale.set(1.35, 1.35, 1);
+      mouth.scale.set(0.7, 3, 1);
+      mouth.position.y = baseMouthY - 0.01;
+      break;
+    case 'thinking':
+      leftEye.position.set(-0.04, baseEyeY + 0.02, 0.19);
+      rightEye.position.set(0.08, baseEyeY + 0.02, 0.19);
+      mouth.scale.set(0.8, 0.8, 1);
+      break;
+    case 'shy':
+      leftEye.position.set(-0.065, baseEyeY - 0.025, 0.19);
+      rightEye.position.set(0.065, baseEyeY - 0.025, 0.19);
+      leftEye.scale.y = 0.7;
+      rightEye.scale.y = 0.7;
+      mouth.scale.set(0.6, 1, 1);
+      blushL.visible = true;
+      blushR.visible = true;
+      break;
+    default:
+      break;
+  }
+}
+
+function createNameTag(name, nameJa) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.fillRect(8, 8, 240, 48);
+  ctx.fillStyle = '#2a4a4a';
+  ctx.font = 'bold 18px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(nameJa || name, 128, 28);
+  ctx.fillStyle = '#666';
+  ctx.font = '13px sans-serif';
+  ctx.fillText(name || '', 128, 48);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+  const sprite = new THREE.Sprite(material);
+  sprite.position.y = 1.85;
+  sprite.scale.set(1.4, 0.35, 1);
+  sprite.userData.isNameTag = true;
+  return sprite;
 }
 
 export function animateCharacter(character, speed, dt) {
@@ -193,6 +337,9 @@ export function animateCharacter(character, speed, dt) {
   });
 }
 
+export const MAX_DIST_FROM_PATH = 8.5;
+export const MAP_BOUNDS = { minX: -32, maxX: 40, minZ: -84, maxZ: 20 };
+
 export class Player {
   constructor(scene, path) {
     this.path = path;
@@ -204,29 +351,49 @@ export class Player {
     this.facing = 0;
     this.walkSpeed = 3.2;
     this.runSpeed = 6.5;
+    this.baseRunSpeed = 6.5;
+    this.speedBoostTimer = 0;
     this.pathT = 0.05;
     this.raycaster = new THREE.Raycaster();
   }
 
+  applySpeedBoost(amount, duration) {
+    this.runSpeed = this.baseRunSpeed + amount;
+    this.speedBoostTimer = duration;
+  }
+
   update(input, dt, groundMeshes) {
-    const speed = input.isRunning ? this.runSpeed : this.walkSpeed;
-    const camForward = new THREE.Vector3(Math.sin(input.cameraAngle), 0, Math.cos(input.cameraAngle));
-    const camRight = new THREE.Vector3(Math.cos(input.cameraAngle), 0, -Math.sin(input.cameraAngle));
+    if (this.speedBoostTimer > 0) {
+      this.speedBoostTimer -= dt;
+      if (this.speedBoostTimer <= 0) {
+        this.runSpeed = this.baseRunSpeed;
+      }
+    }
 
-    const moveDir = new THREE.Vector3()
-      .addScaledVector(camRight, input.move.x)
-      .addScaledVector(camForward, -input.move.z);
-
-    if (moveDir.lengthSq() > 0.001) {
-      moveDir.normalize();
-      this.velocity.copy(moveDir.multiplyScalar(speed));
-      this.facing = Math.atan2(moveDir.x, moveDir.z);
+    if (input.dialogueOpen) {
+      this.velocity.set(0, 0, 0);
     } else {
-      this.velocity.multiplyScalar(0.85);
+      const speed = input.isRunning ? this.runSpeed : this.walkSpeed;
+      const camForward = new THREE.Vector3(Math.sin(input.cameraAngle), 0, Math.cos(input.cameraAngle));
+      const camRight = new THREE.Vector3(Math.cos(input.cameraAngle), 0, -Math.sin(input.cameraAngle));
+
+      const moveDir = new THREE.Vector3()
+        .addScaledVector(camRight, input.move.x)
+        .addScaledVector(camForward, input.move.z);
+
+      if (moveDir.lengthSq() > 0.001) {
+        moveDir.normalize();
+        this.velocity.copy(moveDir.multiplyScalar(speed));
+        this.facing = Math.atan2(moveDir.x, moveDir.z);
+      } else {
+        this.velocity.multiplyScalar(0.85);
+      }
     }
 
     this.mesh.position.x += this.velocity.x * dt;
     this.mesh.position.z += this.velocity.z * dt;
+
+    this._clampToWalkableArea();
 
     const groundY = this._sampleGround(this.mesh.position, groundMeshes);
     this.mesh.position.y = groundY;
@@ -236,7 +403,27 @@ export class Player {
     const moveSpeed = this.velocity.length();
     animateCharacter(this.mesh, moveSpeed, dt);
 
-    this.pathT = this.path.getClosestPointT(this.mesh.position);
+    this.pathT = this.path.getClosestPointT?.(this.mesh.position) ?? 0;
+  }
+
+  _clampToWalkableArea() {
+    const pos = this.mesh.position;
+
+    if (this.path?.getClosestPointT) {
+      this.pathT = this.path.getClosestPointT(pos);
+      const nearest = this.path.getPointAt(this.pathT);
+      const dx = pos.x - nearest.x;
+      const dz = pos.z - nearest.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > MAX_DIST_FROM_PATH) {
+        const scale = MAX_DIST_FROM_PATH / dist;
+        pos.x = nearest.x + dx * scale;
+        pos.z = nearest.z + dz * scale;
+      }
+    }
+
+    pos.x = THREE.MathUtils.clamp(pos.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX);
+    pos.z = THREE.MathUtils.clamp(pos.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ);
   }
 
   _sampleGround(pos, groundMeshes) {
@@ -250,31 +437,263 @@ export class Player {
   }
 }
 
+function createAlertBubble() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f0c040';
+  ctx.beginPath();
+  ctx.arc(32, 36, 22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = 'bold 28px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('!', 32, 44);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: texture, transparent: true }),
+  );
+  sprite.position.y = 2.15;
+  sprite.scale.set(0.45, 0.45, 1);
+  sprite.visible = false;
+  return sprite;
+}
+
+function createWaveBubble() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(32, 36, 22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#3a8a8a';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.font = '28px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('👋', 32, 44);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: texture, transparent: true }),
+  );
+  sprite.position.y = 2.15;
+  sprite.scale.set(0.5, 0.5, 1);
+  sprite.visible = false;
+  return sprite;
+}
+
 export class NPC {
-  constructor(scene, path, startT, speed = 1.2) {
+  constructor(scene, path, profile) {
     this.path = path;
-    this.t = startT;
-    this.speed = speed;
-    this.direction = 1;
-    this.mesh = createCharacter({ shirtColor: 0xe8e0d0, backpackColor: 0xe85050 });
+    this.profile = profile;
+    this.t = profile.startT;
+    this.isTalking = false;
+    this.playerNearby = false;
+    this.talkCount = 0;
+    this.friendship = 0;
+    this.ignoreUntil = 0;
+    this.idlePhase = Math.random() * Math.PI * 2;
+    this.state = 'idle';
+    this.isCompanion = false;
+    this.homePos = new THREE.Vector3();
+    this.walkSpeed = 2.8;
+    this.followSpeed = 3.4;
+
+    this.mesh = createCharacter({
+      shirtColor: profile.shirtColor,
+      backpackColor: profile.backpackColor,
+      hairColor: profile.hairColor,
+      nameTag: profile.name,
+      nameTagJa: profile.nameJa,
+    });
+
+    this.alertBubble = createAlertBubble();
+    this.waveBubble = createWaveBubble();
+    this.mesh.add(this.alertBubble);
+    this.mesh.add(this.waveBubble);
+
     scene.add(this.mesh);
+    setExpression(this.mesh, profile.defaultExpression);
+    this._placeOnPath();
+    this.homePos.copy(this.mesh.position);
   }
 
-  update(dt) {
-    this.t += (this.speed * dt * this.direction) / this.path.getLength();
-    if (this.t > 0.95) {
-      this.t = 0.95;
-      this.direction = -1;
-    } else if (this.t < 0.15) {
-      this.t = 0.15;
-      this.direction = 1;
-    }
-
+  _placeOnPath() {
     const pos = this.path.getPointAt(this.t);
     const tangent = this.path.getTangentAt(this.t);
     this.mesh.position.copy(pos);
     this.mesh.position.y += 0.02;
     this.mesh.rotation.y = Math.atan2(tangent.x, tangent.z);
-    animateCharacter(this.mesh, this.speed, dt);
+  }
+
+  distanceTo(point) {
+    const dx = this.mesh.position.x - point.x;
+    const dz = this.mesh.position.z - point.z;
+    return Math.hypot(dx, dz);
+  }
+
+  isIgnored() {
+    return Date.now() < this.ignoreUntil;
+  }
+
+  ignoreFor(seconds) {
+    this.ignoreUntil = Date.now() + seconds * 1000;
+    this.alertBubble.visible = false;
+    this.stopApproaching();
+  }
+
+  clearIgnore() {
+    this.ignoreUntil = 0;
+  }
+
+  hasMetBefore() {
+    return this.talkCount > 0;
+  }
+
+  markMet() {
+    this.talkCount += 1;
+  }
+
+  addFriendship() {
+    this.friendship += 1;
+  }
+
+  setExpression(expression) {
+    setExpression(this.mesh, expression);
+  }
+
+  onApproach(initiated = false) {
+    this.alertBubble.visible = !initiated;
+    this.waveBubble.visible = initiated;
+    setExpression(this.mesh, initiated ? 'happy' : 'happy');
+  }
+
+  clearApproachBubbles() {
+    this.alertBubble.visible = false;
+    this.waveBubble.visible = false;
+  }
+
+  startApproaching() {
+    if (this.state === 'following' || this.isCompanion) return;
+    this.state = 'approaching';
+    this.waveBubble.visible = true;
+    setExpression(this.mesh, 'happy');
+  }
+
+  stopApproaching() {
+    if (this.state === 'approaching') this.state = 'idle';
+    this.waveBubble.visible = false;
+  }
+
+  startFollowing() {
+    this.state = 'following';
+    this.isCompanion = true;
+    this.clearApproachBubbles();
+    setExpression(this.mesh, 'happy');
+  }
+
+  stopFollowing(returnHome = false) {
+    this.state = 'idle';
+    this.isCompanion = false;
+    this.clearApproachBubbles();
+    setExpression(this.mesh, this.profile.defaultExpression);
+    if (returnHome) {
+      this.mesh.position.copy(this.homePos);
+    }
+  }
+
+  setPlayerNearby(nearby, playerPos) {
+    this.playerNearby = nearby && !this.isCompanion;
+    if (nearby && playerPos && !this.isTalking && !this.isCompanion) {
+      this.facePoint(playerPos);
+    }
+    if (!this.isTalking && !this.isCompanion && this.state !== 'approaching') {
+      this.alertBubble.visible = nearby;
+    }
+  }
+
+  startConversation() {
+    this.isTalking = true;
+    this.clearApproachBubbles();
+    if (this.state === 'approaching') this.state = 'idle';
+  }
+
+  endConversation() {
+    this.isTalking = false;
+    if (!this.isCompanion) {
+      setExpression(this.mesh, this.profile.defaultExpression);
+    }
+  }
+
+  facePoint(point) {
+    const dx = point.x - this.mesh.position.x;
+    const dz = point.z - this.mesh.position.z;
+    if (Math.hypot(dx, dz) > 0.01) {
+      this.mesh.rotation.y = Math.atan2(dx, dz);
+    }
+  }
+
+  _moveToward(target, dt, speed, stopDist = 1.4) {
+    const dx = target.x - this.mesh.position.x;
+    const dz = target.z - this.mesh.position.z;
+    const dist = Math.hypot(dx, dz);
+
+    if (dist > stopDist) {
+      const step = Math.min(speed * dt, dist - stopDist);
+      this.mesh.position.x += (dx / dist) * step;
+      this.mesh.position.z += (dz / dist) * step;
+      this.mesh.rotation.y = Math.atan2(dx, dz);
+      animateCharacter(this.mesh, speed, dt);
+      return false;
+    }
+
+    animateCharacter(this.mesh, 0, dt);
+    return true;
+  }
+
+  update(dt, playerPos = null, playerFacing = 0) {
+    if (this.isTalking) {
+      animateCharacter(this.mesh, 0, dt);
+      if (playerPos) this.facePoint(playerPos);
+      return;
+    }
+
+    if (this.state === 'following' && playerPos) {
+      const offset = new THREE.Vector3(
+        -Math.sin(playerFacing) * 1.4,
+        0,
+        -Math.cos(playerFacing) * 1.4,
+      );
+      const target = playerPos.clone().add(offset);
+      target.y = this.mesh.position.y;
+      this._moveToward(target, dt, this.followSpeed, 1.2);
+      this.mesh.position.y = 0.02 + Math.sin(this.idlePhase) * 0.008;
+      this.idlePhase += dt * 2;
+      return;
+    }
+
+    if (this.state === 'approaching' && playerPos) {
+      const reached = this._moveToward(playerPos, dt, this.walkSpeed, 2.2);
+      this.waveBubble.visible = true;
+      if (reached) setExpression(this.mesh, 'happy');
+      return;
+    }
+
+    if (this.playerNearby) {
+      animateCharacter(this.mesh, 0, dt);
+      if (playerPos) this.facePoint(playerPos);
+      return;
+    }
+
+    this.idlePhase += dt * 1.5;
+    this.mesh.position.y = this.homePos.y + Math.sin(this.idlePhase) * 0.015;
   }
 }

@@ -1,41 +1,154 @@
 import * as THREE from 'three';
 import { createToonMaterial, createOutlinedMesh, PALETTE, nextFrame } from './materials.js';
 
-function createBuilding(width, depth, height, wallColor, roofColor) {
-  const group = new THREE.Group();
+function placeAlongPath(group, path, t, side, offset, y = 0) {
+  const pos = path.getPointAt(t);
+  const tangent = path.getTangentAt(t);
+  const perp = new THREE.Vector3(-tangent.z, 0, tangent.x).multiplyScalar(side);
+  group.position.copy(pos).add(perp.multiplyScalar(offset));
+  group.position.y = y;
+  group.lookAt(group.position.x + tangent.x, group.position.y, group.position.z + tangent.z);
+  return group;
+}
 
-  const walls = createOutlinedMesh(
-    new THREE.BoxGeometry(width, height, depth),
-    createToonMaterial(wallColor),
-  );
+function createBuilding(width, depth, height, wallColor, roofColor, style = 'house') {
+  const group = new THREE.Group();
+  const wallMat = createToonMaterial(wallColor);
+  const roofMat = createToonMaterial(roofColor);
+
+  const walls = createOutlinedMesh(new THREE.BoxGeometry(width, height, depth), wallMat);
   walls.position.y = height / 2;
   group.add(walls);
 
-  const roof = createOutlinedMesh(
-    new THREE.BoxGeometry(width + 0.3, 0.15, depth + 0.3),
-    createToonMaterial(roofColor),
-  );
-  roof.position.y = height + 0.08;
+  if (style === 'shop') {
+    const awning = createOutlinedMesh(
+      new THREE.BoxGeometry(width + 0.4, 0.08, 1.2),
+      createToonMaterial(0xc84040),
+    );
+    awning.position.set(0, height * 0.72, depth / 2 + 0.55);
+    group.add(awning);
+
+    const awningStripe = new THREE.Mesh(
+      new THREE.BoxGeometry(width + 0.2, 0.04, 1.0),
+      createToonMaterial(0xf0f0f0),
+    );
+    awningStripe.position.set(0, height * 0.72, depth / 2 + 0.5);
+    group.add(awningStripe);
+
+    const door = createOutlinedMesh(
+      new THREE.BoxGeometry(0.9, 1.5, 0.08),
+      createToonMaterial(0x5a4030),
+    );
+    door.position.set(0, 0.75, depth / 2 + 0.05);
+    group.add(door);
+  }
+
+  if (style === 'apartment') {
+    const balcony = createOutlinedMesh(
+      new THREE.BoxGeometry(width * 0.5, 0.08, 0.6),
+      createToonMaterial(0x888888),
+    );
+    balcony.position.set(0, height * 0.45, depth / 2 + 0.35);
+    group.add(balcony);
+
+    const rail = createOutlinedMesh(
+      new THREE.BoxGeometry(width * 0.5, 0.35, 0.05),
+      createToonMaterial(0x666666),
+    );
+    rail.position.set(0, height * 0.62, depth / 2 + 0.62);
+    group.add(rail);
+  }
+
+  const roof =
+    style === 'shrine'
+      ? createOutlinedMesh(
+          new THREE.ConeGeometry(width * 0.55, 0.9, 4),
+          roofMat,
+        )
+      : createOutlinedMesh(new THREE.BoxGeometry(width + 0.3, 0.15, depth + 0.3), roofMat);
+
+  roof.position.y = style === 'shrine' ? height + 0.45 : height + 0.08;
+  if (style === 'shrine') roof.rotation.y = Math.PI / 4;
   group.add(roof);
 
   const windowMat = createToonMaterial(0xc8e8f0);
   const windowGeo = new THREE.PlaneGeometry(0.5, 0.6);
-  const windowCount = Math.floor(width / 1.2);
+  const windowCount = Math.max(1, Math.floor(width / 1.2));
   for (let i = 0; i < windowCount; i++) {
     const win = new THREE.Mesh(windowGeo, windowMat);
     win.position.set(-width / 2 + 0.6 + i * 1.2, height * 0.55, depth / 2 + 0.01);
     group.add(win);
+
+    if (style === 'apartment' && i % 2 === 0) {
+      const upperWin = win.clone();
+      upperWin.position.y = height * 0.78;
+      group.add(upperWin);
+    }
   }
 
   return group;
 }
 
-function createVendingMachine() {
+function createTorii() {
   const group = new THREE.Group();
-  const body = createOutlinedMesh(
-    new THREE.BoxGeometry(0.9, 1.8, 0.7),
-    createToonMaterial(PALETTE.vending),
+  const red = createToonMaterial(0xc03030);
+  const postGeo = new THREE.CylinderGeometry(0.12, 0.14, 2.8, 6);
+
+  [-1.1, 1.1].forEach((x) => {
+    const post = createOutlinedMesh(postGeo, red);
+    post.position.set(x, 1.4, 0);
+    group.add(post);
+  });
+
+  const lintel = createOutlinedMesh(new THREE.BoxGeometry(2.8, 0.18, 0.18), red);
+  lintel.position.y = 2.55;
+  group.add(lintel);
+
+  const topLintel = createOutlinedMesh(new THREE.BoxGeometry(3.0, 0.12, 0.22), red);
+  topLintel.position.y = 2.85;
+  group.add(topLintel);
+
+  const plaque = createOutlinedMesh(
+    new THREE.BoxGeometry(0.5, 0.25, 0.06),
+    createToonMaterial(0x1a1a1a),
   );
+  plaque.position.set(0, 2.35, 0.12);
+  group.add(plaque);
+
+  return group;
+}
+
+function createLantern() {
+  const group = new THREE.Group();
+  const post = createOutlinedMesh(
+    new THREE.CylinderGeometry(0.04, 0.05, 1.6, 6),
+    createToonMaterial(PALETTE.metal),
+  );
+  post.position.y = 0.8;
+  group.add(post);
+
+  const paper = createOutlinedMesh(
+    new THREE.CylinderGeometry(0.18, 0.22, 0.45, 8, 1, true),
+    createToonMaterial(0xf06050),
+  );
+  paper.position.y = 1.75;
+  group.add(paper);
+
+  const cap = createOutlinedMesh(
+    new THREE.ConeGeometry(0.12, 0.15, 4),
+    createToonMaterial(0x333333),
+  );
+  cap.position.y = 2.05;
+  cap.rotation.y = Math.PI / 4;
+  group.add(cap);
+
+  group.userData.lanternMesh = paper;
+  return group;
+}
+
+function createVendingMachine(color = PALETTE.vending) {
+  const group = new THREE.Group();
+  const body = createOutlinedMesh(new THREE.BoxGeometry(0.9, 1.8, 0.7), createToonMaterial(color));
   body.position.y = 0.9;
   group.add(body);
 
@@ -76,10 +189,7 @@ function createMailbox() {
   box.position.y = 1.25;
   group.add(box);
 
-  const roof = createOutlinedMesh(
-    new THREE.ConeGeometry(0.28, 0.2, 4),
-    createToonMaterial(PALETTE.orange),
-  );
+  const roof = createOutlinedMesh(new THREE.ConeGeometry(0.28, 0.2, 4), createToonMaterial(PALETTE.orange));
   roof.position.y = 1.5;
   roof.rotation.y = Math.PI / 4;
   group.add(roof);
@@ -95,10 +205,7 @@ function createTrafficMirror() {
   pole.position.y = 1.25;
   group.add(pole);
 
-  const mirror = createOutlinedMesh(
-    new THREE.CircleGeometry(0.45, 16),
-    createToonMaterial(0xd0e8e8),
-  );
+  const mirror = createOutlinedMesh(new THREE.CircleGeometry(0.45, 16), createToonMaterial(0xd0e8e8));
   mirror.position.set(0, 2.6, 0);
   mirror.rotation.x = -0.3;
   group.add(mirror);
@@ -114,10 +221,9 @@ function createTrafficMirror() {
 }
 
 function createTrafficCone() {
-  return createOutlinedMesh(
-    new THREE.ConeGeometry(0.15, 0.4, 8),
-    createToonMaterial(PALETTE.cone),
-  );
+  const cone = createOutlinedMesh(new THREE.ConeGeometry(0.15, 0.4, 8), createToonMaterial(PALETTE.cone));
+  cone.position.y = 0.2;
+  return cone;
 }
 
 function createInfoKiosk() {
@@ -135,6 +241,138 @@ function createInfoKiosk() {
   );
   board.position.set(0, 0.85, 0.26);
   group.add(board);
+
+  for (let i = 0; i < 5; i++) {
+    const line = new THREE.Mesh(
+      new THREE.BoxGeometry(0.45, 0.03, 0.01),
+      createToonMaterial(0x888888),
+    );
+    line.position.set(0, 0.55 + i * 0.14, 0.29);
+    group.add(line);
+  }
+  return group;
+}
+
+function createUtilityPole() {
+  const group = new THREE.Group();
+  const pole = createOutlinedMesh(
+    new THREE.CylinderGeometry(0.07, 0.09, 4.5, 6),
+    createToonMaterial(0x6a5a4a),
+  );
+  pole.position.y = 2.25;
+  group.add(pole);
+
+  const crossbar = createOutlinedMesh(
+    new THREE.BoxGeometry(1.2, 0.06, 0.06),
+    createToonMaterial(0x6a5a4a),
+  );
+  crossbar.position.y = 4.0;
+  group.add(crossbar);
+
+  const sign = createOutlinedMesh(
+    new THREE.CircleGeometry(0.22, 12),
+    createToonMaterial(0x3080c0),
+  );
+  sign.position.set(0, 3.2, 0.12);
+  group.add(sign);
+
+  return group;
+}
+
+function createBicycle() {
+  const group = new THREE.Group();
+  const frameMat = createToonMaterial(0x4080c0);
+  const wheelMat = createToonMaterial(0x222222);
+
+  const wheelGeo = new THREE.TorusGeometry(0.28, 0.03, 6, 12);
+  [-0.45, 0.45].forEach((x) => {
+    const wheel = createOutlinedMesh(wheelGeo, wheelMat);
+    wheel.rotation.y = Math.PI / 2;
+    wheel.position.set(x, 0.28, 0);
+    group.add(wheel);
+  });
+
+  const bar = createOutlinedMesh(new THREE.BoxGeometry(0.9, 0.04, 0.04), frameMat);
+  bar.position.set(0, 0.55, 0);
+  bar.rotation.z = 0.15;
+  group.add(bar);
+
+  const seat = createOutlinedMesh(new THREE.BoxGeometry(0.15, 0.06, 0.2), createToonMaterial(0x1a1a1a));
+  seat.position.set(-0.15, 0.65, 0);
+  group.add(seat);
+
+  return group;
+}
+
+function createBench() {
+  const group = new THREE.Group();
+  const wood = createToonMaterial(0x8a6a4a);
+  const leg = createOutlinedMesh(new THREE.BoxGeometry(0.08, 0.35, 0.08), wood);
+  [[-0.5, -0.15], [0.5, -0.15], [-0.5, 0.15], [0.5, 0.15]].forEach(([x, z]) => {
+    const l = leg.clone();
+    l.position.set(x, 0.18, z);
+    group.add(l);
+  });
+
+  const seat = createOutlinedMesh(new THREE.BoxGeometry(1.2, 0.06, 0.4), wood);
+  seat.position.y = 0.38;
+  group.add(seat);
+
+  const back = createOutlinedMesh(new THREE.BoxGeometry(1.2, 0.35, 0.06), wood);
+  back.position.set(0, 0.6, -0.17);
+  group.add(back);
+
+  return group;
+}
+
+function createBollard() {
+  const bollard = createOutlinedMesh(
+    new THREE.CylinderGeometry(0.08, 0.1, 0.55, 6),
+    createToonMaterial(0xf0c030),
+  );
+  bollard.position.y = 0.28;
+  return bollard;
+}
+
+function createPottedPlant() {
+  const group = new THREE.Group();
+  const pot = createOutlinedMesh(
+    new THREE.CylinderGeometry(0.15, 0.12, 0.25, 6),
+    createToonMaterial(0x8a5030),
+  );
+  pot.position.y = 0.13;
+  group.add(pot);
+
+  const leaves = createOutlinedMesh(
+    new THREE.SphereGeometry(0.22, 8, 6),
+    createToonMaterial(0x4a9a4a),
+  );
+  leaves.position.y = 0.38;
+  group.add(leaves);
+
+  return group;
+}
+
+function createCat() {
+  const group = new THREE.Group();
+  const body = createOutlinedMesh(
+    new THREE.SphereGeometry(0.12, 8, 6),
+    createToonMaterial(0xf0a040),
+  );
+  body.scale.set(1.2, 0.8, 1);
+  body.position.y = 0.12;
+  group.add(body);
+
+  const head = createOutlinedMesh(new THREE.SphereGeometry(0.09, 8, 6), createToonMaterial(0xf0a040));
+  head.position.set(0.14, 0.18, 0);
+  group.add(head);
+
+  [[-0.04, 0.28, 0.04], [0.04, 0.28, 0.04]].forEach(([x, y, z]) => {
+    const ear = createOutlinedMesh(new THREE.ConeGeometry(0.03, 0.06, 3), createToonMaterial(0xf0a040));
+    ear.position.set(x + 0.14, y, z);
+    group.add(ear);
+  });
+
   return group;
 }
 
@@ -142,13 +380,63 @@ function createPowerLines(start, end, height) {
   const group = new THREE.Group();
   const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
   mid.y = height;
-
   const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
   const tube = new THREE.Mesh(
     new THREE.TubeGeometry(curve, 20, 0.015, 4, false),
     createToonMaterial(0x333333),
   );
   group.add(tube);
+  return group;
+}
+
+function createTree(variant = 'normal') {
+  const tree = new THREE.Group();
+  const trunk = createOutlinedMesh(
+    new THREE.CylinderGeometry(0.08, 0.12, 0.8, 6),
+    createToonMaterial(0x6a5040),
+  );
+  trunk.position.y = 0.4;
+  tree.add(trunk);
+
+  if (variant === 'cherry') {
+    const blossomMat = createToonMaterial(0xf0a0b8);
+    [[0, 1.1, 0, 0.55], [-0.3, 1.0, 0.1, 0.4], [0.3, 1.05, -0.1, 0.45], [0, 1.3, 0.15, 0.35]].forEach(
+      ([x, y, z, s]) => {
+        const puff = createOutlinedMesh(new THREE.SphereGeometry(s, 8, 6), blossomMat);
+        puff.position.set(x, y, z);
+        tree.add(puff);
+      },
+    );
+  } else if (variant === 'pine') {
+    [0.55, 0.4, 0.28].forEach((r, i) => {
+      const layer = createOutlinedMesh(
+        new THREE.ConeGeometry(r, 0.45, 6),
+        createToonMaterial(0x3a7a4a),
+      );
+      layer.position.y = 0.85 + i * 0.35;
+      tree.add(layer);
+    });
+  } else {
+    const foliage = createOutlinedMesh(
+      new THREE.SphereGeometry(0.5 + Math.random() * 0.25, 8, 6),
+      createToonMaterial(0x5a9a5a + Math.floor(Math.random() * 0x050505)),
+    );
+    foliage.position.y = 1.1;
+    tree.add(foliage);
+  }
+
+  return tree;
+}
+
+function createBambooCluster() {
+  const group = new THREE.Group();
+  const mat = createToonMaterial(0x5a9a5a);
+  for (let i = 0; i < 5; i++) {
+    const h = 1.5 + Math.random() * 1.2;
+    const stalk = createOutlinedMesh(new THREE.CylinderGeometry(0.04, 0.05, h, 6), mat);
+    stalk.position.set((Math.random() - 0.5) * 0.6, h / 2, (Math.random() - 0.5) * 0.6);
+    group.add(stalk);
+  }
   return group;
 }
 
@@ -164,6 +452,136 @@ function createCloud(x, y, z, scale) {
   );
   group.position.set(x, y, z);
   group.scale.setScalar(scale);
+  group.userData.driftSpeed = 0.15 + Math.random() * 0.2;
+  group.userData.driftPhase = Math.random() * Math.PI * 2;
+  return group;
+}
+
+function createMountainBackdrop() {
+  const group = new THREE.Group();
+  const mat = createToonMaterial(0x7a9a9a);
+  const peaks = [
+    [-45, 0, -55, 9, 14],
+    [-28, 0, -62, 7, 11],
+    [-10, 0, -68, 11, 16],
+    [8, 0, -72, 8, 13],
+    [28, 0, -65, 10, 15],
+    [48, 0, -58, 8, 12],
+    [-35, 0, -78, 6, 10],
+    [18, 0, -82, 9, 14],
+    [42, 0, -75, 7, 11],
+  ];
+  peaks.forEach(([x, y, z, w, h]) => {
+    const peak = new THREE.Mesh(new THREE.ConeGeometry(w, h, 4), mat);
+    peak.position.set(x, h / 2 - 1, z);
+    peak.rotation.y = Math.PI / 4;
+    group.add(peak);
+  });
+  return group;
+}
+
+function createHarborPier() {
+  const group = new THREE.Group();
+  const woodMat = createToonMaterial(0x8a7050);
+  const railMat = createToonMaterial(0x606050);
+
+  for (let i = 0; i < 6; i++) {
+    const plank = createOutlinedMesh(new THREE.BoxGeometry(2.8, 0.12, 1.2), woodMat);
+    plank.position.set(0, 0.18 + i * 0.02, -i * 1.1);
+    group.add(plank);
+  }
+
+  [-1.3, 1.3].forEach((x) => {
+    const post = createOutlinedMesh(new THREE.BoxGeometry(0.1, 0.7, 0.1), railMat);
+    post.position.set(x, 0.55, -2.5);
+    group.add(post);
+    const rail = createOutlinedMesh(new THREE.BoxGeometry(0.08, 0.08, 5.5), railMat);
+    rail.position.set(x, 0.85, -2.7);
+    group.add(rail);
+  });
+
+  const lamp = createLantern();
+  lamp.position.set(0, 0, -5.8);
+  lamp.scale.setScalar(0.85);
+  group.add(lamp);
+
+  return group;
+}
+
+function createHarborWater() {
+  const water = new THREE.Mesh(
+    new THREE.PlaneGeometry(28, 22),
+    createToonMaterial(0x5a9ab8),
+  );
+  water.rotation.x = -Math.PI / 2;
+  water.position.y = -0.08;
+  return water;
+}
+
+function createLookoutDeck() {
+  const group = new THREE.Group();
+  const deck = createOutlinedMesh(new THREE.BoxGeometry(3.5, 0.15, 2.5), createToonMaterial(0x989080));
+  deck.position.y = 0.45;
+  group.add(deck);
+
+  const bench = createBench();
+  bench.position.set(0, 0, 0.3);
+  bench.scale.setScalar(0.9);
+  group.add(bench);
+
+  const sign = createOutlinedMesh(new THREE.BoxGeometry(1.6, 0.9, 0.08), createToonMaterial(0xf0e8d8));
+  sign.position.set(-1.6, 0.95, 0);
+  group.add(sign);
+
+  return group;
+}
+
+function createStoneSteps(count = 4) {
+  const group = new THREE.Group();
+  const mat = createToonMaterial(0x989890);
+  for (let i = 0; i < count; i++) {
+    const step = createOutlinedMesh(new THREE.BoxGeometry(1.8 - i * 0.1, 0.12, 0.45), mat);
+    step.position.set(0, 0.06 + i * 0.12, -i * 0.4);
+    group.add(step);
+  }
+  return group;
+}
+
+function createShrine() {
+  const group = new THREE.Group();
+  const base = createOutlinedMesh(new THREE.BoxGeometry(2.2, 0.25, 1.8), createToonMaterial(0x888880));
+  base.position.y = 0.12;
+  group.add(base);
+
+  const building = createBuilding(1.8, 1.5, 1.6, 0xf0e8d8, 0x3a3a3a, 'shrine');
+  building.position.set(0, 0, -0.3);
+  group.add(building);
+
+  const torii = createTorii();
+  torii.position.set(0, 0, 1.6);
+  torii.scale.setScalar(0.75);
+  group.add(torii);
+
+  return group;
+}
+
+function createGardenPatch() {
+  const group = new THREE.Group();
+  const soil = new THREE.Mesh(
+    new THREE.BoxGeometry(2.5, 0.05, 1.8),
+    createToonMaterial(0x6a5040),
+  );
+  soil.position.y = 0.03;
+  group.add(soil);
+
+  for (let i = 0; i < 6; i++) {
+    const flower = createOutlinedMesh(
+      new THREE.SphereGeometry(0.08, 6, 4),
+      createToonMaterial([0xf06080, 0xf0c040, 0xf0f0f0, 0xe080c0][i % 4]),
+    );
+    flower.position.set((Math.random() - 0.5) * 2, 0.15, (Math.random() - 0.5) * 1.4);
+    group.add(flower);
+  }
   return group;
 }
 
@@ -171,12 +589,15 @@ export class Town {
   constructor(scene) {
     this.scene = scene;
     this.groundMeshes = [];
+    this.animatedClouds = [];
+    this.lanterns = [];
     this.path = this._createPath();
   }
 
   async build(onProgress) {
     onProgress?.('Building sky…');
     this._createSky();
+    this._createBackdrop();
     await nextFrame();
 
     onProgress?.('Laying streets…');
@@ -186,54 +607,109 @@ export class Town {
 
     onProgress?.('Placing buildings…');
     this._createBuildings();
+    this._createLandmarks();
     await nextFrame();
 
     onProgress?.('Adding details…');
     this._createProps();
+    this._createStreetFurniture();
     this._createVegetation();
     this._createClouds();
     this._createLighting();
     onProgress?.('Ready');
   }
 
+  update(elapsed) {
+    this.animatedClouds.forEach((cloud) => {
+      cloud.position.x += Math.sin(elapsed * cloud.userData.driftSpeed + cloud.userData.driftPhase) * 0.003;
+    });
+
+    this.lanterns.forEach((lantern, i) => {
+      const pulse = 0.75 + Math.sin(elapsed * 2 + i) * 0.25;
+      if (!lantern.userData.baseColor) {
+        lantern.userData.baseColor = lantern.material.color.clone();
+      }
+      lantern.material.color.copy(lantern.userData.baseColor).multiplyScalar(pulse);
+    });
+  }
+
   _createPath() {
     const points = [
-      new THREE.Vector3(0, 0, 8),
-      new THREE.Vector3(-2, 0, 4),
-      new THREE.Vector3(-1, 0, 0),
-      new THREE.Vector3(2, 0, -4),
-      new THREE.Vector3(4, 0, -8),
-      new THREE.Vector3(2, 0, -14),
-      new THREE.Vector3(-3, 0, -18),
-      new THREE.Vector3(-6, 0, -22),
+      new THREE.Vector3(0, 0, 12),
+      new THREE.Vector3(-2, 0, 8),
+      new THREE.Vector3(-3, 0, 4),
+      new THREE.Vector3(-2, 0, 0),
+      new THREE.Vector3(0, 0, -4),
+      new THREE.Vector3(3, 0, -8),
+      new THREE.Vector3(5, 0, -12),
+      new THREE.Vector3(4, 0, -18),
+      new THREE.Vector3(0, 0, -22),
+      new THREE.Vector3(-4, 0, -26),
+      new THREE.Vector3(-7, 0, -30),
+      new THREE.Vector3(-5, 0, -36),
+      new THREE.Vector3(-2, 0, -40),
+      new THREE.Vector3(2, 0, -44),
+      new THREE.Vector3(6, 0, -48),
+      new THREE.Vector3(10, 0, -52),
+      new THREE.Vector3(12, 0, -56),
+      new THREE.Vector3(10, 0, -60),
+      new THREE.Vector3(6, 0, -64),
+      new THREE.Vector3(2, 0, -68),
     ];
     return new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.5);
   }
 
   _createSky() {
-    this.scene.fog = new THREE.Fog(PALETTE.sky, 30, 80);
+    this.scene.fog = new THREE.Fog(PALETTE.sky, 40, 130);
     this.scene.background = new THREE.Color(PALETTE.sky);
+  }
+
+  _createBackdrop() {
+    this.scene.add(createMountainBackdrop());
   }
 
   _createGround() {
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(120, 120),
+      new THREE.PlaneGeometry(220, 220),
       createToonMaterial(PALETTE.green),
     );
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.05;
+    ground.position.set(2, -0.05, -28);
     ground.receiveShadow = true;
     this.scene.add(ground);
     this.groundMeshes.push(ground);
+
+    const patches = [
+      [-12, -8, 4, 3, 0x6a9a6a],
+      [8, -18, 5, 4, 0x8aaa7a],
+      [-6, -32, 6, 5, 0x5a8a5a],
+      [14, -48, 8, 6, 0x6a9a8a],
+      [18, -62, 10, 8, 0x5a8aaa],
+      [-10, -55, 5, 4, 0x7aaa7a],
+    ];
+    patches.forEach(([x, z, w, d, color]) => {
+      const patch = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, d),
+        createToonMaterial(color),
+      );
+      patch.rotation.x = -Math.PI / 2;
+      patch.position.set(x, 0.01, z);
+      this.scene.add(patch);
+    });
+
+    const harborWater = createHarborWater();
+    harborWater.position.set(22, -0.08, -62);
+    this.scene.add(harborWater);
   }
 
   _createRoad() {
-    const divisions = 48;
+    const divisions = 80;
     const roadWidth = 3.5;
     const points = this.path.getSpacedPoints(divisions);
     const roadMat = createToonMaterial(PALETTE.road);
     const sidewalkMat = createToonMaterial(PALETTE.sidewalk);
     const lineMat = createToonMaterial(PALETTE.roadLine);
+    const curbMat = createToonMaterial(0x989080);
 
     for (let i = 0; i < points.length - 1; i++) {
       const p0 = points[i];
@@ -252,59 +728,68 @@ export class Town {
 
       const sidewalkGeo = new THREE.BoxGeometry(1.5, 0.06, len + 0.05);
 
-      const sidewalkL = new THREE.Mesh(sidewalkGeo, sidewalkMat);
-      sidewalkL.position.copy(center).add(perp.clone().multiplyScalar(roadWidth / 2 + 0.75));
-      sidewalkL.position.y = 0.04;
-      sidewalkL.lookAt(
-        sidewalkL.position.x + dir.x,
-        sidewalkL.position.y,
-        sidewalkL.position.z + dir.z,
-      );
-      this.scene.add(sidewalkL);
-      this.groundMeshes.push(sidewalkL);
-
-      const sidewalkR = new THREE.Mesh(sidewalkGeo, sidewalkMat);
-      sidewalkR.position.copy(center).add(perp.clone().multiplyScalar(-(roadWidth / 2 + 0.75)));
-      sidewalkR.position.y = 0.04;
-      sidewalkR.lookAt(
-        sidewalkR.position.x + dir.x,
-        sidewalkR.position.y,
-        sidewalkR.position.z + dir.z,
-      );
-      this.scene.add(sidewalkR);
-      this.groundMeshes.push(sidewalkR);
-
-      if (i % 6 === 0) {
-        const line = new THREE.Mesh(
-          new THREE.BoxGeometry(0.12, 0.02, len * 0.4),
-          lineMat,
+      [-1, 1].forEach((sign) => {
+        const sidewalk = new THREE.Mesh(sidewalkGeo, sidewalkMat);
+        sidewalk.position.copy(center).add(perp.clone().multiplyScalar(sign * (roadWidth / 2 + 0.75)));
+        sidewalk.position.y = 0.04;
+        sidewalk.lookAt(
+          sidewalk.position.x + dir.x,
+          sidewalk.position.y,
+          sidewalk.position.z + dir.z,
         );
+        this.scene.add(sidewalk);
+        this.groundMeshes.push(sidewalk);
+
+        const curb = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, len + 0.05), curbMat);
+        curb.position.copy(center).add(perp.clone().multiplyScalar(sign * (roadWidth / 2 + 0.2)));
+        curb.position.y = 0.05;
+        curb.lookAt(curb.position.x + dir.x, curb.position.y, curb.position.z + dir.z);
+        this.scene.add(curb);
+      });
+
+      if (i % 5 === 0) {
+        const line = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, len * 0.35), lineMat);
         line.position.copy(center).add(perp.clone().multiplyScalar(roadWidth / 2 - 0.3));
         line.position.y = 0.07;
         line.lookAt(p1.x, line.position.y, p1.z);
         this.scene.add(line);
+      }
+
+      if (i % 14 === 7) {
+        const cover = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.25, 0.25, 0.03, 10),
+          createToonMaterial(0x505050),
+        );
+        cover.position.copy(center);
+        cover.position.y = 0.07;
+        this.scene.add(cover);
       }
     }
   }
 
   _createBuildings() {
     const buildingDefs = [
-      { t: 0.08, side: 1, w: 3, d: 4, h: 3.5, wall: PALETTE.wall, roof: PALETTE.roof },
-      { t: 0.12, side: -1, w: 4, d: 3.5, h: 4, wall: 0xd0c8b8, roof: PALETTE.roofDark },
-      { t: 0.22, side: 1, w: 3.5, d: 3, h: 3, wall: 0xc8d0c0, roof: 0x5a7a6a },
-      { t: 0.35, side: -1, w: 5, d: 4, h: 4.5, wall: PALETTE.wallDark, roof: PALETTE.roof },
-      { t: 0.48, side: 1, w: 3, d: 3.5, h: 3.2, wall: 0xe0d8c8, roof: 0x6a9a7a },
-      { t: 0.58, side: -1, w: 4, d: 3, h: 3.8, wall: 0xd8d0c0, roof: PALETTE.roofDark },
-      { t: 0.72, side: 1, w: 3.5, d: 4, h: 3.5, wall: PALETTE.wall, roof: PALETTE.roof },
-      { t: 0.85, side: -1, w: 4.5, d: 3.5, h: 4.2, wall: 0xc0b8a8, roof: 0x5a8a6a },
+      { t: 0.04, side: 1, w: 3, d: 4, h: 3.5, wall: PALETTE.wall, roof: PALETTE.roof, style: 'house' },
+      { t: 0.08, side: -1, w: 4, d: 3.5, h: 3.2, wall: 0xd0c8b8, roof: PALETTE.roofDark, style: 'shop' },
+      { t: 0.14, side: 1, w: 3.5, d: 3, h: 4.2, wall: 0xc8d0c0, roof: 0x5a7a6a, style: 'apartment' },
+      { t: 0.22, side: -1, w: 5, d: 4, h: 4.5, wall: PALETTE.wallDark, roof: PALETTE.roof, style: 'house' },
+      { t: 0.30, side: 1, w: 3, d: 3.5, h: 3.2, wall: 0xe0d8c8, roof: 0x6a9a7a, style: 'shop' },
+      { t: 0.38, side: -1, w: 4, d: 3, h: 3.8, wall: 0xd8d0c0, roof: PALETTE.roofDark, style: 'apartment' },
+      { t: 0.46, side: 1, w: 3.5, d: 4, h: 3.5, wall: PALETTE.wall, roof: PALETTE.roof, style: 'house' },
+      { t: 0.54, side: -1, w: 4.5, d: 3.5, h: 4.2, wall: 0xc0b8a8, roof: 0x5a8a6a, style: 'shop' },
+      { t: 0.62, side: 1, w: 3, d: 3, h: 3.0, wall: 0xe8e0d0, roof: PALETTE.roofDark, style: 'house' },
+      { t: 0.70, side: -1, w: 4, d: 3.5, h: 3.6, wall: 0xd0c8b8, roof: PALETTE.roof, style: 'apartment' },
+      { t: 0.78, side: 1, w: 3.5, d: 3.2, h: 3.4, wall: 0xd8e0d0, roof: 0x6a8a7a, style: 'shop' },
+      { t: 0.86, side: -1, w: 4.2, d: 3.8, h: 3.8, wall: 0xc8c0b0, roof: PALETTE.roofDark, style: 'house' },
+      { t: 0.94, side: 1, w: 3.2, d: 3, h: 3.2, wall: 0xe0d8c8, roof: PALETTE.roof, style: 'apartment' },
     ];
 
-    buildingDefs.forEach(({ t, side, w, d, h, wall, roof }) => {
+    buildingDefs.forEach(({ t, side, w, d, h, wall, roof, style }) => {
       const pos = this.path.getPointAt(t);
       const tangent = this.path.getTangentAt(t);
       const perp = new THREE.Vector3(-tangent.z, 0, tangent.x).multiplyScalar(side);
 
-      const building = createBuilding(w, d, h, wall, roof);
+      const building = createBuilding(w, d, h, wall, roof, style);
       building.position.copy(pos).add(perp.multiplyScalar(5));
       building.lookAt(
         building.position.x + tangent.x,
@@ -328,27 +813,62 @@ export class Town {
     });
   }
 
+  _createLandmarks() {
+    const shrine = createShrine();
+    placeAlongPath(shrine, this.path, 0.58, 1, 7.5);
+    this.scene.add(shrine);
+
+    const steps = createStoneSteps(5);
+    placeAlongPath(steps, this.path, 0.56, 1, 5.5);
+    this.scene.add(steps);
+
+    const torii = createTorii();
+    placeAlongPath(torii, this.path, 0.38, -1, 6);
+    this.scene.add(torii);
+
+    const garden = createGardenPatch();
+    placeAlongPath(garden, this.path, 0.20, 1, 7);
+    this.scene.add(garden);
+
+    const lookout = createLookoutDeck();
+    placeAlongPath(lookout, this.path, 0.72, -1, 6.5);
+    this.scene.add(lookout);
+
+    const pier = createHarborPier();
+    placeAlongPath(pier, this.path, 0.92, 1, 5);
+    pier.rotation.y += Math.PI / 6;
+    this.scene.add(pier);
+
+    const harborTorii = createTorii();
+    placeAlongPath(harborTorii, this.path, 0.88, -1, 7);
+    harborTorii.scale.setScalar(0.65);
+    this.scene.add(harborTorii);
+  }
+
   _createProps() {
     const props = [
-      { t: 0.1, side: -1, type: 'vending', offset: 2.8 },
-      { t: 0.15, side: 1, type: 'mailbox', offset: 2.5 },
-      { t: 0.28, side: -1, type: 'mirror', offset: 2.2 },
-      { t: 0.32, side: 1, type: 'cone', offset: 2.0 },
-      { t: 0.45, side: -1, type: 'kiosk', offset: 2.6 },
-      { t: 0.55, side: 1, type: 'vending', offset: 2.8 },
-      { t: 0.68, side: -1, type: 'cone', offset: 2.0 },
-      { t: 0.78, side: 1, type: 'mailbox', offset: 2.5 },
+      { t: 0.06, side: -1, type: 'vending', offset: 2.8, color: PALETTE.vending },
+      { t: 0.10, side: 1, type: 'mailbox', offset: 2.5 },
+      { t: 0.16, side: -1, type: 'mirror', offset: 2.2 },
+      { t: 0.20, side: 1, type: 'cone', offset: 2.0 },
+      { t: 0.28, side: -1, type: 'vending', offset: 2.8, color: 0x4060a0 },
+      { t: 0.36, side: 1, type: 'kiosk', offset: 2.6 },
+      { t: 0.44, side: -1, type: 'bicycle', offset: 2.3 },
+      { t: 0.50, side: 1, type: 'vending', offset: 2.8, color: 0xc04060 },
+      { t: 0.58, side: -1, type: 'lantern', offset: 2.4 },
+      { t: 0.64, side: 1, type: 'cone', offset: 2.0 },
+      { t: 0.70, side: -1, type: 'utility', offset: 2.5 },
+      { t: 0.76, side: 1, type: 'mailbox', offset: 2.5 },
+      { t: 0.82, side: -1, type: 'mirror', offset: 2.2 },
+      { t: 0.88, side: 1, type: 'vending', offset: 2.8, color: 0x4080a0 },
+      { t: 0.94, side: -1, type: 'bicycle', offset: 2.4 },
     ];
 
-    props.forEach(({ t, side, type, offset }) => {
-      const pos = this.path.getPointAt(t);
-      const tangent = this.path.getTangentAt(t);
-      const perp = new THREE.Vector3(-tangent.z, 0, tangent.x).multiplyScalar(side);
-
+    props.forEach(({ t, side, type, offset, color }) => {
       let prop;
       switch (type) {
         case 'vending':
-          prop = createVendingMachine();
+          prop = createVendingMachine(color);
           break;
         case 'mailbox':
           prop = createMailbox();
@@ -358,64 +878,125 @@ export class Town {
           break;
         case 'cone':
           prop = createTrafficCone();
-          prop.position.y = 0.2;
           break;
         case 'kiosk':
           prop = createInfoKiosk();
+          break;
+        case 'bicycle':
+          prop = createBicycle();
+          break;
+        case 'lantern': {
+          prop = createLantern();
+          const lanternPart = prop.userData.lanternMesh;
+          if (lanternPart) this.lanterns.push(lanternPart);
+          break;
+        }
+        case 'utility':
+          prop = createUtilityPole();
           break;
         default:
           return;
       }
 
-      prop.position.copy(pos).add(perp.multiplyScalar(offset));
-      prop.lookAt(prop.position.x + tangent.x, prop.position.y, prop.position.z + tangent.z);
+      placeAlongPath(prop, this.path, t, side, offset);
       this.scene.add(prop);
     });
 
-    const polePositions = [
-      this.path.getPointAt(0.2),
-      this.path.getPointAt(0.5),
-      this.path.getPointAt(0.75),
-    ];
+    const polePositions = [0.12, 0.28, 0.44, 0.60, 0.76, 0.90].map((t) => this.path.getPointAt(t));
     for (let i = 0; i < polePositions.length - 1; i++) {
       const start = polePositions[i].clone();
       start.y = 3.5;
-      start.x += 4;
+      start.x += 4.5;
       const end = polePositions[i + 1].clone();
       end.y = 3.5;
-      end.x += 4;
-      this.scene.add(createPowerLines(start, end, 5));
+      end.x += 4.5;
+      this.scene.add(createPowerLines(start, end, 5 + (i % 2) * 0.5));
     }
   }
 
+  _createStreetFurniture() {
+    const furniture = [
+      { t: 0.12, side: 1, type: 'bench', offset: 2.2 },
+      { t: 0.24, side: -1, type: 'bollard', offset: 2.0 },
+      { t: 0.26, side: -1, type: 'bollard', offset: 2.4 },
+      { t: 0.34, side: 1, type: 'plant', offset: 2.1 },
+      { t: 0.36, side: 1, type: 'plant', offset: 2.5 },
+      { t: 0.48, side: -1, type: 'bench', offset: 2.3 },
+      { t: 0.56, side: 1, type: 'cat', offset: 3.0 },
+      { t: 0.68, side: -1, type: 'lantern', offset: 2.3 },
+      { t: 0.74, side: 1, type: 'bench', offset: 2.2 },
+      { t: 0.84, side: -1, type: 'plant', offset: 2.2 },
+      { t: 0.90, side: 1, type: 'cat', offset: 3.2 },
+    ];
+
+    furniture.forEach(({ t, side, type, offset }) => {
+      let item;
+      switch (type) {
+        case 'bench':
+          item = createBench();
+          break;
+        case 'bollard':
+          item = createBollard();
+          break;
+        case 'plant':
+          item = createPottedPlant();
+          break;
+        case 'cat':
+          item = createCat();
+          break;
+        case 'lantern': {
+          item = createLantern();
+          const lanternPart = item.userData.lanternMesh;
+          if (lanternPart) this.lanterns.push(lanternPart);
+          break;
+        }
+        default:
+          return;
+      }
+      placeAlongPath(item, this.path, t, side, offset);
+      this.scene.add(item);
+    });
+  }
+
   _createVegetation() {
-    for (let i = 0; i < 20; i++) {
-      const t = 0.1 + Math.random() * 0.8;
+    const treeSpots = [
+      { t: 0.10, side: 1, dist: 7, variant: 'cherry' },
+      { t: 0.18, side: -1, dist: 8, variant: 'normal' },
+      { t: 0.30, side: 1, dist: 7.5, variant: 'pine' },
+      { t: 0.40, side: -1, dist: 9, variant: 'cherry' },
+      { t: 0.50, side: 1, dist: 8, variant: 'normal' },
+      { t: 0.60, side: -1, dist: 7, variant: 'pine' },
+      { t: 0.72, side: 1, dist: 8.5, variant: 'cherry' },
+      { t: 0.82, side: -1, dist: 7, variant: 'normal' },
+      { t: 0.92, side: 1, dist: 9, variant: 'pine' },
+    ];
+
+    treeSpots.forEach(({ t, side, dist, variant }) => {
+      const pos = this.path.getPointAt(t);
+      const tangent = this.path.getTangentAt(t);
+      const perp = new THREE.Vector3(-tangent.z, 0, tangent.x).multiplyScalar(side);
+      const tree = createTree(variant);
+      tree.position.copy(pos).add(perp.multiplyScalar(dist));
+      this.scene.add(tree);
+    });
+
+    for (let i = 0; i < 18; i++) {
+      const t = 0.06 + Math.random() * 0.9;
       const pos = this.path.getPointAt(t);
       const tangent = this.path.getTangentAt(t);
       const side = Math.random() > 0.5 ? 1 : -1;
       const perp = new THREE.Vector3(-tangent.z, 0, tangent.x).multiplyScalar(side);
-      const dist = 6 + Math.random() * 4;
-
-      const tree = new THREE.Group();
-      const trunk = createOutlinedMesh(
-        new THREE.CylinderGeometry(0.08, 0.12, 0.8, 6),
-        createToonMaterial(0x6a5040),
-      );
-      trunk.position.y = 0.4;
-      tree.add(trunk);
-
-      const foliage = createOutlinedMesh(
-        new THREE.SphereGeometry(0.5 + Math.random() * 0.3, 8, 6),
-        createToonMaterial(0x5a9a5a + Math.floor(Math.random() * 0x050505)),
-      );
-      foliage.position.y = 1.1;
-      tree.add(foliage);
-
-      tree.position.copy(pos).add(perp.multiplyScalar(dist));
-      tree.position.y = 0;
+      const tree = createTree('normal');
+      tree.position.copy(pos).add(perp.multiplyScalar(6 + Math.random() * 5));
+      tree.scale.setScalar(0.7 + Math.random() * 0.5);
       this.scene.add(tree);
     }
+
+    [0.24, 0.52, 0.78, 0.90].forEach((t) => {
+      const bamboo = createBambooCluster();
+      placeAlongPath(bamboo, this.path, t, 1, 6.5 + Math.random());
+      this.scene.add(bamboo);
+    });
   }
 
   _createClouds() {
@@ -426,28 +1007,49 @@ export class Town {
       [20, 19, -15, 2.2],
       [-20, 21, 0, 1.5],
       [5, 23, -25, 2],
+      [-12, 19, -35, 2.3],
+      [15, 21, -38, 1.7],
+      [0, 24, -12, 2.8],
+      [22, 20, -50, 2.1],
+      [-18, 22, -58, 1.9],
+      [8, 23, -65, 2.4],
+      [28, 21, -45, 1.8],
     ];
     cloudPositions.forEach(([x, y, z, s]) => {
-      this.scene.add(createCloud(x, y, z, s));
+      const cloud = createCloud(x, y, z, s);
+      this.scene.add(cloud);
+      this.animatedClouds.push(cloud);
     });
   }
 
   _createLighting() {
-    const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
     this.scene.add(ambient);
 
-    const sun = new THREE.DirectionalLight(0xfff8e8, 1.1);
+    const sun = new THREE.DirectionalLight(0xfff0d0, 1.15);
     sun.position.set(15, 25, 10);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
     sun.shadow.camera.near = 0.5;
-    sun.shadow.camera.far = 60;
-    sun.shadow.camera.left = -25;
-    sun.shadow.camera.right = 25;
-    sun.shadow.camera.top = 25;
-    sun.shadow.camera.bottom = -25;
+    sun.shadow.camera.far = 100;
+    sun.shadow.camera.left = -50;
+    sun.shadow.camera.right = 50;
+    sun.shadow.camera.top = 50;
+    sun.shadow.camera.bottom = -70;
     this.scene.add(sun);
     this.sun = sun;
+
+    const fill = new THREE.DirectionalLight(0xc8e8f0, 0.35);
+    fill.position.set(-10, 8, -5);
+    this.scene.add(fill);
+
+    const warm = new THREE.PointLight(0xffa060, 0.4, 14);
+    warm.position.set(-3, 2.5, -20);
+    this.scene.add(warm);
+
+    const harborLight = new THREE.PointLight(0x80c0e0, 0.35, 16);
+    harborLight.position.set(18, 3, -58);
+    this.scene.add(harborLight);
   }
 
   getPath() {
