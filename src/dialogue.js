@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { EXPRESSION_EMOJI } from './npcData.js';
 
 export class DialogueManager {
@@ -309,164 +308,14 @@ export class DialogueManager {
     this.advance();
     return true;
   }
-}
 
-export class InteractionSystem {
-  constructor(player, npcs, dialogue, game) {
-    this.player = player;
-    this.npcs = npcs;
-    this.dialogue = dialogue;
-    this.game = game;
-    this.approachRange = 9;
-    this.spotRange = 20;
-    this.wasInRange = false;
-    this.initiatedNpc = null;
+  addJournalEntry(title, body, source) {
+    this.journal.push({ title, body, npc: source });
+    this._updateJournalUI();
+    this._showToast(`📓 Saved to journal: ${title}`);
   }
 
-  setRewardHandler(handler) {
-    this.dialogue.setRewardHandler(handler);
-  }
-
-  _findNearestNpc(includeIgnored = false, maxRange = this.approachRange) {
-    let closest = null;
-    let closestDist = Infinity;
-
-    for (const npc of this.npcs) {
-      if (npc.isCompanion || npc.isTalking) continue;
-
-      const dist = npc.distanceTo(this.player.position);
-      if (dist >= maxRange || dist >= closestDist) continue;
-      if (!includeIgnored && npc.isIgnored()) continue;
-
-      closest = npc;
-      closestDist = dist;
-    }
-
-    return closest;
-  }
-
-  _interactWithNpc(npc) {
-    if (!npc) return false;
-    npc.clearIgnore();
-    npc.stopApproaching();
-    this.dialogue.showApproach(npc, { initiated: false });
-    return true;
-  }
-
-  _npcFromObject(object) {
-    let current = object;
-    while (current) {
-      if (current.userData?.interactNpc) return current.userData.interactNpc;
-      current = current.parent;
-    }
-    return null;
-  }
-
-  _getTapTargets() {
-    const targets = [];
-    for (const npc of this.npcs) {
-      if (npc.nameTag) targets.push(npc.nameTag);
-    }
-    if (this.game.companion?.nameTag) {
-      targets.push(this.game.companion.nameTag);
-    }
-    return targets;
-  }
-
-  _npcFromTap(tap, camera, canvas) {
-    if (!tap || !camera || !canvas) return null;
-
-    const rect = canvas.getBoundingClientRect();
-    const ndc = new THREE.Vector2(
-      ((tap.x - rect.left) / rect.width) * 2 - 1,
-      -((tap.y - rect.top) / rect.height) * 2 + 1,
-    );
-
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(ndc, camera);
-
-    const targets = this._getTapTargets();
-    if (targets.length === 0) return null;
-
-    const hits = raycaster.intersectObjects(targets, true);
-    if (hits.length === 0) return null;
-
-    return this._npcFromObject(hits[0].object);
-  }
-
-  update(input, camera, canvas) {
-    if (this.dialogue.isBlocking()) return;
-
-    const companion = this.game.companion;
-
-    for (const npc of this.npcs) {
-      if (npc.isCompanion) continue;
-
-      const dist = npc.distanceTo(this.player.position);
-      const inTalkRange = dist < this.approachRange;
-
-      npc.setPlayerNearby(inTalkRange, this.player.position);
-
-      if (
-        !npc.profile.isAmbient &&
-        !npc.isIgnored() &&
-        !npc.isTalking &&
-        npc.state === 'idle' &&
-        dist < this.spotRange &&
-        dist > this.approachRange + 1
-      ) {
-        npc.startApproaching();
-      }
-
-      if (
-        npc.state === 'approaching' &&
-        dist < this.approachRange &&
-        !npc.isIgnored()
-      ) {
-        if (!this.dialogue.approachOpen && this.initiatedNpc !== npc) {
-          this.dialogue.showApproach(npc, { initiated: true });
-          this.initiatedNpc = npc;
-        }
-      }
-    }
-
-    const closest = this._findNearestNpc(false);
-    const inRange = !!closest;
-
-    if (this.dialogue.approachOpen && !inRange && !this.dialogue.approachInitiated) {
-      this.dialogue.hideApproach();
-    } else if (inRange && !this.wasInRange && !this.dialogue.approachOpen) {
-      this.dialogue.showApproach(closest, { initiated: false });
-    }
-
-    const tap = input.consumeTap();
-    if (tap) {
-      const tappedNpc = this._npcFromTap(tap, camera, canvas);
-      if (tappedNpc) {
-        const maxRange = tappedNpc.isCompanion ? this.approachRange + 2 : this.spotRange;
-        if (tappedNpc.distanceTo(this.player.position) <= maxRange) {
-          this._interactWithNpc(tappedNpc);
-        } else {
-          this.dialogue._showToast('Move closer to talk.');
-        }
-      }
-    }
-
-    if (input.consumeKey('KeyE')) {
-      if (companion) {
-        this._interactWithNpc(companion);
-      } else {
-        const target = this._findNearestNpc(true, this.approachRange + 2);
-        if (target) {
-          this._interactWithNpc(target);
-        } else {
-          this.dialogue._showToast('No one nearby to talk to.');
-        }
-      }
-    }
-
-    if (!inRange) this.initiatedNpc = null;
-
-    this.wasInRange = inRange;
+  showToast(message) {
+    this._showToast(message);
   }
 }

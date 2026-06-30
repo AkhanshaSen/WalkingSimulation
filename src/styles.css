@@ -142,6 +142,22 @@ body {
   display: none;
 }
 
+#pet-companion-tag {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(200, 120, 80, 0.92);
+  color: #fff;
+  padding: 0.35rem 0.65rem 0.35rem 0.85rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  margin-top: 0.35rem;
+}
+
+#pet-companion-tag.hidden {
+  display: none;
+}
+
 .companion-part-btn {
   pointer-events: auto;
   border: 1px solid rgba(255, 255, 255, 0.45);
@@ -301,6 +317,80 @@ body {
 
 #approach-modal.hidden {
   display: none;
+}
+
+#pet-modal {
+  pointer-events: auto;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 40, 40, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+#pet-modal.hidden {
+  display: none;
+}
+
+.pet-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 2rem 2rem 1.5rem;
+  text-align: center;
+  max-width: 360px;
+  width: 90%;
+  box-shadow: 0 12px 50px rgba(0, 0, 0, 0.2);
+  animation: approach-pop 0.3s ease;
+}
+
+.pet-portrait {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+  background: linear-gradient(135deg, #f8e8d8, #f0d0b0);
+  width: 80px;
+  height: 80px;
+  line-height: 80px;
+  border-radius: 50%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.pet-card h3 {
+  font-size: 1.1rem;
+  color: #2a4a4a;
+  margin-bottom: 0.25rem;
+}
+
+.pet-role {
+  font-size: 0.8rem;
+  color: #8a6040;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.pet-hearts {
+  display: flex;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-bottom: 1.25rem;
+  font-size: 1.4rem;
+}
+
+.pet-heart {
+  color: #ddd;
+}
+
+.pet-heart.filled {
+  color: #e85070;
+}
+
+.pet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .approach-card {

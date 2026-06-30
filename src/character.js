@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createToonMaterial, createOutlinedMesh, PALETTE } from './materials.js';
 import { setupNpcRoutine, updateNpcRoutine } from './npcRoutines.js';
+import { followPlayer, moveToward } from './entities/FollowerBehavior.js';
 
 export class InputManager {
   constructor(canvas) {
@@ -398,6 +399,8 @@ export class Player {
     this.speedBoostTimer = 0;
     this.pathT = 0.05;
     this.raycaster = new THREE.Raycaster();
+    this.restTimer = 0;
+    this.restPos = null;
   }
 
   applySpeedBoost(amount, duration) {
@@ -413,8 +416,15 @@ export class Player {
       }
     }
 
-    if (input.dialogueOpen) {
+    if (input.dialogueOpen || this.restTimer > 0) {
       this.velocity.set(0, 0, 0);
+      if (this.restTimer > 0) {
+        this.restTimer -= dt;
+        if (this.restPos) {
+          this.mesh.position.lerp(this.restPos, 0.08);
+          this.mesh.position.y = 0.01;
+        }
+      }
     } else {
       const speed = input.isRunning ? this.runSpeed : this.walkSpeed;
       const camForward = new THREE.Vector3(Math.sin(input.cameraAngle), 0, Math.cos(input.cameraAngle));
@@ -447,6 +457,12 @@ export class Player {
     animateCharacter(this.mesh, moveSpeed, dt);
 
     this.pathT = this.path.getClosestPointT?.(this.mesh.position) ?? 0;
+  }
+
+  rest(duration, nearPos) {
+    this.restTimer = duration;
+    this.restPos = nearPos?.clone();
+    this.velocity.set(0, 0, 0);
   }
 
   _clampToWalkableArea() {
@@ -535,6 +551,7 @@ function createWaveBubble() {
 
 export class NPC {
   constructor(scene, path, profile) {
+    this.type = 'npc';
     this.path = path;
     this.profile = profile;
     this.t = profile.startT;
@@ -571,11 +588,30 @@ export class NPC {
     setupNpcRoutine(this);
     this.nameTag = this.mesh.children.find((c) => c.userData?.isNameTag) ?? null;
     if (this.nameTag) {
+      this.nameTag.userData.interactable = this;
       this.nameTag.userData.interactNpc = this;
       this.nameTag.children.forEach((child) => {
+        child.userData.interactable = this;
         child.userData.interactNpc = this;
       });
     }
+    this.mesh.userData.interactable = this;
+  }
+
+  getHitTargets() {
+    const targets = [];
+    if (this.nameTag) targets.push(this.nameTag);
+    return targets;
+  }
+
+  canInteract(playerPos) {
+    return this.distanceTo(playerPos) < 9;
+  }
+
+  interact(context) {
+    this.clearIgnore();
+    this.stopApproaching();
+    context.dialogue?.showApproach(this, { initiated: false });
   }
 
   _placeOnPath() {
@@ -695,21 +731,7 @@ export class NPC {
   }
 
   _moveToward(target, dt, speed, stopDist = 1.4) {
-    const dx = target.x - this.mesh.position.x;
-    const dz = target.z - this.mesh.position.z;
-    const dist = Math.hypot(dx, dz);
-
-    if (dist > stopDist) {
-      const step = Math.min(speed * dt, dist - stopDist);
-      this.mesh.position.x += (dx / dist) * step;
-      this.mesh.position.z += (dz / dist) * step;
-      this.mesh.rotation.y = Math.atan2(dx, dz);
-      animateCharacter(this.mesh, speed, dt);
-      return false;
-    }
-
-    animateCharacter(this.mesh, 0, dt);
-    return true;
+    return moveToward(this.mesh, target, dt, speed, stopDist, (s, d) => animateCharacter(this.mesh, s, d));
   }
 
   update(dt, playerPos = null, playerFacing = 0) {
@@ -720,14 +742,16 @@ export class NPC {
     }
 
     if (this.state === 'following' && playerPos) {
-      const offset = new THREE.Vector3(
-        -Math.sin(playerFacing) * 1.4,
-        0,
-        -Math.cos(playerFacing) * 1.4,
+      followPlayer(
+        this.mesh,
+        playerPos,
+        playerFacing,
+        dt,
+        this.followSpeed,
+        1.4,
+        1.2,
+        (s, d) => animateCharacter(this.mesh, s, d),
       );
-      const target = playerPos.clone().add(offset);
-      target.y = this.mesh.position.y;
-      this._moveToward(target, dt, this.followSpeed, 1.2);
       this.mesh.position.y = 0.02 + Math.sin(this.idlePhase) * 0.008;
       this.idlePhase += dt * 2;
       return;

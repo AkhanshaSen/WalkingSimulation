@@ -3,8 +3,13 @@ import { Town } from './town.js';
 import { Player, NPC, InputManager } from './character.js';
 import { NPC_PROFILES } from './npcData.js';
 import { AMBIENT_NPCS } from './ambientNpcs.js';
-import { DialogueManager, InteractionSystem } from './dialogue.js';
+import { DialogueManager } from './dialogue.js';
+import { InteractionSystem } from './interaction/InteractionSystem.js';
+import { InteractableRegistry } from './interaction/InteractableRegistry.js';
 import { Minimap } from './minimap.js';
+import { Animal } from './entities/Animal.js';
+import { createBenchProp, createTreeProp } from './entities/WorldProp.js';
+import { ANIMAL_DEFINITIONS } from './data/animalData.js';
 
 function closestPointOnPath(path, point, samples = 100) {
   let closestT = 0;
@@ -91,6 +96,23 @@ export class Game {
         (profile) => new NPC(game.scene, game.path, profile),
       );
 
+      onProgress?.('Spawning animals…');
+      game.animals = ANIMAL_DEFINITIONS.map(
+        (def) => new Animal(game.scene, game.path, def),
+      );
+
+      game.worldProps = [];
+      for (const spawn of game.town.getInteractableSpawns()) {
+        if (spawn.propId === 'bench') {
+          game.worldProps.push(createBenchProp(game.scene, spawn.position, spawn.rotationY));
+        } else if (spawn.propId === 'cherry_tree' || spawn.propId === 'shrine_tree') {
+          game.worldProps.push(createTreeProp(game.scene, spawn.position, spawn.propId));
+        }
+      }
+
+      game.interactables = new InteractableRegistry();
+      game.interactables.registerAll(game.npcs, game.animals, game.worldProps);
+
       game.ready = true;
       return game;
     } catch (error) {
@@ -98,13 +120,32 @@ export class Game {
     }
   }
 
-  initInteraction(dialogue) {
+  initInteraction(dialogue, petUI) {
     this.dialogue = dialogue;
+    this.petUI = petUI;
     this.companion = null;
+    this.petCompanion = null;
     this.locationTag = document.getElementById('location-tag');
+    this.petTag = document.getElementById('pet-companion-tag');
+    this.petLabel = document.getElementById('pet-companion-label');
+    this.petPartBtn = document.getElementById('pet-companion-part');
+
     dialogue.setGame(this);
-    this.interaction = new InteractionSystem(this.player, this.npcs, dialogue, this);
+    this.interaction = new InteractionSystem(
+      this.player,
+      this.interactables,
+      dialogue,
+      this,
+      petUI,
+    );
     this.interaction.setRewardHandler((reward) => this._handleReward(reward));
+
+    petUI?.setHandlers({
+      onAction: (animal, action) => this._handlePetAction(animal, action),
+      onInvite: (animal) => this.setPetCompanion(animal),
+    });
+
+    this.petPartBtn?.addEventListener('click', () => this.clearPetCompanion());
 
     const minimapCanvas = document.getElementById('minimap');
     if (minimapCanvas) {
@@ -112,6 +153,21 @@ export class Game {
       this.minimap.setPlayer(this.player);
       this.minimap.setNpcs(this.npcs);
     }
+  }
+
+  playerRest(duration, position) {
+    this.player.rest(duration, position);
+  }
+
+  _handlePetAction(animal, action) {
+    const result = animal.applyAction(action);
+    if (result.message) {
+      this.dialogue.showToast(result.message);
+    }
+    if (result.isFriend && action !== 'shoo') {
+      this.dialogue.showToast(`${animal.definition.name} seems to really like you! ♥`);
+    }
+    return result;
   }
 
   setCompanion(npc) {
@@ -130,6 +186,37 @@ export class Game {
       this.companion = null;
       this.dialogue.setCompanionTag(null);
       this.minimap?.setCompanion(null);
+    }
+  }
+
+  setPetCompanion(animal) {
+    if (this.petCompanion && this.petCompanion !== animal) {
+      this.petCompanion.stopFollowing(true);
+    }
+    this.petCompanion = animal;
+    animal.startFollowing();
+    this._setPetCompanionTag(animal);
+    this.dialogue.showToast(animal.definition.reactions?.friend ?? `${animal.definition.name} is following you!`);
+  }
+
+  clearPetCompanion() {
+    if (this.petCompanion) {
+      this.petCompanion.stopFollowing(true);
+      this.petCompanion = null;
+      this._setPetCompanionTag(null);
+      this.dialogue.showToast('Your pet friend headed home.');
+    }
+  }
+
+  _setPetCompanionTag(animal) {
+    if (!this.petTag) return;
+    if (animal) {
+      if (this.petLabel) {
+        this.petLabel.textContent = `${animal.definition.emoji} ${animal.definition.name} is following`;
+      }
+      this.petTag.classList.remove('hidden');
+    } else {
+      this.petTag.classList.add('hidden');
     }
   }
 
@@ -183,10 +270,10 @@ export class Game {
     const dt = Math.min(this.clock.getDelta(), 0.05);
     this.input.update();
 
-    const inDialogue = this.dialogue?.isBlocking() ?? false;
-    this.input.dialogueOpen = inDialogue;
+    const blocking = this.interaction?.isBlocking() ?? this.dialogue?.isBlocking() ?? false;
+    this.input.dialogueOpen = blocking;
 
-    if (inDialogue) {
+    if (blocking) {
       if (this.dialogue.isOpen()) {
         if (this.input.consumeKey('KeyE') || this.input.consumeKey('Space') || this.input.consumeKey('Enter')) {
           this.dialogue.tryAdvanceFromKey();
@@ -212,6 +299,7 @@ export class Game {
 
     this.player.update(this.input, dt, this.town.getGroundMeshes());
     this.npcs.forEach((npc) => npc.update(dt, this.player.position, this.player.facing));
+    this.animals?.forEach((a) => a.update(dt, this.player.position, this.player.facing));
     this._updateLocationTag();
     this.minimap?.update();
     this.town.update(this.clock.elapsedTime);

@@ -707,7 +707,16 @@ export class Town {
     this.groundMeshes = [];
     this.animatedClouds = [];
     this.lanterns = [];
+    this.interactableSpawns = [];
     this.path = this._createPath();
+  }
+
+  _recordSpawn(propId, position, rotationY = 0) {
+    this.interactableSpawns.push({
+      propId,
+      position: position.clone(),
+      rotationY,
+    });
   }
 
   async build(onProgress) {
@@ -1119,6 +1128,9 @@ export class Town {
       }
       placeAlongPath(item, this.path, t, side, offset);
       this.scene.add(item);
+      if (type === 'bench') {
+        this._recordSpawn('bench', item.position, item.rotation.y);
+      }
     });
   }
 
@@ -1142,6 +1154,11 @@ export class Town {
       const tree = createTree(variant);
       tree.position.copy(pos).add(perp.multiplyScalar(dist));
       this.scene.add(tree);
+      if (variant === 'cherry') {
+        this._recordSpawn('cherry_tree', tree.position);
+      } else if (variant === 'pine' && t > 0.55 && t < 0.65) {
+        this._recordSpawn('shrine_tree', tree.position);
+      }
     });
 
     for (let i = 0; i < 24; i++) {
@@ -1218,6 +1235,10 @@ export class Town {
     const marketLight = new THREE.PointLight(0xffc080, 0.3, 14);
     marketLight.position.set(6, 3, -48);
     this.scene.add(marketLight);
+  }
+
+  getInteractableSpawns() {
+    return this.interactableSpawns;
   }
 
   getPath() {
