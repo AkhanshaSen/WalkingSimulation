@@ -63,4 +63,22 @@ export class InteractableRegistry {
   getAnimals() {
     return this.items.filter((i) => i.type === 'animal');
   }
+
+  findAllInRange(playerPos, maxRange, options = {}) {
+    const { includeIgnored = false } = options;
+    const results = [];
+
+    for (const item of this.items) {
+      if (item.type === 'npc' && item.isCompanion) continue;
+      if (item.type === 'npc' && item.isTalking) continue;
+      if (item.type === 'npc' && !includeIgnored && item.isIgnored?.()) continue;
+      if (item.type === 'animal' && item.isPetCompanion) continue;
+
+      const dist = item.distanceTo(playerPos);
+      if (dist >= maxRange) continue;
+      results.push({ item, dist });
+    }
+
+    return results.sort((a, b) => a.dist - b.dist);
+  }
 }

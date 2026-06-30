@@ -1,5 +1,11 @@
 import { EXPRESSION_EMOJI } from './npcData.js';
 
+const SOCIAL_CHOICE_META = {
+  befriend: { label: '💛 Make friends', className: 'social-befriend', mood: 8, moodLabel: 'New friend!' },
+  argue: { label: '💢 Argue', className: 'social-argue', mood: -6 },
+  flirt: { label: '💕 Flirt', className: 'social-flirt', mood: 10, moodLabel: 'Bold move!' },
+};
+
 export class DialogueManager {
   constructor(elements) {
     this.box = elements.box;
@@ -22,6 +28,8 @@ export class DialogueManager {
     this.portraitEl = elements.portrait;
     this.nextBtn = elements.next;
     this.choicesEl = elements.choices;
+    this.dialogueWalkBtn = elements.dialogueWalkBtn;
+    this.dialogueStopWalkBtn = elements.dialogueStopWalkBtn;
     this.toastEl = elements.toast;
     this.journalPanel = elements.journalPanel;
     this.journalList = elements.journalList;
@@ -46,6 +54,8 @@ export class DialogueManager {
     this.approachPartBtn?.addEventListener('click', () => this._onPartClicked());
     this.approachIgnoreBtn?.addEventListener('click', () => this._onIgnoreClicked());
     this.companionPartBtn?.addEventListener('click', () => this._onCompanionPartClicked());
+    this.dialogueWalkBtn?.addEventListener('click', () => this._onDialogueWalkClicked());
+    this.dialogueStopWalkBtn?.addEventListener('click', () => this._onDialogueStopWalkClicked());
     this.journalBtn?.addEventListener('click', () => this.journalPanel?.classList.remove('hidden'));
     this.closeJournalBtn?.addEventListener('click', () => this.journalPanel?.classList.add('hidden'));
     this.interactHint?.addEventListener('click', () => {
@@ -121,6 +131,14 @@ export class DialogueManager {
     }
   }
 
+  _updateDialogueWalkButtons() {
+    const npc = this.npc;
+    const isAmbient = npc?.profile?.isAmbient;
+    const isCompanion = npc?.isCompanion;
+    this.dialogueWalkBtn?.classList.toggle('hidden', !this.active || isCompanion || isAmbient);
+    this.dialogueStopWalkBtn?.classList.toggle('hidden', !this.active || !isCompanion);
+  }
+
   showApproach(npc, options = {}) {
     if (this.isBlocking() || !npc) return;
 
@@ -194,6 +212,20 @@ export class DialogueManager {
     }
   }
 
+  _onDialogueWalkClicked() {
+    const npc = this.npc;
+    if (!npc || npc.isCompanion || npc.profile?.isAmbient) return;
+    this._beginCompanion(npc);
+    this._updateDialogueWalkButtons();
+  }
+
+  _onDialogueStopWalkClicked() {
+    const npc = this.npc;
+    if (!npc?.isCompanion) return;
+    this._dismissCompanion(npc);
+    this._updateDialogueWalkButtons();
+  }
+
   _beginCompanion(npc) {
     this._rewardHandler?.({ type: 'companion', npc });
     this._showToast(`🚶 ${npc.profile.name}: "${npc.profile.walkAccept}"`);
@@ -203,6 +235,7 @@ export class DialogueManager {
     this._rewardHandler?.({ type: 'dismissCompanion', npc });
     this._showToast(`👋 ${npc.profile.name}: "${npc.profile.partWayLine}"`);
     this.setCompanionTag(null);
+    this._updateDialogueWalkButtons();
   }
 
   _onIgnoreClicked() {
@@ -229,6 +262,7 @@ export class DialogueManager {
     this.choicesEl.innerHTML = '';
     this.choicesEl.classList.add('hidden');
     this.nextBtn.classList.remove('hidden');
+    this._updateDialogueWalkButtons();
 
     npc.startConversation();
     npc.markMet();
@@ -240,6 +274,14 @@ export class DialogueManager {
     this.nextBtn.textContent = '▶ Continue';
   }
 
+  _getSocialChoices() {
+    const social = this.npc?.profile?.social;
+    if (!social || this.npc?.profile?.isAmbient) return [];
+    return Object.entries(SOCIAL_CHOICE_META)
+      .filter(([key]) => social[key])
+      .map(([key, meta]) => ({ key, meta, response: social[key] }));
+  }
+
   _showChoices() {
     this.phase = 'choices';
     this.expressionEl.textContent = '💬';
@@ -248,13 +290,51 @@ export class DialogueManager {
     this.choicesEl.classList.remove('hidden');
     this.choicesEl.innerHTML = '';
 
-    this.conversation.choices.forEach((choice, index) => {
+    let choiceIndex = 0;
+    const addChoice = (label, className, onClick) => {
       const btn = document.createElement('button');
-      btn.className = 'dialogue-choice';
-      btn.innerHTML = `<span class="choice-num">${index + 1}</span>${choice.label}`;
-      btn.addEventListener('click', () => this._pickChoice(index));
+      btn.className = `dialogue-choice${className ? ` ${className}` : ''}`;
+      btn.innerHTML = `<span class="choice-num">${choiceIndex + 1}</span>${label}`;
+      btn.addEventListener('click', onClick);
       this.choicesEl.appendChild(btn);
+      choiceIndex += 1;
+    };
+
+    for (const { key, meta, response } of this._getSocialChoices()) {
+      addChoice(meta.label, meta.className, () => this._pickSocialChoice(key, response, meta));
+    }
+
+    this.conversation.choices.forEach((choice, index) => {
+      addChoice(choice.label, '', () => this._pickChoice(index));
     });
+  }
+
+  _pickSocialChoice(key, response, meta) {
+    this.phase = 'response';
+    this.choicesEl.classList.add('hidden');
+    this.choicesEl.innerHTML = '';
+    this.nextBtn.classList.remove('hidden');
+
+    this._renderLine(response);
+    this.nextBtn.textContent = '▶ Keep talking';
+
+    if (key === 'befriend') {
+      this.npc.addFriendship();
+      this._showToast(`💛 ${this.npc.profile.name} warmed up to you.`);
+    } else if (key === 'argue') {
+      this._showToast(`💢 Tension rises with ${this.npc.profile.name}…`);
+    } else if (key === 'flirt') {
+      this.npc.addFriendship();
+      this._showToast(`💕 ${this.npc.profile.name} seems flustered—in a good way.`);
+    }
+
+    if (this.game?.mood && meta.mood) {
+      if (meta.mood > 0) this.game.mood.boost(meta.mood, meta.moodLabel ?? '');
+      else this.game.mood.drain(-meta.mood);
+      this.game._updateMoodHUD?.();
+    }
+
+    this.pendingChoices = true;
   }
 
   _pickChoice(index) {
@@ -286,8 +366,6 @@ export class DialogueManager {
     } else if (reward.type === 'friendship') {
       this.npc.addFriendship();
       this._showToast(`💛 ${this.npc.profile.name} opened up to you.`);
-    } else if (reward.type === 'companion') {
-      this._beginCompanion(this.npc);
     } else if (reward.type === 'dismissCompanion') {
       this._dismissCompanion(this.npc);
     }
@@ -343,6 +421,8 @@ export class DialogueManager {
     this.choicesEl.classList.add('hidden');
     this.nextBtn.classList.remove('hidden');
     this.nextBtn.textContent = '▶ Continue';
+    this.dialogueWalkBtn?.classList.add('hidden');
+    this.dialogueStopWalkBtn?.classList.add('hidden');
     if (this.npc) {
       this.npc.endConversation();
       if (!this.npc.isCompanion) this.npc = null;

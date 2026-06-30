@@ -91,6 +91,8 @@ function setupUI(game) {
     journalBtn: document.getElementById('journal-btn'),
     closeJournalBtn: document.getElementById('close-journal'),
     interactHint: document.getElementById('interact-hint'),
+    dialogueWalkBtn: document.getElementById('dialogue-walk'),
+    dialogueStopWalkBtn: document.getElementById('dialogue-stop-walk'),
   });
   dialogue._updateJournalUI();
 
@@ -158,7 +160,7 @@ function setupUI(game) {
       }
     }
 
-    if (game.dialogue?.isOpen() && ['Digit1', 'Digit2', 'Digit3'].includes(e.code)) {
+    if (game.dialogue?.isOpen() && /^Digit[1-9]$/.test(e.code)) {
       const index = parseInt(e.code.replace('Digit', ''), 10) - 1;
       const choices = document.querySelectorAll('.dialogue-choice');
       if (choices[index]) choices[index].click();

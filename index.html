@@ -55,7 +55,15 @@
       <div id="minimap-panel">
         <div id="minimap-compass">N</div>
         <div id="minimap-wrap">
-          <canvas id="minimap" width="160" height="160" aria-label="Town minimap"></canvas>
+          <canvas id="minimap" width="180" height="180" aria-label="Town minimap"></canvas>
+        </div>
+        <div id="minimap-legend" aria-label="Minimap legend">
+          <span class="legend-item" data-type="player"><i></i>You</span>
+          <span class="legend-item" data-type="npc"><i></i>NPC</span>
+          <span class="legend-item" data-type="animal"><i></i>Pet</span>
+          <span class="legend-item" data-type="shop"><i></i>Shop</span>
+          <span class="legend-item" data-type="shrine"><i></i>Shrine</span>
+          <span class="legend-item" data-type="prop"><i></i>Spot</span>
         </div>
         <div id="minimap-info">
           <div id="location-tag">静かな町 · Town Entrance</div>
@@ -72,7 +80,7 @@
       <div id="top-bar">
         <div id="companion-tag" class="hidden">
           <span id="companion-label">Walking with...</span>
-          <button id="companion-part" type="button" class="companion-part-btn" title="Part ways">Part ways</button>
+          <button id="companion-part" type="button" class="companion-part-btn" title="Stop walking together">Stop walking together</button>
         </div>
         <div id="pet-companion-tag" class="hidden">
           <span id="pet-companion-label">Pet following...</span>
@@ -99,7 +107,7 @@
           <div class="approach-actions">
             <button id="approach-chat" class="approach-btn chat">💬 Chat</button>
             <button id="approach-walk" class="approach-btn walk">🚶 Walk together</button>
-            <button id="approach-part" class="approach-btn part hidden">👋 Part ways</button>
+            <button id="approach-part" class="approach-btn part hidden">👋 Stop walking together</button>
             <button id="approach-ignore" class="approach-btn ignore">✕ Ignore</button>
           </div>
         </div>
@@ -135,6 +143,10 @@
           </div>
           <p id="dialogue-text">...</p>
           <div id="dialogue-choices" class="dialogue-choices hidden"></div>
+          <div id="dialogue-actions" class="dialogue-actions">
+            <button id="dialogue-walk" type="button" class="dialogue-action-btn walk hidden">🚶 Walk together</button>
+            <button id="dialogue-stop-walk" type="button" class="dialogue-action-btn stop hidden">👋 Stop walking together</button>
+          </div>
           <button id="dialogue-next" class="dialogue-next">▶ Continue</button>
         </div>
       </div>
@@ -171,7 +183,9 @@
         <ul>
           <li><kbd>W A S D</kbd> — Move</li>
           <li><kbd>Shift</kbd> — Run</li>
-          <li>Walk near NPCs — Chat or Ignore popup</li>
+          <li>Walk near NPCs — choose Chat, Walk together, or Ignore</li>
+          <li>While chatting — Make friends, Argue, or Flirt</li>
+          <li>Minimap (top-left) — colored dots show nearby interactions</li>
           <li><kbd>E</kbd> — Interact with benches, trees, animals</li>
           <li>Build affinity with animals to befriend them</li>
           <li><kbd>1 2 3</kbd> — Pick dialogue options</li>

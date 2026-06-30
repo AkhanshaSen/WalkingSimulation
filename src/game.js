@@ -311,6 +311,7 @@ export class Game {
     this._addCompanionRing(npc);
     this.dialogue.setCompanionTag(npc);
     this.minimap?.setCompanion(npc);
+    this.dialogue._updateDialogueWalkButtons?.();
   }
 
   clearCompanion() {
@@ -320,6 +321,7 @@ export class Game {
       this.companion = null;
       this.dialogue.setCompanionTag(null);
       this.minimap?.setCompanion(null);
+      this.dialogue._updateDialogueWalkButtons?.();
     }
   }
 
@@ -480,6 +482,11 @@ export class Game {
     if (this.mood) {
       this.mood.update(dt);
       this._updateMoodHUD();
+    }
+    if (this.minimap && this.interactables && this.player) {
+      this.minimap.setNearbyInteractables(
+        this.interactables.findAllInRange(this.player.position, 20),
+      );
     }
     this.minimap?.update();
     this.town.update(this.clock.elapsedTime);

@@ -15,6 +15,20 @@ export const NPC_PROFILES = [
     startT: 0.07,
     defaultExpression: 'shy',
     routine: 'sit',
+    social: {
+      befriend: {
+        expression: 'shy',
+        text: 'Friends...? I\'d like that. Maybe we could swap book recommendations sometime.',
+      },
+      argue: {
+        expression: 'surprised',
+        text: 'Oh... I didn\'t mean to upset you. Not everyone loves quiet poetry, I suppose.',
+      },
+      flirt: {
+        expression: 'shy',
+        text: 'W-what?! My face is burning. You\'re... very bold. I don\'t know what to say.',
+      },
+    },
     firstMeet: {
       greeting: {
         expression: 'shy',
@@ -44,9 +58,9 @@ export const NPC_PROFILES = [
           label: '"Want to walk together?"',
           response: {
             expression: 'shy',
-            text: 'I\'d love that... I know a quiet spot by the garden. I\'ll follow you—just go at your own pace.',
+            text: 'I\'d love that... when you\'re ready, tap Walk together. I know a quiet spot by the garden.',
           },
-          reward: { type: 'companion' },
+          reward: { type: 'friendship' },
         },
         {
           label: '"I should let you read."',
@@ -80,9 +94,9 @@ export const NPC_PROFILES = [
           label: '"Want to explore together?"',
           response: {
             expression: 'shy',
-            text: 'I... I\'d like that. I\'ll walk right beside you. Just—don\'t go too fast, okay?',
+            text: 'I... I\'d like that. Tap Walk together whenever you want me beside you—don\'t go too fast, okay?',
           },
-          reward: { type: 'companion' },
+          reward: { type: 'friendship' },
         },
         {
           label: '"See you, Yuki."',
@@ -134,6 +148,20 @@ export const NPC_PROFILES = [
     defaultExpression: 'happy',
     routine: 'jog',
     patrolTs: [0.16, 0.24, 0.20],
+    social: {
+      befriend: {
+        expression: 'happy',
+        text: 'Friend request accepted! You\'re officially on Team Ren now. Let\'s hit the street!',
+      },
+      argue: {
+        expression: 'surprised',
+        text: 'Whoa, feisty! I respect someone who pushes back. Rematch on the torii curve?',
+      },
+      flirt: {
+        expression: 'happy',
+        text: 'Ha! Smooth. I\'ll pretend I didn\'t hear that... but I\'m definitely grinning.',
+      },
+    },
     firstMeet: {
       greeting: {
         expression: 'happy',
@@ -164,9 +192,9 @@ export const NPC_PROFILES = [
           label: '"Walk with me to the shrine?"',
           response: {
             expression: 'happy',
-            text: 'YES! That\'s the spirit! I\'ll jog beside you—well, walk-jog. Let\'s make this street ours!',
+            text: 'YES! Tap Walk together and I\'ll jog beside you—well, walk-jog. Let\'s make this street ours!',
           },
-          reward: { type: 'companion' },
+          reward: { type: 'friendship' },
         },
         {
           label: '"Good luck with your run."',
@@ -253,6 +281,20 @@ export const NPC_PROFILES = [
     startT: 0.62,
     defaultExpression: 'happy',
     routine: 'work',
+    social: {
+      befriend: {
+        expression: 'happy',
+        text: 'How lovely, dear. Friendship is the oldest kind of magic on any street.',
+      },
+      argue: {
+        expression: 'thinking',
+        text: 'Even disagreeing can be honest. I appreciate your spirit, dear—don\'t hold back.',
+      },
+      flirt: {
+        expression: 'surprised',
+        text: 'Oh my... at my age? You\'re a charmer. I\'ll pretend not to notice—but I noticed.',
+      },
+    },
     firstMeet: {
       greeting: {
         expression: 'happy',
@@ -287,9 +329,9 @@ export const NPC_PROFILES = [
           label: '"Will you show me around?"',
           response: {
             expression: 'happy',
-            text: 'Nothing would make me happier, dear. Take my arm—metaphorically, of course. I\'ll walk every step with you.',
+            text: 'Nothing would make me happier, dear. Tap Walk together and I\'ll stroll every step with you.',
           },
-          reward: { type: 'companion' },
+          reward: { type: 'friendship' },
         },
         {
           label: '"Thank you, Haruko."',
@@ -375,6 +417,20 @@ export const NPC_PROFILES = [
     startT: 0.74,
     defaultExpression: 'thinking',
     routine: 'work',
+    social: {
+      befriend: {
+        expression: 'happy',
+        text: 'Friends! Now I have someone to point at beautiful things with. This is the best commission ever.',
+      },
+      argue: {
+        expression: 'thinking',
+        text: 'Conflict is just contrasting colors. Bold choice—I respect it. Want to argue about art?',
+      },
+      flirt: {
+        expression: 'shy',
+        text: 'You\'re... kind of compositionally perfect. Don\'t make me blush while I\'m holding a pencil.',
+      },
+    },
     firstMeet: {
       greeting: {
         expression: 'surprised',
@@ -404,9 +460,9 @@ export const NPC_PROFILES = [
           label: '"Walk with me and point out art?"',
           response: {
             expression: 'happy',
-            text: 'That\'s literally my dream request! I\'ll tag along and whisper every beautiful thing I see.',
+            text: 'That\'s literally my dream request! Tap Walk together and I\'ll whisper every beautiful thing I see.',
           },
-          reward: { type: 'companion' },
+          reward: { type: 'friendship' },
         },
         {
           label: '"Sorry to interrupt your art."',
