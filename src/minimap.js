@@ -1,5 +1,3 @@
-import { MAP_BOUNDS } from './character.js';
-
 // ── symbol renderers ──────────────────────────────────────────────────────────
 function dot(ctx, mx, my, r, fill, stroke = null, sw = 1.5) {
   ctx.fillStyle = fill;
@@ -107,12 +105,55 @@ function getInteractablePosition(item) {
   return item.mesh?.position;
 }
 
+function computeMapBounds(path, npcs, animals, worldProps, padding = 10) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+
+  const add = (x, z) => {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (z < minZ) minZ = z;
+    if (z > maxZ) maxZ = z;
+  };
+
+  if (path?.getPointAt) {
+    for (let i = 0; i <= 60; i++) {
+      const p = path.getPointAt(i / 60);
+      add(p.x, p.z);
+    }
+  }
+
+  for (const npc of npcs) {
+    add(npc.mesh.position.x, npc.mesh.position.z);
+  }
+  for (const animal of animals) {
+    add(animal.mesh.position.x, animal.mesh.position.z);
+  }
+  for (const prop of worldProps) {
+    if (prop.mesh?.position) {
+      add(prop.mesh.position.x, prop.mesh.position.z);
+    }
+  }
+
+  if (!Number.isFinite(minX)) {
+    return { minX: -20, maxX: 20, minZ: -100, maxZ: 20 };
+  }
+
+  return {
+    minX: minX - padding,
+    maxX: maxX + padding,
+    minZ: minZ - padding,
+    maxZ: maxZ + padding,
+  };
+}
+
 export class Minimap {
-  constructor(canvas, path) {
+  constructor(canvas, path, wrapEl = null) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
+    this.wrapEl = wrapEl;
     this.path = path;
-    this.bounds = MAP_BOUNDS;
     this.player = null;
     this.npcs = [];
     this.animals = [];
@@ -120,23 +161,59 @@ export class Minimap {
     this.companion = null;
     this.petCompanion = null;
     this.nearbyInteractables = [];
-    this.size = canvas.width;
+    this.bounds = { minX: -20, maxX: 20, minZ: -100, maxZ: 20 };
     this.padding = 10;
     this._pulse = 0;
+    this.unavailable = false;
+    this.dpr = 1;
+    this.size = canvas?.width || 180;
+
+    this.fallbackEl = wrapEl?.querySelector('#minimap-fallback') ?? null;
+    this.ctx = canvas?.getContext('2d') ?? null;
+
+    if (!this.ctx) {
+      console.warn('Minimap: 2D canvas context unavailable');
+      this.unavailable = true;
+      if (canvas) canvas.style.display = 'none';
+      this.fallbackEl?.classList.remove('hidden');
+      return;
+    }
+
+    const logicalSize = wrapEl?.clientWidth || canvas.width || 180;
+    this.resize(logicalSize);
   }
 
   setPlayer(player)       { this.player = player; }
-  setNpcs(npcs)           { this.npcs = npcs; }
-  setAnimals(animals)     { this.animals = animals; }
-  setWorldProps(props)    { this.worldProps = props; }
+  setNpcs(npcs)           { this.npcs = npcs; this._recomputeBounds(); }
+  setAnimals(animals)     { this.animals = animals; this._recomputeBounds(); }
+  setWorldProps(props)    { this.worldProps = props; this._recomputeBounds(); }
   setCompanion(npc)       { this.companion = npc; }
   setPetCompanion(animal) { this.petCompanion = animal; }
   setNearbyInteractables(entries) { this.nearbyInteractables = entries ?? []; }
 
+  _recomputeBounds() {
+    this.bounds = computeMapBounds(this.path, this.npcs, this.animals, this.worldProps, 10);
+  }
+
+  resize(logicalSize) {
+    if (this.unavailable || !this.canvas || !this.ctx) return;
+
+    const size = Math.max(80, Math.round(logicalSize || this.wrapEl?.clientWidth || this.size || 180));
+    this.size = size;
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    this.canvas.width = Math.round(size * this.dpr);
+    this.canvas.height = Math.round(size * this.dpr);
+    this.canvas.style.width = `${size}px`;
+    this.canvas.style.height = `${size}px`;
+
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+  }
+
   _worldToMap(x, z) {
     const { minX, maxX, minZ, maxZ } = this.bounds;
-    const spanX = maxX - minX;
-    const spanZ = maxZ - minZ;
+    const spanX = maxX - minX || 1;
+    const spanZ = maxZ - minZ || 1;
     const usable = this.size - this.padding * 2;
     return {
       mx: this.padding + ((x - minX) / spanX) * usable,
@@ -144,26 +221,9 @@ export class Minimap {
     };
   }
 
-  _drawNearbyPulse(ctx, mx, my, color, intensity = 1) {
-    const pr = 7 + Math.sin(this._pulse) * 2.5 * intensity;
-    dot(ctx, mx, my, pr, color.replace(')', ', 0.28)').replace('#', 'rgba(').replace(/rgba\(([^)]+)\)/, (_, hex) => {
-      const h = hex.trim();
-      if (h.startsWith('#')) {
-        const r = parseInt(h.slice(1, 3), 16);
-        const g = parseInt(h.slice(3, 5), 16);
-        const b = parseInt(h.slice(5, 7), 16);
-        return `rgba(${r},${g},${b},0.28)`;
-      }
-      return `rgba(255,255,255,0.28)`;
-    }));
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(mx, my, pr, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
   update() {
+    if (this.unavailable || !this.ctx) return;
+
     const { ctx, size } = this;
     this._pulse = (this._pulse + 0.07) % (Math.PI * 2);
     ctx.clearRect(0, 0, size, size);
@@ -262,7 +322,6 @@ export class Minimap {
       ctx.stroke();
     }
 
-    // Nearby interactable highlights (pulsing rings by type)
     for (const { item, dist } of this.nearbyInteractables) {
       const pos = getInteractablePosition(item);
       if (!pos) continue;

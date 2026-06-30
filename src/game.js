@@ -227,12 +227,16 @@ export class Game {
     this._updateYenHUD();
 
     const minimapCanvas = document.getElementById('minimap');
+    const minimapWrap = document.getElementById('minimap-wrap');
     if (minimapCanvas) {
-      this.minimap = new Minimap(minimapCanvas, this.path);
+      this.minimap = new Minimap(minimapCanvas, this.path, minimapWrap);
       this.minimap.setPlayer(this.player);
       this.minimap.setNpcs(this.npcs);
       this.minimap.setAnimals(this.animals);
       this.minimap.setWorldProps(this.worldProps);
+      this.minimap.update();
+    } else {
+      console.warn('Minimap: #minimap canvas not found in DOM');
     }
 
     // Mood system
@@ -413,6 +417,10 @@ export class Game {
     this.composer.setSize(w, h);
     if (this._fxaaPass) {
       this._fxaaPass.material.uniforms.resolution.value.set(1 / (w * dpr), 1 / (h * dpr));
+    }
+    const minimapWrap = document.getElementById('minimap-wrap');
+    if (this.minimap?.resize && minimapWrap) {
+      this.minimap.resize(minimapWrap.clientWidth);
     }
   }
 

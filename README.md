@@ -51,6 +51,7 @@ After the first successful deploy, the game is at:
 - Cel-shaded toon materials with black outlines
 - Procedural Japanese town — buildings, vending machines, mailboxes, traffic mirrors, power lines
 - Walking NPCs along the street
+- Top-left minimap tracks your position, NPCs, shops, and nearby interactions
 - Character walk animation
 - Backpack color customization (👕 button)
 
