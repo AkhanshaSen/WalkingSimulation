@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createToonMaterial, createOutlinedMesh, PALETTE } from './materials.js';
 import { setupNpcRoutine, updateNpcRoutine } from './npcRoutines.js';
 import { followPlayer, moveToward } from './entities/FollowerBehavior.js';
+import { attachAccessory } from './accessories.js';
 
 let _characterLoader = null;
 
@@ -14,13 +15,14 @@ export class InputManager {
     this.keys = {};
     this.move = { x: 0, z: 0 };
     this.cameraAngle = 0;
-    this.cameraPitch = 0.33;
-    this.cameraDistance = 8.5;
+    this.cameraPitch = 0.38;
+    this.cameraDistance = 4.5;
     this.isDragging = false;
     this.lastPointer = { x: 0, y: 0 };
     this.justPressed = new Set();
     this.interactRequested = false;
     this.dialogueOpen = false;
+    this.outfitOpen = false;
     this.tap = null;
     this.pointerStart = null;
     this.touchStart = null;
@@ -57,12 +59,12 @@ export class InputManager {
       const dx = e.clientX - this.lastPointer.x;
       const dy = e.clientY - this.lastPointer.y;
       this.cameraAngle -= dx * 0.005;
-      this.cameraPitch = THREE.MathUtils.clamp(this.cameraPitch + dy * 0.003, 0.18, 0.52);
+      this.cameraPitch = THREE.MathUtils.clamp(this.cameraPitch + dy * 0.003, 0.30, 0.55);
       this.lastPointer = { x: e.clientX, y: e.clientY };
     });
 
     canvas.addEventListener('wheel', (e) => {
-      this.cameraDistance = THREE.MathUtils.clamp(this.cameraDistance + e.deltaY * 0.01, 5.5, 15);
+      this.cameraDistance = THREE.MathUtils.clamp(this.cameraDistance + e.deltaY * 0.01, 3.5, 10);
     }, { passive: true });
 
     this._setupTouch(canvas);
@@ -98,7 +100,7 @@ export class InputManager {
         const dx = t.clientX - this.lastPointer.x;
         const dy = t.clientY - this.lastPointer.y;
         this.cameraAngle -= dx * 0.005;
-        this.cameraPitch = THREE.MathUtils.clamp(this.cameraPitch + dy * 0.003, 0.18, 0.52);
+        this.cameraPitch = THREE.MathUtils.clamp(this.cameraPitch + dy * 0.003, 0.30, 0.55);
         this.lastPointer = { x: t.clientX, y: t.clientY };
       }
     }, { passive: true });
@@ -182,11 +184,14 @@ export class InputManager {
 
 export function createCharacter(options = {}) {
   const modelKey = options.modelKey ?? 'character_female_a';
-  const rigged = _characterLoader?.createCharacterInstance(modelKey);
+  const rigged = _characterLoader?.createCharacterInstance(modelKey, {
+    tint: options.tint ?? null,
+    tintStrength: options.tintStrength ?? 0.22,
+  });
   if (rigged) {
     if (options.nameTag) {
       const tag = createNameTag(options.nameTag, options.nameTagJa);
-      tag.position.y = 1.75;
+      tag.position.y = 2.45;
       rigged.add(tag);
     }
     return rigged;
@@ -198,77 +203,76 @@ export function createCharacter(options = {}) {
   const hairColor = options.hairColor ?? PALETTE.hair;
 
   const body = createOutlinedMesh(
-    new THREE.CylinderGeometry(0.22, 0.26, 0.55, 8),
+    new THREE.CylinderGeometry(0.20, 0.24, 0.72, 8),
     createToonMaterial(shirtColor),
   );
-  body.position.y = 0.85;
+  body.position.y = 1.05;
   group.add(body);
 
   const skirt = createOutlinedMesh(
-    new THREE.CylinderGeometry(0.3, 0.35, 0.35, 8),
+    new THREE.CylinderGeometry(0.26, 0.30, 0.28, 8),
     createToonMaterial(PALETTE.pants),
   );
-  skirt.position.y = 0.45;
+  skirt.position.y = 0.58;
   group.add(skirt);
 
   const head = createOutlinedMesh(
-    new THREE.SphereGeometry(0.22, 10, 8),
+    new THREE.SphereGeometry(0.17, 10, 8),
     createToonMaterial(PALETTE.skin),
   );
-  head.position.y = 1.35;
+  head.position.y = 1.58;
   group.add(head);
 
   const hair = createOutlinedMesh(
-    new THREE.SphereGeometry(0.24, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55),
+    new THREE.SphereGeometry(0.19, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55),
     createToonMaterial(hairColor),
   );
-  hair.position.y = 1.42;
-  hair.scale.set(1, 0.8, 1);
+  hair.position.y = 1.64;
+  hair.scale.set(1, 0.82, 1);
   group.add(hair);
 
   const backpack = createOutlinedMesh(
-    new THREE.BoxGeometry(0.35, 0.4, 0.15),
+    new THREE.BoxGeometry(0.30, 0.38, 0.14),
     createToonMaterial(backpackColor),
   );
-  backpack.position.set(0, 0.95, -0.22);
+  backpack.position.set(0, 1.12, -0.20);
   group.add(backpack);
 
-  const legGeo = new THREE.CylinderGeometry(0.07, 0.08, 0.35, 6);
+  const legGeo = new THREE.CylinderGeometry(0.065, 0.075, 0.52, 6);
   const legGroups = [];
-  [-0.12, 0.12].forEach((x) => {
+  [-0.11, 0.11].forEach((x) => {
     const legGroup = new THREE.Group();
-    legGroup.position.set(x, 0.18, 0);
+    legGroup.position.set(x, 0.28, 0);
 
     const leg = createOutlinedMesh(legGeo, createToonMaterial(PALETTE.pants));
     legGroup.add(leg);
 
     const shoe = createOutlinedMesh(
-      new THREE.BoxGeometry(0.12, 0.06, 0.18),
+      new THREE.BoxGeometry(0.11, 0.06, 0.20),
       createToonMaterial(0xf0f0f0),
     );
-    shoe.position.set(0, -0.15, 0.03);
+    shoe.position.set(0, -0.22, 0.04);
     legGroup.add(shoe);
 
     group.add(legGroup);
     legGroups.push(legGroup);
   });
 
-  // Arms
-  const armGeo = new THREE.CylinderGeometry(0.048, 0.052, 0.3, 6);
+  const armGeo = new THREE.CylinderGeometry(0.044, 0.048, 0.42, 6);
   const armGroups = [];
-  [-0.28, 0.28].forEach((x) => {
+  [-0.26, 0.26].forEach((x) => {
     const armGroup = new THREE.Group();
-    armGroup.position.set(x, 0.92, 0);
-    armGroup.rotation.z = x > 0 ? -0.18 : 0.18;
+    armGroup.position.set(x, 1.18, 0);
+    armGroup.rotation.z = x > 0 ? -0.15 : 0.15;
 
     const arm = createOutlinedMesh(armGeo, createToonMaterial(shirtColor));
     armGroup.add(arm);
 
     const hand = createOutlinedMesh(
-      new THREE.SphereGeometry(0.052, 6, 4),
+      new THREE.SphereGeometry(0.048, 6, 4),
       createToonMaterial(PALETTE.skin),
     );
-    hand.position.y = -0.18;
+    hand.position.y = -0.24;
     armGroup.add(hand);
 
     group.add(armGroup);
@@ -299,52 +303,52 @@ function createFaceParts(group) {
   // White sclera
   const leftSclera  = new THREE.Mesh(new THREE.CircleGeometry(0.032, 10), whiteMat);
   const rightSclera = new THREE.Mesh(new THREE.CircleGeometry(0.032, 10), whiteMat);
-  leftSclera.position.set(-0.065, 1.38, 0.195);
-  rightSclera.position.set(0.065, 1.38, 0.195);
+  leftSclera.position.set(-0.065, 1.58, 0.195);
+  rightSclera.position.set(0.065, 1.58, 0.195);
   group.add(leftSclera, rightSclera);
 
   // Iris
   const leftIris  = new THREE.Mesh(new THREE.CircleGeometry(0.022, 10), irisMat);
   const rightIris = new THREE.Mesh(new THREE.CircleGeometry(0.022, 10), irisMat);
-  leftIris.position.set(-0.065, 1.38, 0.196);
-  rightIris.position.set(0.065, 1.38, 0.196);
+  leftIris.position.set(-0.065, 1.58, 0.196);
+  rightIris.position.set(0.065, 1.58, 0.196);
   group.add(leftIris, rightIris);
 
   // Pupils
   const leftEye  = new THREE.Mesh(new THREE.CircleGeometry(0.014, 8), pupilMat);
   const rightEye = new THREE.Mesh(new THREE.CircleGeometry(0.014, 8), pupilMat);
-  leftEye.position.set(-0.065, 1.38, 0.197);
-  rightEye.position.set(0.065, 1.38, 0.197);
+  leftEye.position.set(-0.065, 1.58, 0.197);
+  rightEye.position.set(0.065, 1.58, 0.197);
   group.add(leftEye, rightEye);
 
   // Highlights
   const hlL = new THREE.Mesh(new THREE.CircleGeometry(0.006, 6), hlMat);
   const hlR = new THREE.Mesh(new THREE.CircleGeometry(0.006, 6), hlMat);
-  hlL.position.set(-0.056, 1.39, 0.198);
-  hlR.position.set(0.074, 1.39, 0.198);
+  hlL.position.set(-0.056, 1.59, 0.198);
+  hlR.position.set(0.074, 1.59, 0.198);
   group.add(hlL, hlR);
 
   // Nose
   const nose = new THREE.Mesh(new THREE.SphereGeometry(0.013, 6, 5), noseMat);
   nose.scale.set(1.2, 0.75, 0.6);
-  nose.position.set(0, 1.31, 0.205);
+  nose.position.set(0, 1.51, 0.205);
   group.add(nose);
 
   // Mouth
   const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.013, 0.015), mouthMat);
-  mouth.position.set(0, 1.275, 0.2);
+  mouth.position.set(0, 1.475, 0.2);
   group.add(mouth);
 
   // Blush
   const blushMat = new THREE.MeshBasicMaterial({ color: 0xf0a0a8, transparent: true, opacity: 0.65 });
   const blushL = new THREE.Mesh(new THREE.CircleGeometry(0.04, 10), blushMat);
-  blushL.position.set(-0.115, 1.315, 0.175);
+  blushL.position.set(-0.115, 1.515, 0.175);
   blushL.rotation.y = 0.28;
   blushL.visible = false;
   group.add(blushL);
 
   const blushR = new THREE.Mesh(new THREE.CircleGeometry(0.04, 10), blushMat);
-  blushR.position.set(0.115, 1.315, 0.175);
+  blushR.position.set(0.115, 1.515, 0.175);
   blushR.rotation.y = -0.28;
   blushR.visible = false;
   group.add(blushR);
@@ -355,8 +359,8 @@ function createFaceParts(group) {
     mouth,
     blushL,
     blushR,
-    baseMouthY: 1.275,
-    baseEyeY:   1.38,
+    baseMouthY: 1.475,
+    baseEyeY:   1.58,
     // also keep refs to sclera for expression changes
     _leftSclera: leftSclera,
     _rightSclera: rightSclera,
@@ -469,7 +473,7 @@ function createNameTag(name, nameJa) {
   const texture = new THREE.CanvasTexture(canvas);
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
   const sprite = new THREE.Sprite(material);
-  sprite.position.y = 1.75;
+  sprite.position.y = 2.45;
   sprite.scale.set(1.2, 0.32, 1);
 
   const hitMaterial = new THREE.SpriteMaterial({
@@ -478,7 +482,7 @@ function createNameTag(name, nameJa) {
     depthWrite: false,
   });
   const hitArea = new THREE.Sprite(hitMaterial);
-  hitArea.position.y = 1.75;
+  hitArea.position.y = 2.45;
   hitArea.scale.set(1.8, 0.65, 1);
   hitArea.userData.isNameTagHit = true;
 
@@ -553,8 +557,10 @@ export const MAP_BOUNDS = { minX: -55, maxX: 65, minZ: -145, maxZ: 28 };
 
 export class Player {
   constructor(scene, path) {
+    this.scene = scene;
     this.path = path;
-    this.mesh = createCharacter({ modelKey: 'character_female_a' });
+    this.outfit = { modelKey: 'character_female_a', tint: null, scale: 1 };
+    this.mesh = createCharacter({ modelKey: this.outfit.modelKey });
     this.mesh.position.copy(path.getPointAt(0.05));
     scene.add(this.mesh);
 
@@ -568,6 +574,7 @@ export class Player {
     this.raycaster = new THREE.Raycaster();
     this.restTimer = 0;
     this.restPos = null;
+    this.restSitY = 0.01;
     this.verticalVelocity = 0;
     this.isGrounded = true;
   }
@@ -575,6 +582,41 @@ export class Player {
   applySpeedBoost(amount, duration) {
     this.runSpeed = this.baseRunSpeed + amount;
     this.speedBoostTimer = duration;
+  }
+
+  setOutfit({ modelKey, tint, tintStrength, scale = 1 }) {
+    const pos = this.mesh.position.clone();
+    const rotY = this.mesh.rotation.y;
+    const wasSitting = this.mesh.userData.isSitting;
+    const wasJumping = this.mesh.userData.isJumping;
+    // Preserve current headgear so it survives a skin swap.
+    const prevAccessoryId = this.mesh.userData.accessoryId ?? 'none';
+
+    this.scene.remove(this.mesh);
+    this.mesh = createCharacter({
+      modelKey: modelKey ?? this.outfit.modelKey,
+      tint: tint !== undefined ? tint : this.outfit.tint,
+      tintStrength: tintStrength ?? this.outfit.tintStrength ?? 0.22,
+    });
+    if (scale !== 1) this.mesh.scale.setScalar(scale);
+    this.mesh.position.copy(pos);
+    this.mesh.rotation.y = rotY;
+    this.mesh.userData.isSitting = wasSitting;
+    this.mesh.userData.isJumping = wasJumping;
+    this.mesh.traverse((c) => { c.userData.dynamic = true; });
+    this.scene.add(this.mesh);
+
+    // Re-apply headgear on the fresh mesh.
+    if (prevAccessoryId && prevAccessoryId !== 'none') {
+      attachAccessory(this.mesh, prevAccessoryId);
+    }
+
+    this.outfit = {
+      modelKey: modelKey ?? this.outfit.modelKey,
+      tint: tint !== undefined ? tint : this.outfit.tint,
+      tintStrength: tintStrength ?? this.outfit.tintStrength ?? 0.22,
+      scale,
+    };
   }
 
   update(input, dt, groundMeshes) {
@@ -585,14 +627,14 @@ export class Player {
       }
     }
 
-    if (input.dialogueOpen || this.restTimer > 0) {
+    if (input.dialogueOpen || this.restTimer > 0 || input.outfitOpen) {
       this.velocity.set(0, 0, 0);
       if (this.restTimer > 0) {
         this.restTimer -= dt;
         this.mesh.userData.isSitting = true;
         if (this.restPos) {
           this.mesh.position.lerp(this.restPos, 0.08);
-          this.mesh.position.y = 0.01;
+          this.mesh.position.y = this.restSitY;
         }
         if (this.restTimer <= 0) {
           this.mesh.userData.isSitting = false;
@@ -650,9 +692,11 @@ export class Player {
     this.pathT = this.path.getClosestPointT?.(this.mesh.position) ?? 0;
   }
 
-  rest(duration, nearPos) {
+  rest(duration, nearPos, options = {}) {
     this.restTimer = duration;
     this.restPos = nearPos?.clone();
+    this.restSitY = options.sitY ?? 0.01;
+    if (options.facing != null) this.mesh.rotation.y = options.facing;
     this.velocity.set(0, 0, 0);
   }
 
@@ -687,6 +731,150 @@ export class Player {
   }
 }
 
+function drawSpeechBubbleCanvas(text, mode = 'speech') {
+  const upper = (text ?? '').toUpperCase();
+  const isEllipsis = mode === 'ellipsis';
+  const fontSize = isEllipsis ? 22 : 13;
+  const maxWidth = 220;
+  const lineHeight = isEllipsis ? 28 : 18;
+  const padX = 14;
+  const padY = 10;
+
+  const measure = document.createElement('canvas').getContext('2d');
+  measure.font = `bold ${fontSize}px "Noto Sans JP", sans-serif`;
+
+  const lines = [];
+  if (isEllipsis) {
+    lines.push('...');
+  } else {
+    const words = upper.split(/\s+/);
+    let line = '';
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (measure.measureText(test).width > maxWidth && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line);
+    if (lines.length === 0) lines.push('');
+  }
+
+  const w = Math.max(
+    80,
+    ...lines.map((l) => measure.measureText(l).width + padX * 2),
+  );
+  const h = lines.length * lineHeight + padY * 2 + 8;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(w);
+  canvas.height = Math.ceil(h);
+  const ctx = canvas.getContext('2d');
+
+  const r = 10;
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(r, 0);
+  ctx.lineTo(w - r, 0);
+  ctx.quadraticCurveTo(w, 0, w, r);
+  ctx.lineTo(w, h - r - 8);
+  ctx.quadraticCurveTo(w, h - 8, w - r, h - 8);
+  ctx.lineTo(w * 0.55, h - 8);
+  ctx.lineTo(w * 0.5, h);
+  ctx.lineTo(w * 0.45, h - 8);
+  ctx.lineTo(r, h - 8);
+  ctx.quadraticCurveTo(0, h - 8, 0, h - r - 8);
+  ctx.lineTo(0, r);
+  ctx.quadraticCurveTo(0, 0, r, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  if (isEllipsis) {
+    ctx.fillStyle = '#50a850';
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.arc(w / 2 - 14 + i * 14, h / 2 - 2, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = '#1a1a1a';
+    ctx.font = `bold ${fontSize}px "Noto Sans JP", sans-serif`;
+    ctx.textAlign = 'center';
+    lines.forEach((line, i) => {
+      ctx.fillText(line, w / 2, padY + lineHeight * (i + 0.75));
+    });
+  }
+
+  return { canvas, w, h };
+}
+
+function createSpeechBubble() {
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ transparent: true, depthTest: true }),
+  );
+  sprite.position.y = 2.75;
+  sprite.visible = false;
+  sprite.userData.mode = 'speech';
+
+  sprite.userData.setText = (text, mode = 'speech') => {
+    sprite.userData.mode = mode;
+    if (!text && mode !== 'ellipsis') {
+      sprite.visible = false;
+      return;
+    }
+    const { canvas, w, h } = drawSpeechBubbleCanvas(text, mode);
+    if (sprite.material.map) sprite.material.map.dispose();
+    sprite.material.map = new THREE.CanvasTexture(canvas);
+    sprite.material.map.colorSpace = THREE.SRGBColorSpace;
+    sprite.material.needsUpdate = true;
+    const aspect = w / h;
+    const height = mode === 'ellipsis' ? 0.38 : Math.min(0.95, 0.22 + linesEstimate(text) * 0.12);
+    sprite.scale.set(height * aspect, height, 1);
+    sprite.visible = true;
+  };
+
+  sprite.userData.hide = () => {
+    sprite.visible = false;
+  };
+
+  return sprite;
+}
+
+function linesEstimate(text) {
+  return Math.max(1, Math.ceil((text?.length ?? 0) / 28));
+}
+
+function createInteractPrompt() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 24;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(16, 20);
+  ctx.lineTo(4, 6);
+  ctx.lineTo(28, 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: texture, transparent: true }),
+  );
+  sprite.position.y = 2.25;
+  sprite.scale.set(0.28, 0.22, 1);
+  sprite.visible = false;
+  return sprite;
+}
+
 function createAlertBubble() {
   const canvas = document.createElement('canvas');
   canvas.width = 64;
@@ -708,7 +896,7 @@ function createAlertBubble() {
   const sprite = new THREE.Sprite(
     new THREE.SpriteMaterial({ map: texture, transparent: true }),
   );
-  sprite.position.y = 2.15;
+  sprite.position.y = 2.25;
   sprite.scale.set(0.45, 0.45, 1);
   sprite.visible = false;
   return sprite;
@@ -734,7 +922,7 @@ function createWaveBubble() {
   const sprite = new THREE.Sprite(
     new THREE.SpriteMaterial({ map: texture, transparent: true }),
   );
-  sprite.position.y = 2.15;
+  sprite.position.y = 2.25;
   sprite.scale.set(0.5, 0.5, 1);
   sprite.visible = false;
   return sprite;
@@ -769,8 +957,12 @@ export class NPC {
 
     this.alertBubble = createAlertBubble();
     this.waveBubble = createWaveBubble();
+    this.speechBubble = createSpeechBubble();
+    this.interactPrompt = createInteractPrompt();
     this.mesh.add(this.alertBubble);
     this.mesh.add(this.waveBubble);
+    this.mesh.add(this.speechBubble);
+    this.mesh.add(this.interactPrompt);
 
     scene.add(this.mesh);
     setExpression(this.mesh, profile.defaultExpression);
@@ -850,15 +1042,41 @@ export class NPC {
     setExpression(this.mesh, expression);
   }
 
+  showSpeechText(text) {
+    this.speechBubble.userData.setText(text, 'speech');
+    this.interactPrompt.visible = false;
+  }
+
+  showEllipsisBubble() {
+    this.speechBubble.userData.setText('', 'ellipsis');
+  }
+
+  hideSpeechBubble() {
+    this.speechBubble.userData.hide();
+  }
+
+  showInteractPrompt() {
+    if (!this.isTalking && !this.isIgnored()) {
+      this.interactPrompt.visible = true;
+    }
+  }
+
+  hideInteractPrompt() {
+    this.interactPrompt.visible = false;
+  }
+
   onApproach(initiated = false) {
     this.alertBubble.visible = !initiated;
     this.waveBubble.visible = initiated;
+    this.hideInteractPrompt();
+    if (!initiated) this.showEllipsisBubble();
     setExpression(this.mesh, initiated ? 'happy' : 'happy');
   }
 
   clearApproachBubbles() {
     this.alertBubble.visible = false;
     this.waveBubble.visible = false;
+    if (!this.isTalking) this.hideSpeechBubble();
   }
 
   startApproaching() {
@@ -898,17 +1116,28 @@ export class NPC {
     }
     if (!this.isTalking && !this.isCompanion && this.state !== 'approaching') {
       this.alertBubble.visible = false;
+      if (nearby && !this.isIgnored()) {
+        this.showInteractPrompt();
+        if (this.profile.routine === 'sit' || this.mesh.userData.isSitting) {
+          this.showEllipsisBubble();
+        }
+      } else {
+        this.hideInteractPrompt();
+        if (!this.isTalking) this.hideSpeechBubble();
+      }
     }
   }
 
   startConversation() {
     this.isTalking = true;
     this.clearApproachBubbles();
+    this.hideInteractPrompt();
     if (this.state === 'approaching') this.state = 'idle';
   }
 
   endConversation() {
     this.isTalking = false;
+    this.hideSpeechBubble();
     if (!this.isCompanion) {
       setExpression(this.mesh, this.profile.defaultExpression);
     }

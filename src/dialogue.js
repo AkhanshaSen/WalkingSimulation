@@ -36,6 +36,7 @@ export class DialogueManager {
     this.journalBtn = elements.journalBtn;
     this.closeJournalBtn = elements.closeJournalBtn;
     this.interactHint = elements.interactHint;
+    this.continueHint = elements.continueHint;
 
     this.active = false;
     this.hintItem = null;
@@ -131,11 +132,16 @@ export class DialogueManager {
     }
   }
 
+  _canWalk(npc) {
+    if (!npc) return false;
+    if (npc.isCompanion) return false;
+    return !!npc.profile?.approachInvite; // any NPC with an approachInvite can walk
+  }
+
   _updateDialogueWalkButtons() {
     const npc = this.npc;
-    const isAmbient = npc?.profile?.isAmbient;
     const isCompanion = npc?.isCompanion;
-    this.dialogueWalkBtn?.classList.toggle('hidden', !this.active || isCompanion || isAmbient);
+    this.dialogueWalkBtn?.classList.toggle('hidden', !this.active || isCompanion || !this._canWalk(npc));
     this.dialogueStopWalkBtn?.classList.toggle('hidden', !this.active || !isCompanion);
   }
 
@@ -158,7 +164,7 @@ export class DialogueManager {
       : this.approachInitiated
         ? p.approachInvite
         : p.tagline;
-    this.approachWalkBtn?.classList.toggle('hidden', isCompanion || npc.profile.isAmbient);
+    this.approachWalkBtn?.classList.toggle('hidden', isCompanion || !this._canWalk(npc));
     this.approachPartBtn?.classList.toggle('hidden', !isCompanion);
     this.approachIgnoreBtn?.classList.toggle('hidden', isCompanion);
     this.approachModal.classList.remove('hidden');
@@ -259,9 +265,11 @@ export class DialogueManager {
     this.pendingChoices = false;
 
     this.box.classList.remove('hidden');
+    this.box.classList.add('bubble-mode');
     this.choicesEl.innerHTML = '';
     this.choicesEl.classList.add('hidden');
     this.nextBtn.classList.remove('hidden');
+    this.continueHint?.classList.remove('hidden');
     this._updateDialogueWalkButtons();
 
     npc.startConversation();
@@ -276,7 +284,7 @@ export class DialogueManager {
 
   _getSocialChoices() {
     const social = this.npc?.profile?.social;
-    if (!social || this.npc?.profile?.isAmbient) return [];
+    if (!social) return [];
     return Object.entries(SOCIAL_CHOICE_META)
       .filter(([key]) => social[key])
       .map(([key, meta]) => ({ key, meta, response: social[key] }));
@@ -286,7 +294,9 @@ export class DialogueManager {
     this.phase = 'choices';
     this.expressionEl.textContent = '💬';
     this.textEl.textContent = 'What do you say?';
+    this.npc.showSpeechText('What do you say?');
     this.nextBtn.classList.add('hidden');
+    this.continueHint?.classList.add('hidden');
     this.choicesEl.classList.remove('hidden');
     this.choicesEl.innerHTML = '';
 
@@ -314,6 +324,7 @@ export class DialogueManager {
     this.choicesEl.classList.add('hidden');
     this.choicesEl.innerHTML = '';
     this.nextBtn.classList.remove('hidden');
+    this.continueHint?.classList.remove('hidden');
 
     this._renderLine(response);
     this.nextBtn.textContent = '▶ Keep talking';
@@ -343,6 +354,7 @@ export class DialogueManager {
     this.choicesEl.classList.add('hidden');
     this.choicesEl.innerHTML = '';
     this.nextBtn.classList.remove('hidden');
+    this.continueHint?.classList.remove('hidden');
 
     this._renderLine(choice.response);
     this.nextBtn.textContent = choice.end ? '👋 Say goodbye' : '▶ Keep talking';
@@ -413,17 +425,24 @@ export class DialogueManager {
     this.expressionEl.textContent = EXPRESSION_EMOJI[line.expression] ?? '😐';
     this.portraitEl.textContent = p.emoji;
     this.npc.setExpression(line.expression);
+    this.npc.showSpeechText(line.text);
+    if (this.continueHint) {
+      this.continueHint.textContent = '▶ Continue';
+    }
   }
 
   close() {
     this.active = false;
     this.box.classList.add('hidden');
+    this.box.classList.remove('bubble-mode');
     this.choicesEl.classList.add('hidden');
     this.nextBtn.classList.remove('hidden');
     this.nextBtn.textContent = '▶ Continue';
+    this.continueHint?.classList.add('hidden');
     this.dialogueWalkBtn?.classList.add('hidden');
     this.dialogueStopWalkBtn?.classList.add('hidden');
     if (this.npc) {
+      this.npc.hideSpeechBubble();
       this.npc.endConversation();
       if (!this.npc.isCompanion) this.npc = null;
       this.onConversationEnd?.();

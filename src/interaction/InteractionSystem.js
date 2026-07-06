@@ -23,7 +23,7 @@ export class InteractionSystem {
   }
 
   isBlocking() {
-    return this.dialogue.isBlocking() || this.petUI?.isOpen() || this.shopUI?.isOpen();
+    return this.dialogue.isBlocking() || this.petUI?.isOpen() || this.shopUI?.isOpen() || this.game?.outfitOpen;
   }
 
   _interactWithNpc(npc) {

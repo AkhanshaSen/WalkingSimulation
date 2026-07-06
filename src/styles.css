@@ -370,13 +370,17 @@ body {
   pointer-events: auto;
   width: 44px;
   height: 44px;
-  border: none;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.92);
+  border: 2.5px solid #1a1a1a;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.95);
   font-size: 1.1rem;
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  transition: transform 0.15s, background 0.15s;
+  box-shadow: 0 3px 0 #1a1a1a;
+  transition: transform 0.12s, background 0.12s;
+}
+
+.hud-btn-icon {
+  font-size: 1.15rem;
 }
 
 .hud-btn:hover {
@@ -1191,4 +1195,159 @@ body {
   .loading-title {
     font-size: 1.5rem;
   }
+}
+
+/* ── Reference-style speech continue ───────────────────────────────── */
+#speech-continue {
+  pointer-events: auto;
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  color: #1a1a1a;
+  border: 2.5px solid #1a1a1a;
+  border-radius: 10px;
+  padding: 0.55rem 1.4rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #1a1a1a;
+  z-index: 12;
+}
+
+#speech-continue:hover {
+  transform: translateX(-50%) translateY(-1px);
+}
+
+/* Bubble mode — speech text lives in 3D bubble above NPC */
+#dialogue-box.bubble-mode {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  bottom: 1.5rem;
+  width: 92%;
+  max-width: 440px;
+  pointer-events: none;
+}
+
+#dialogue-box.bubble-mode .dialogue-portrait,
+#dialogue-box.bubble-mode .dialogue-header,
+#dialogue-box.bubble-mode #dialogue-text,
+#dialogue-box.bubble-mode .dialogue-next,
+#dialogue-box.bubble-mode .dialogue-actions {
+  display: none !important;
+}
+
+#dialogue-box.bubble-mode .dialogue-choices {
+  pointer-events: auto;
+}
+
+#dialogue-box.bubble-mode .dialogue-content {
+  width: 100%;
+}
+
+/* ── Outfit customizer (reference arrows) ─────────────────────────── */
+#outfit-modal {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+}
+
+#outfit-modal:not(.hidden) {
+  display: block;
+}
+
+.outfit-close {
+  pointer-events: auto;
+  position: absolute;
+  top: 1.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 44px;
+  border: 2.5px solid #1a1a1a;
+  border-radius: 8px;
+  background: #fff;
+  color: #e04040;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #1a1a1a;
+  z-index: 22;
+}
+
+.outfit-slot {
+  pointer-events: auto;
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.outfit-slot-left {
+  left: 1rem;
+}
+
+.outfit-slot-right {
+  right: 1rem;
+}
+
+.outfit-model { top: 28%; }
+.outfit-accent { top: 28%; }
+.outfit-hat { top: 52%; }
+.outfit-shoes { top: 52%; }
+
+.outfit-arrow {
+  width: 44px;
+  height: 44px;
+  border: 2.5px solid #1a1a1a;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #1a1a1a;
+  line-height: 1;
+}
+
+.outfit-arrow:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #1a1a1a;
+}
+
+.outfit-slot-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  background: rgba(255, 255, 255, 0.88);
+  border: 2px solid #1a1a1a;
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  min-width: 4.5rem;
+  text-align: center;
+}
+
+.outfit-hint {
+  pointer-events: none;
+  position: absolute;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.78rem;
+  color: #1a1a1a;
+  background: rgba(255, 255, 255, 0.85);
+  border: 2px solid #1a1a1a;
+  border-radius: 8px;
+  padding: 0.35rem 0.75rem;
+}
+
+.dialogue-choice {
+  border: 2.5px solid #1a1a1a !important;
+  box-shadow: 0 2px 0 #1a1a1a !important;
+  border-radius: 10px !important;
+  font-weight: 600 !important;
 }

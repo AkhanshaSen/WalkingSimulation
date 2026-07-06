@@ -411,12 +411,10 @@ function createVendingMachine(color = PALETTE.vending) {
     const displayTex = createVendingDisplayTexture(color);
     const glass = new THREE.Mesh(
       new THREE.PlaneGeometry(0.68, 1.15),
-      new THREE.MeshStandardMaterial({
+      createToonMaterial(0xffffff, {
         map: displayTex,
-        emissive: new THREE.Color(0x306878),
+        emissive: 0x306878,
         emissiveIntensity: 0.35,
-        roughness: 0.25,
-        metalness: 0.05,
       }),
     );
     glass.position.set(0, 1.02, 0.36);
@@ -464,11 +462,10 @@ function decorateVendingMachine(group, color) {
     const displayTex = createVendingDisplayTexture(color);
     const panel = new THREE.Mesh(
       new THREE.PlaneGeometry(0.64, 1.0),
-      new THREE.MeshStandardMaterial({
+      createToonMaterial(0xffffff, {
         map: displayTex,
-        emissive: new THREE.Color(0x306878),
+        emissive: 0x306878,
         emissiveIntensity: 0.42,
-        roughness: 0.18,
         transparent: true,
         opacity: 0.94,
         depthWrite: false,
@@ -481,13 +478,11 @@ function decorateVendingMachine(group, color) {
   } else if (!group.userData.vendingGlow) {
     const glow = new THREE.Mesh(
       new THREE.PlaneGeometry(0.55, 0.9),
-      new THREE.MeshStandardMaterial({
-        color: 0x90d0e8,
-        emissive: new THREE.Color(0x4098b8),
+      createToonMaterial(0x90d0e8, {
+        emissive: 0x4098b8,
         emissiveIntensity: 0.45,
         transparent: true,
         opacity: 0.55,
-        roughness: 0.2,
         depthWrite: false,
       }),
     );
@@ -758,22 +753,61 @@ function createBambooCluster() {
   return group;
 }
 
+function createPainterlyCloudTexture(seed = 0) {
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, size, size);
+
+  const rng = (n) => {
+    const x = Math.sin(seed * 127.1 + n * 311.7) * 43758.5453;
+    return x - Math.floor(x);
+  };
+
+  const blobs = 4 + Math.floor(rng(0) * 3);
+  for (let b = 0; b < blobs; b++) {
+    const cx = size * (0.25 + rng(b + 1) * 0.5);
+    const cy = size * (0.3 + rng(b + 2) * 0.4);
+    const rx = size * (0.22 + rng(b + 3) * 0.18);
+    const ry = size * (0.14 + rng(b + 4) * 0.12);
+    const alpha = 0.55 + rng(b + 5) * 0.35;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rng(b + 6) * Math.PI);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 function createCloud(x, y, z, scale) {
-  const group = new THREE.Group();
-  const mat = createToonMaterial(PALETTE.skyCloud);
-  [[0, 0, 0, 1], [-0.5, 0.1, 0, 0.7], [0.5, 0.05, 0.1, 0.8], [0, -0.1, 0.2, 0.6]].forEach(
-    ([ox, oy, oz, s]) => {
-      const puff = new THREE.Mesh(new THREE.SphereGeometry(0.8 * s, 8, 6), mat);
-      puff.position.set(ox * scale, oy * scale, oz * scale);
-      group.add(puff);
-    },
+  const seed = x * 0.17 + y * 0.31 + z * 0.09;
+  const texture = createPainterlyCloudTexture(seed);
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      opacity: 0.88,
+    }),
   );
-  group.position.set(x, y, z);
-  group.scale.setScalar(scale);
-  group.userData.driftSpeed = 0.15 + Math.random() * 0.2;
-  group.userData.driftPhase = Math.random() * Math.PI * 2;
-  group.userData.dynamic = true;
-  return group;
+  const aspect = 1.6 + (seed % 0.6);
+  const height = scale * 1.8;
+  sprite.scale.set(height * aspect, height, 1);
+  sprite.position.set(x, y, z);
+  sprite.userData.driftSpeed = 0.15 + (seed % 0.2);
+  sprite.userData.driftPhase = seed * Math.PI;
+  sprite.userData.dynamic = true;
+  return sprite;
 }
 
 
@@ -920,6 +954,7 @@ function createPathBuilding(modelKey, targetHeight, w, d, h, wall, roof, style) 
     modelKey,
     targetHeight,
     () => createBuilding(w, d, h, wall, roof, style),
+    { maxHeight: targetHeight * 1.15 },
   );
   if (mesh.userData?.isLoadedModel) {
     mesh.rotation.y = -Math.PI / 2;
@@ -1112,7 +1147,7 @@ export class Town {
     this.waterMeshes.forEach((water, i) => {
       if (!water?.material?.color) return;
       const wave = 0.92 + Math.sin(elapsed * 0.8 + i * 2.1) * 0.08;
-      water.material.color.setHex(0x4a90b0);
+      water.material.color.setHex(0x6ab0c0);
       water.material.color.multiplyScalar(wave);
       water.material.opacity = 0.84 + Math.sin(elapsed * 1.1 + i) * 0.06;
     });
@@ -1183,19 +1218,19 @@ export class Town {
   }
 
   _createSky() {
-    this.scene.fog = new THREE.Fog(0xd0e4f4, 75, 190);
-    this.scene.background = new THREE.Color(0xa0cce8);
+    this.scene.fog = new THREE.Fog(0xb8e0d8, 50, 200);
+    this.scene.background = new THREE.Color(0xa8dcd4);
 
     const skyGeo = new THREE.SphereGeometry(220, 24, 16);
     const skyCanvas = document.createElement('canvas');
     skyCanvas.width = 1; skyCanvas.height = 64;
     const skyCtx = skyCanvas.getContext('2d');
     const grad = skyCtx.createLinearGradient(0, 0, 0, 64);
-    grad.addColorStop(0,   '#4a88c0');
-    grad.addColorStop(0.4, '#88b8d8');
-    grad.addColorStop(0.72, '#c8e0f0');
-    grad.addColorStop(0.9, '#f0dcc8');
-    grad.addColorStop(1,   '#f8e4d0');
+    grad.addColorStop(0,   '#68a8a8');
+    grad.addColorStop(0.35, '#98d0c8');
+    grad.addColorStop(0.68, '#c0e8e0');
+    grad.addColorStop(0.88, '#e0d8c8');
+    grad.addColorStop(1,   '#f0e8d8');
     skyCtx.fillStyle = grad;
     skyCtx.fillRect(0, 0, 1, 64);
     const skyTex = new THREE.CanvasTexture(skyCanvas);
@@ -1260,7 +1295,7 @@ export class Town {
     const grassTex = createGrassTexture();
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(420, 420),
-      createToonMaterial(PALETTE.green, { map: grassTex, roughness: 0.92 }),
+      createToonMaterial(PALETTE.green, { map: grassTex }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(2, -0.06, -52);
@@ -1270,32 +1305,32 @@ export class Town {
 
     const meadow = new THREE.Mesh(
       new THREE.PlaneGeometry(420, 420),
-      createToonMaterial(PALETTE.meadow, { map: grassTex, roughness: 0.9 }),
+      createToonMaterial(PALETTE.meadow, { map: grassTex }),
     );
     meadow.rotation.x = -Math.PI / 2;
     meadow.position.set(2, -0.055, -52);
     this.scene.add(meadow);
 
     const patches = [
-      [-14, -6, 5, 4, 0x6a9a6a],
-      [10, -16, 6, 5, 0x7aaa7a],
-      [-8, -30, 7, 6, 0x5a8a5a],
-      [16, -44, 9, 7, 0x6a9a8a],
-      [20, -58, 12, 9, 0x5a8a6a],
-      [-12, -52, 6, 5, 0x7aaa7a],
-      [10, -74, 14, 10, 0x6aba7a],
-      [-10, -86, 9, 7, 0x6a9a7a],
-      [-18, -105, 11, 8, 0x5a9a6a],
-      [14, -112, 10, 9, 0x6aaa8a],
-      [22, -125, 14, 10, 0x5a8a8a],
-      [-6, -128, 8, 7, 0x7a9a7a],
-      [8, 8, 6, 5, 0x7aaa7a],
-      [-10, 4, 5, 4, 0x6a9a68],
+      [-14, -6, 5, 4, 0x7aaa88],
+      [10, -16, 6, 5, 0x82b890],
+      [-8, -30, 7, 6, 0x6a9a78],
+      [16, -44, 9, 7, 0x7aaa90],
+      [20, -58, 12, 9, 0x6a9a78],
+      [-12, -52, 6, 5, 0x82b890],
+      [10, -74, 14, 10, 0x7ab888],
+      [-10, -86, 9, 7, 0x7aaa88],
+      [-18, -105, 11, 8, 0x6a9a78],
+      [14, -112, 10, 9, 0x82b898],
+      [22, -125, 14, 10, 0x6a9888],
+      [-6, -128, 8, 7, 0x7aaa88],
+      [8, 8, 6, 5, 0x82b890],
+      [-10, 4, 5, 4, 0x7aaa80],
     ];
     patches.forEach(([x, z, w, d, color]) => {
       const patch = new THREE.Mesh(
         new THREE.PlaneGeometry(w, d),
-        createToonMaterial(color, { roughness: 0.88 }),
+        createToonMaterial(color),
       );
       patch.rotation.x = -Math.PI / 2;
       patch.position.set(x, 0.012, z);
@@ -1309,7 +1344,7 @@ export class Town {
     gravelStrips.forEach(([x, y, z, w, d]) => {
       const gravel = new THREE.Mesh(
         new THREE.PlaneGeometry(w, d),
-        createToonMaterial(PALETTE.gravel, { roughness: 0.95 }),
+        createToonMaterial(PALETTE.gravel),
       );
       gravel.rotation.x = -Math.PI / 2;
       gravel.position.set(x, y, z);
@@ -1341,7 +1376,7 @@ export class Town {
     const sidewalkOffset = roadHalf + sidewalkHalf + 0.15;
 
     const road = createPathRibbon(
-      this.path, roadHalf, 0.08, createToonMaterial(PALETTE.road, { roughness: 0.78 }), 0, 200,
+      this.path, roadHalf, 0.08, createToonMaterial(PALETTE.road), 0, 200,
     );
     this.scene.add(road);
     this.groundMeshes.push(road);
@@ -1709,21 +1744,26 @@ export class Town {
     const cloudPositions = [
       [-18, 20, -2, 2.2],
       [12, 22, -8, 2.6],
-      [-10, 24, -22, 2],
+      [-10, 24, -22, 2.0],
       [24, 21, -18, 2.4],
       [-24, 23, 2, 1.8],
       [6, 25, -28, 2.2],
       [-14, 20, -38, 2.5],
-      [18, 22, -42, 2],
-      [0, 26, -14, 3],
+      [18, 22, -42, 2.0],
+      [0, 26, -14, 3.0],
       [26, 21, -55, 2.3],
       [-22, 24, -65, 2.1],
       [10, 25, -72, 2.6],
-      [32, 22, -50, 2],
+      [32, 22, -50, 2.0],
       [-8, 23, -95, 2.2],
       [20, 24, -105, 2.4],
-      [-28, 21, -115, 2],
+      [-28, 21, -115, 2.0],
       [14, 25, -128, 2.3],
+      [-32, 19, -48, 1.9],
+      [8, 28, -88, 2.1],
+      [30, 20, -108, 2.5],
+      [-16, 27, -78, 2.0],
+      [22, 23, -32, 2.2],
     ];
     cloudPositions.forEach(([x, y, z, s]) => {
       const cloud = createCloud(x, y, z, s);
@@ -1733,13 +1773,13 @@ export class Town {
   }
 
   _createLighting() {
-    const hemi = new THREE.HemisphereLight(0xc8e8ff, 0x5a8a5a, 0.9);
+    const hemi = new THREE.HemisphereLight(0xc0e8e0, 0x6a9888, 1.25);
     this.scene.add(hemi);
 
-    const sun = new THREE.DirectionalLight(0xfff4d0, 1.22);
-    sun.position.set(22, 32, 14);
+    const sun = new THREE.DirectionalLight(0xfff4e8, 0.65);
+    sun.position.set(18, 28, 12);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(1024, 1024);
     sun.shadow.camera.near = 0.5;
     sun.shadow.camera.far = 220;
     sun.shadow.camera.left   = -85;
@@ -1751,37 +1791,37 @@ export class Town {
     this.scene.add(sun);
     this.sun = sun;
 
-    const fill = new THREE.DirectionalLight(0xb8d8f8, 0.68);
-    fill.position.set(-18, 14, -10);
+    const fill = new THREE.DirectionalLight(0xc8e0f0, 0.55);
+    fill.position.set(-14, 12, -8);
     this.scene.add(fill);
 
-    const ambient = new THREE.AmbientLight(0xe0ece8, 0.26);
+    const ambient = new THREE.AmbientLight(0xe8f0ec, 0.55);
     this.scene.add(ambient);
 
-    // Street-level warm point lights along the road
+    // Subtle street accents — kept low for flat cel look
     [[-3, 2.5, -10], [-5, 2.5, -22], [4, 2.5, -34], [-2, 2.5, -46], [6, 2.5, -62], [3, 2.5, -88]].forEach(([x, y, z]) => {
-      const pl = new THREE.PointLight(0xffa858, 0.55, 14);
+      const pl = new THREE.PointLight(0xffc878, 0.28, 12);
       pl.position.set(x, y, z);
       this.scene.add(pl);
     });
 
-    const harborLight = new THREE.PointLight(0x80c8e8, 0.55, 26);
+    const harborLight = new THREE.PointLight(0x90d0e0, 0.3, 22);
     harborLight.position.set(22, 3, -95);
     this.scene.add(harborLight);
 
-    const harborLight2 = new THREE.PointLight(0x70b8d8, 0.45, 22);
+    const harborLight2 = new THREE.PointLight(0x80c0d8, 0.25, 18);
     harborLight2.position.set(28, 3, -118);
     this.scene.add(harborLight2);
 
-    const marketLight = new THREE.PointLight(0xffb868, 0.48, 18);
+    const marketLight = new THREE.PointLight(0xffc878, 0.25, 14);
     marketLight.position.set(6, 3, -48);
     this.scene.add(marketLight);
 
-    const shrineLight = new THREE.PointLight(0xb890e8, 0.42, 16);
+    const shrineLight = new THREE.PointLight(0xc0a0e0, 0.22, 14);
     shrineLight.position.set(-8, 3, -68);
     this.scene.add(shrineLight);
 
-    const coastLight = new THREE.PointLight(0xa0d0f0, 0.4, 20);
+    const coastLight = new THREE.PointLight(0xa8d0e8, 0.22, 16);
     coastLight.position.set(12, 3, -128);
     this.scene.add(coastLight);
   }

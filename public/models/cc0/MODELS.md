@@ -10,16 +10,20 @@ All Kenney GLBs reference `Textures/colormap.png` (city-kit-suburban atlas). Req
 |------|----------|
 | fence_low.glb | Low fences along buildings |
 
-## Characters — [Kenney Mini Characters](https://kenney.nl/assets/mini-characters)
+## Characters — [KayKit Character Pack Adventures](https://kaylousberg.itch.io/kaykit-adventurers) (CC0)
 
-Requires `Textures/colormap.png` (shared atlas from the same pack).
+Taller human-proportioned rigged characters (replaces Kenney Mini Characters). Original chibi models are in `_kenney_backup/`.
 
-| File | Used for |
-|------|----------|
-| character_female_a–c.glb | Player & female NPCs |
-| character_male_a–c.glb | Male NPCs |
+| File | Model |
+|------|-------|
+| character_female_a.glb | Mage |
+| character_female_b.glb | Rogue |
+| character_female_c.glb | Rogue (hooded) |
+| character_male_a.glb | Knight |
+| character_male_b.glb | Barbarian |
+| character_male_c.glb | Rogue |
 
-Animations: idle, walk, sprint, sit, emote-yes, emote-no, etc.
+Animations: idle, walk, sprint, jump, sit (via KayKit clip aliases).
 
 ## Animals — [Kenney Cube Pets](https://kenney.nl/assets/cube-pets)
 

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { convertMaterialToToon, addOutline } from '../materials.js';
 import { MODEL_CATALOG } from '../data/modelCatalog.js';
 
 function resolveModelUrl(filename) {
@@ -8,24 +9,49 @@ function resolveModelUrl(filename) {
   return `${base}models/cc0/${filename}`;
 }
 
-function enhanceMeshMaterials(object) {
+/** Body-part suffixes that should be kept; everything else is a weapon/accessory. */
+// Meshes whose names end with one of these suffixes are kept visible on load.
+// Everything else (weapons, accessories) is hidden and may be re-shown selectively.
+const BODY_SUFFIXES = [
+  '_armleft', '_armright', '_body', '_head', '_legleft', '_legright',
+  '_head_hooded',
+  '_cape',   // show class capes by default — nice visual flair
+];
+
+function isBodyMesh(mesh) {
+  const n = mesh.name.toLowerCase();
+  return BODY_SUFFIXES.some((s) => n.endsWith(s));
+}
+
+function hideAccessories(object) {
+  let hasBodyMesh = false;
   object.traverse((child) => {
-    if (!child.isMesh) return;
+    if ((child.isMesh || child.isSkinnedMesh) && isBodyMesh(child)) hasBodyMesh = true;
+  });
+  if (!hasBodyMesh) return; // not a character — leave everything visible
+  object.traverse((child) => {
+    if (!child.isMesh && !child.isSkinnedMesh) return;
+    if (!isBodyMesh(child)) {
+      child.visible = false;
+    }
+  });
+}
+
+function enhanceMeshMaterials(object, { outlineScale = 1.055 } = {}) {
+  object.traverse((child) => {
+    if (!child.isMesh || child.userData.isOutline) return;
     child.castShadow = true;
     child.receiveShadow = true;
     child.frustumCulled = true;
 
-    const mats = Array.isArray(child.material) ? child.material : [child.material];
-    for (const mat of mats) {
-      if (!mat) continue;
-      if (mat.map) {
-        mat.map.anisotropy = 12;
-        mat.map.colorSpace = THREE.SRGBColorSpace;
-      }
-      if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
-      if ('roughness' in mat) mat.roughness = Math.min(mat.roughness ?? 0.72, 0.92);
-      if ('metalness' in mat) mat.metalness = Math.min(mat.metalness ?? 0, 0.12);
-      mat.needsUpdate = true;
+    if (Array.isArray(child.material)) {
+      child.material = child.material.map(convertMaterialToToon);
+    } else {
+      child.material = convertMaterialToToon(child.material);
+    }
+
+    if (child.geometry && !child.userData.hasOutline && outlineScale > 1) {
+      addOutline(child, outlineScale, 0x0a0a10);
     }
   });
 }
@@ -36,7 +62,7 @@ export function computeMeshBounds(object) {
   let found = false;
   object.updateMatrixWorld(true);
   object.traverse((child) => {
-    if (!child.isMesh || !child.geometry) return;
+    if (!child.isMesh || !child.geometry || child.visible === false) return;
     const geom = child.geometry;
     if (!geom.boundingBox) geom.computeBoundingBox();
     const meshBox = geom.boundingBox.clone();
@@ -51,6 +77,38 @@ export function snapToGround(object, y = 0) {
   const box = computeMeshBounds(object);
   object.position.y += y - box.min.y;
   return object;
+}
+
+function buildActionMap(mixer, animations) {
+  const actions = {};
+  for (const clip of animations) {
+    const action = mixer.clipAction(clip);
+    action.clampWhenFinished = true;
+    actions[clip.name.toLowerCase()] = action;
+  }
+
+  const aliases = {
+    walking_a: 'walk',
+    walking_b: 'walk',
+    walking_c: 'walk',
+    running_a: 'sprint',
+    running_b: 'sprint',
+    jump_start: 'jump',
+    jump_idle: 'jump',
+    jump_full_short: 'jump',
+    sit_floor_idle: 'sit',
+    sit_chair_idle: 'sit',
+    unarmed_idle: 'idle',
+    cheer: 'emote-yes',
+    interact: 'emote-no',
+  };
+  for (const [from, to] of Object.entries(aliases)) {
+    if (actions[from] && !actions[to]) actions[to] = actions[from];
+  }
+  if (actions.sit_chair_idle) actions.sit = actions.sit_chair_idle;
+  else if (actions.sit_floor_idle) actions.sit = actions.sit_floor_idle;
+
+  return actions;
 }
 
 function normalizeModel(object, { targetHeight, maxFootprint, maxHeight }) {
@@ -86,16 +144,6 @@ function normalizeModel(object, { targetHeight, maxFootprint, maxHeight }) {
   return object;
 }
 
-function buildActionMap(mixer, animations) {
-  const actions = {};
-  for (const clip of animations) {
-    const action = mixer.clipAction(clip);
-    action.clampWhenFinished = true;
-    actions[clip.name.toLowerCase()] = action;
-  }
-  return actions;
-}
-
 export class ModelLoader {
   constructor() {
     this.loader = new GLTFLoader();
@@ -129,10 +177,11 @@ export class ModelLoader {
           this.loader.setResourcePath(resourcePath);
           const gltf = await this.loader.loadAsync(url);
           const root = gltf.scene;
-          enhanceMeshMaterials(root);
+          if (def.rigged) hideAccessories(root);
+          enhanceMeshMaterials(root, { outlineScale: def.rigged ? 1 : 1.055 });
           normalizeModel(root, {
             targetHeight: def.targetHeight,
-            maxFootprint: def.maxFootprint,
+            maxFootprint: def.rigged ? null : def.maxFootprint,
             maxHeight: def.maxHeight,
           });
           root.traverse((c) => { c.userData.modelKey = key; });
@@ -167,7 +216,7 @@ export class ModelLoader {
     if (!template || this.failed.has(key)) return null;
 
     const def = MODEL_CATALOG[key] ?? {};
-    const { rotationY = 0 } = options;
+    const { rotationY = 0, tint = null, tintStrength = 0.22 } = options;
 
     const model = cloneSkeleton(template.scene);
     model.traverse((child) => {
@@ -177,7 +226,14 @@ export class ModelLoader {
       } else {
         child.material = child.material.clone();
       }
+      if (tint != null) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of mats) {
+          if (mat.color) mat.color.lerp(new THREE.Color(tint), tintStrength);
+        }
+      }
     });
+    // Outlines are skipped for rigged characters — they produce oversized black blobs.
 
     const mixer = new THREE.AnimationMixer(model);
     const actions = buildActionMap(mixer, template.animations);
@@ -205,23 +261,28 @@ export class ModelLoader {
   _playCharacterAnim(character, animName, fade = 0.2) {
     const actions = character.userData.actions;
     const next = actions?.[animName];
-    if (!next) return;
+    if (!next) {
+      console.warn(`[Anim] missing clip "${animName}" for`, character.userData.modelKey ?? '?',
+        '| available:', Object.keys(actions ?? {}).filter(k => !k.includes('_')).join(' '));
+      return;
+    }
 
     const prevName = character.userData.currentAnim;
-    const prev = prevName ? actions[prevName] : null;
+    const prev = (prevName && prevName !== animName) ? actions[prevName] : null;
 
+    const loopOnce = ['sit', 'static'].includes(animName);
     next.reset();
     next.setEffectiveWeight(1);
-    next.setLoop(
-      ['sit', 'static'].includes(animName) ? THREE.LoopOnce : THREE.LoopRepeat,
-      ['sit', 'static'].includes(animName) ? 1 : Infinity,
-    );
+    next.setLoop(loopOnce ? THREE.LoopOnce : THREE.LoopRepeat, loopOnce ? 1 : Infinity);
+    next.clampWhenFinished = loopOnce;
     next.play();
 
-    if (prev && prev !== next && fade > 0) {
-      prev.crossFadeTo(next, fade, false);
-    } else if (prev && prev !== next) {
-      prev.stop();
+    if (prev) {
+      if (fade > 0) {
+        prev.fadeOut(fade);
+      } else {
+        prev.stop();
+      }
     }
 
     character.userData.currentAnim = animName;
@@ -229,7 +290,10 @@ export class ModelLoader {
 
   updateCharacterAnimation(character, speed, dt) {
     if (!character?.userData?.isRiggedCharacter) return;
-    character.userData.mixer?.update(dt);
+
+    const mixer = character.userData.mixer;
+    if (!mixer) return;
+    mixer.update(dt);
 
     const isSitting = character.userData.isSitting;
     const isJumping = character.userData.isJumping;
@@ -239,8 +303,22 @@ export class ModelLoader {
     else if (speed > 4.5) target = 'sprint';
     else if (speed > 0.15) target = 'walk';
 
-    if (character.userData.currentAnim !== target) {
+    const actions = character.userData.actions;
+    const currentAction = actions?.[character.userData.currentAnim];
+
+    // Switch animation if target changed, OR if current action somehow stopped running.
+    if (character.userData.currentAnim !== target ||
+        (currentAction && !currentAction.isRunning() && !['sit'].includes(target))) {
       this._playCharacterAnim(character, target, 0.18);
+    }
+
+    // Scale walk/sprint playback rate to match movement speed (avoids foot-slide).
+    if (target === 'walk' || target === 'sprint') {
+      const walkAction = actions?.[target];
+      if (walkAction) {
+        const baseSpeed = target === 'sprint' ? 6.5 : 3.2;
+        walkAction.setEffectiveTimeScale(Math.min(speed / baseSpeed, 2.5));
+      }
     }
   }
 

@@ -3,6 +3,7 @@ import { Game } from './game.js';
 import { DialogueManager } from './dialogue.js';
 import { PetInteractionUI } from './ui/PetInteractionUI.js';
 import { ShopUI } from './ui/ShopUI.js';
+import { OutfitUI } from './ui/OutfitUI.js';
 import { SHOP_CATALOG } from './data/shopData.js';
 
 const canvas = document.getElementById('game-canvas');
@@ -50,8 +51,13 @@ async function boot() {
 
     await new Promise((resolve) => setTimeout(resolve, 200));
     loading.classList.add('hidden');
-    setupUI(game);
-    game.start();
+    try {
+      setupUI(game);
+      game.start();
+    } catch (error) {
+      console.error('Failed to start UI:', error);
+      showLoadError(`UI failed: ${error.message}. Check the browser console (F12).`);
+    }
   } catch (error) {
     console.error('Failed to start game:', error);
     window.__gameBooted = true;
@@ -91,6 +97,7 @@ function setupUI(game) {
     journalBtn: document.getElementById('journal-btn'),
     closeJournalBtn: document.getElementById('close-journal'),
     interactHint: document.getElementById('interact-hint'),
+    continueHint: document.getElementById('speech-continue'),
     dialogueWalkBtn: document.getElementById('dialogue-walk'),
     dialogueStopWalkBtn: document.getElementById('dialogue-stop-walk'),
   });
@@ -123,6 +130,26 @@ function setupUI(game) {
 
   game.initInteraction(dialogue, petUI, shopUI);
 
+  const outfitUI = new OutfitUI({
+    modal: document.getElementById('outfit-modal'),
+    closeBtn: document.getElementById('outfit-close'),
+    modelLabel: document.getElementById('outfit-model-label'),
+    accentLabel: document.getElementById('outfit-accent-label'),
+    hatLabel: document.getElementById('outfit-hat-label'),
+    shoesLabel: document.getElementById('outfit-shoes-label'),
+    modelPrev: document.getElementById('outfit-model-prev'),
+    modelNext: document.getElementById('outfit-model-next'),
+    accentPrev: document.getElementById('outfit-accent-prev'),
+    accentNext: document.getElementById('outfit-accent-next'),
+    hatPrev: document.getElementById('outfit-hat-prev'),
+    hatNext: document.getElementById('outfit-hat-next'),
+    shoesPrev: document.getElementById('outfit-shoes-prev'),
+    shoesNext: document.getElementById('outfit-shoes-next'),
+  }, game);
+  game.outfitUI = outfitUI;
+
+  dialogue.continueHint?.addEventListener('click', () => dialogue.advance());
+
   menuBtn.addEventListener('click', () => menuPanel.classList.remove('hidden'));
   closeMenu.addEventListener('click', () => menuPanel.classList.add('hidden'));
 
@@ -133,19 +160,14 @@ function setupUI(game) {
   });
 
   customBtn.addEventListener('click', () => {
-    const colors = [0x3a7ae8, 0xe85050, 0x50a050, 0xf0a030, 0x9040c0];
-    const backpack = game.player.mesh.children.find(
-      (c) => c.geometry?.type === 'BoxGeometry' && c.position.z < 0,
-    );
-    if (backpack?.material) {
-      const idx = colors.indexOf(backpack.material.color.getHex());
-      backpack.material.color.setHex(colors[(idx + 1) % colors.length]);
-    }
+    outfitUI.toggle();
   });
 
   document.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') {
-      if (game.shopUI?.isOpen()) {
+      if (outfitUI.isOpen()) {
+        outfitUI.hide();
+      } else if (game.shopUI?.isOpen()) {
         game.shopUI.close();
       } else if (game.petUI?.isOpen()) {
         game.petUI.hide();

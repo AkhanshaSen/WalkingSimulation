@@ -40,6 +40,15 @@ export class WorldProp {
     return this.distanceTo(playerPos) <= this.range;
   }
 
+  getSitPosition(sitHeight = 0.40) {
+    const pos = this.mesh.position.clone();
+    const forward = 0.55;
+    pos.x -= Math.sin(this.mesh.rotation.y) * forward;
+    pos.z -= Math.cos(this.mesh.rotation.y) * forward;
+    pos.y = sitHeight;
+    return pos;
+  }
+
   interact(context) {
     const def = this.definition;
 
@@ -69,7 +78,12 @@ export class WorldProp {
     if (!actionDef) return;
 
     if (actionDef.sitDuration) {
-      context.game?.playerRest?.(actionDef.sitDuration, this.mesh.position);
+      const sitHeight = actionDef.sitHeight ?? 0.40;
+      const sitPos = this.getSitPosition(sitHeight);
+      context.game?.playerRest?.(actionDef.sitDuration, sitPos, {
+        sitY: sitHeight,
+        facing: this.mesh.rotation.y,
+      });
       context.game?.mood?.boost(6, 'Taking a rest');
       context.game?._updateMoodHUD?.();
     }

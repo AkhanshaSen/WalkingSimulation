@@ -38,6 +38,7 @@ export function updateNpcRoutine(npc, dt) {
 }
 
 function updatePatrol(npc, dt) {
+  npc.mesh.userData.isSitting = false;
   if (!npc.patrolTs?.length) return;
   const targetT = npc.patrolTs[npc.patrolIndex];
   const target = npc.path.getPointAt(targetT);
@@ -49,6 +50,7 @@ function updatePatrol(npc, dt) {
 }
 
 function updateWork(npc, dt) {
+  npc.mesh.userData.isSitting = false;
   npc.workPhase += dt;
   npc.mesh.position.y = npc.homePos.y + Math.sin(npc.workPhase * 2.2) * 0.01;
   const busy = Math.sin(npc.workPhase * 1.4) > 0.6;
@@ -61,10 +63,12 @@ function updateSit(npc, dt) {
   npc.mesh.position.copy(npc.homePos);
   npc.mesh.position.y += Math.sin(npc.idlePhase) * 0.012;
   npc.mesh.rotation.y = npc.homeFacing;
+  npc.mesh.userData.isSitting = true;
   animateCharacter(npc.mesh, 0, dt);
 }
 
 function updateIdle(npc, dt) {
+  npc.mesh.userData.isSitting = false;
   npc.idlePhase += dt * 1.5;
   npc.mesh.position.y = npc.homePos.y + Math.sin(npc.idlePhase) * 0.015;
 }

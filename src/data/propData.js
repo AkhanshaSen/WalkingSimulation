@@ -20,6 +20,7 @@ export const PROP_DEFINITIONS = {
       sit: {
         message: 'You sit for a moment. The town feels unhurried.',
         sitDuration: 4,
+        sitHeight: 0.40,
       },
     },
   },

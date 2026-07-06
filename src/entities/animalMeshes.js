@@ -8,13 +8,20 @@ export function setAnimalModelLoader(loader) {
 }
 
 const SPECIES_MODEL = {
-  cat:    { key: 'animal_cat' },
-  shiba:  { key: 'animal_dog' },
-  rabbit: { key: 'animal_bunny' },
-  fox:    { key: 'animal_fox', tint: 0xe87830, tintStrength: 0.5 },
-  duck:   { key: 'animal_duck', tint: 0xf0d040, tintStrength: 0.35 },
-  pig:    { key: 'animal_pig' },
-  parrot: { key: 'animal_parrot', tint: 0x40c0f0, tintStrength: 0.3 },
+  // Warm orange tabby cat
+  cat:    { key: 'animal_cat',    tint: 0xf07828, tintStrength: 0.55 },
+  // Classic shiba golden-brown
+  shiba:  { key: 'animal_dog',    tint: 0xe89040, tintStrength: 0.50 },
+  // Soft lavender / lilac bunny
+  rabbit: { key: 'animal_bunny',  tint: 0xd0a8e8, tintStrength: 0.45 },
+  // Vivid fox: burnt orange
+  fox:    { key: 'animal_fox',    tint: 0xe05510, tintStrength: 0.60 },
+  // Bright canary-yellow duck
+  duck:   { key: 'animal_duck',   tint: 0xf8d020, tintStrength: 0.60 },
+  // Rosy pink pig
+  pig:    { key: 'animal_pig',    tint: 0xf090b8, tintStrength: 0.55 },
+  // Tropical teal-and-green parrot
+  parrot: { key: 'animal_parrot', tint: 0x18c888, tintStrength: 0.55 },
 };
 
 // ─── reusable hit volume ──────────────────────────────────────────────────────

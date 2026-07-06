@@ -203,29 +203,43 @@ export class Animal {
 
     // ── following player ───────────────────────────────────────────────────
     if (this.state === 'following' && playerPos) {
-      const moved = followPlayer(
-        this.mesh,
-        playerPos,
-        playerFacing,
-        dt,
-        this.followSpeed,
-        2.5,   // offset behind player
-        1.0,   // stop distance
-        null,
-      );
+      // Compute the ideal "behind player" position
+      const fwdX = Math.sin(playerFacing);
+      const fwdZ = Math.cos(playerFacing);
+      const desiredX = playerPos.x - fwdX * 2.2;
+      const desiredZ = playerPos.z - fwdZ * 2.2;
 
-      // Ground-lock — no floating
-      this.mesh.position.y = GROUND_Y;
-
-      // Walking bounce (abs-sin gives a footfall rhythm)
-      if (!moved) {
-        this.walkPhase += dt * this.followSpeed * 4;
-        const bounce = Math.abs(Math.sin(this.walkPhase)) * 0.05;
-        this.mesh.position.y = GROUND_Y + bounce;
+      // Lazy-initialise a smoothed target so it doesn't teleport on sharp turns
+      if (!this._followTarget) {
+        this._followTarget = new THREE.Vector3(desiredX, 0, desiredZ);
+      } else {
+        this._followTarget.x += (desiredX - this._followTarget.x) * Math.min(1, dt * 4.0);
+        this._followTarget.z += (desiredZ - this._followTarget.z) * Math.min(1, dt * 4.0);
       }
 
-      // Tail wag while following
-      this._animateTail(dt, 6.0);
+      const dx = this._followTarget.x - this.mesh.position.x;
+      const dz = this._followTarget.z - this.mesh.position.z;
+      const dist = Math.hypot(dx, dz);
+
+      if (dist > 0.8) {
+        const step = Math.min(this.followSpeed * dt, dist - 0.8);
+        this.mesh.position.x += (dx / dist) * step;
+        this.mesh.position.z += (dz / dist) * step;
+        // Face the direction of travel, not toward the player
+        const targetRot = Math.atan2(dx, dz);
+        const diff = ((targetRot - this.mesh.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        this.mesh.rotation.y += diff * Math.min(1, dt * 8);
+
+        this.walkPhase += dt * this.followSpeed * 4;
+        this.mesh.position.y = GROUND_Y + Math.abs(Math.sin(this.walkPhase)) * 0.05;
+      } else {
+        // Idle behind player — face same direction as player
+        const diff = ((playerFacing - this.mesh.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        this.mesh.rotation.y += diff * Math.min(1, dt * 4);
+        this.mesh.position.y = GROUND_Y;
+      }
+
+      this._animateTail(dt, dist > 0.8 ? 6.0 : 2.5);
       return;
     }
 

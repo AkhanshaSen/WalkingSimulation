@@ -73,13 +73,12 @@ export class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMapping = THREE.NoToneMapping;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xa0cce8);
+    this.scene.background = new THREE.Color(0xa8dcd4);
     this.camera = new THREE.PerspectiveCamera(
-      48,
+      42,
       window.innerWidth / window.innerHeight,
       0.1,
       280,
@@ -88,7 +87,7 @@ export class Game {
     this.input = new InputManager(canvas);
     this.cameraTarget = new THREE.Vector3();
     this._cameraSmoothed = new THREE.Vector3();
-    this.isMusicPlaying = false;
+    this.outfitOpen = false;
 
     // Post-processing: FXAA anti-aliasing only — no bloom (bloom washes out labels)
     this.composer = new EffectComposer(this.renderer);
@@ -132,6 +131,9 @@ export class Game {
       game.player = new Player(game.scene, game.path);
       // Mark all character meshes as dynamic so the static freeze pass skips them
       game.player.mesh.traverse((c) => { c.userData.dynamic = true; });
+
+      const startTangent = game.path.getTangentAt(0.05);
+      game.input.cameraAngle = Math.atan2(-startTangent.x, -startTangent.z);
 
       game.npcs = [...NPC_PROFILES, ...AMBIENT_NPCS].map(
         (profile) => new NPC(game.scene, game.path, profile),
@@ -294,8 +296,8 @@ export class Game {
     if (this.shopUI && shopId) this.shopUI.open(shopId);
   }
 
-  playerRest(duration, position) {
-    this.player.rest(duration, position);
+  playerRest(duration, position, options = {}) {
+    this.player.rest(duration, position, options);
   }
 
   _handlePetAction(animal, action) {
@@ -443,14 +445,14 @@ export class Game {
     const pitch = this.input.cameraPitch;
     const dist = this.input.cameraDistance;
 
-    const shoulderY = 1.55;
+    const shoulderY = 1.95;
     const target = playerPos.clone().add(new THREE.Vector3(0, shoulderY, 0));
-    this.cameraTarget.lerp(target, 0.12);
+    this.cameraTarget.lerp(target, 0.22);
 
     const horiz = dist * Math.cos(pitch);
     const offset = new THREE.Vector3(
       Math.sin(angle) * horiz,
-      Math.sin(pitch) * dist + dist * 0.2,
+      Math.sin(pitch) * dist + dist * 0.08,
       Math.cos(angle) * horiz,
     );
 
@@ -458,7 +460,7 @@ export class Game {
     if (this._cameraSmoothed.lengthSq() < 0.001) {
       this._cameraSmoothed.copy(desired);
     } else {
-      this._cameraSmoothed.lerp(desired, 0.14);
+      this._cameraSmoothed.lerp(desired, 0.22);
     }
     this.camera.position.copy(this._cameraSmoothed);
     this.camera.lookAt(this.cameraTarget);
@@ -470,8 +472,9 @@ export class Game {
     const dt = Math.min(this.clock.getDelta(), 0.05);
     this.input.update();
 
-    const blocking = this.interaction?.isBlocking() ?? this.dialogue?.isBlocking() ?? this.shopUI?.isOpen() ?? false;
+    const blocking = this.interaction?.isBlocking() ?? this.dialogue?.isBlocking() ?? this.shopUI?.isOpen() ?? this.outfitOpen ?? false;
     this.input.dialogueOpen = blocking;
+    this.input.outfitOpen = this.outfitOpen;
 
     if (blocking) {
       if (this.dialogue.isOpen()) {

@@ -2,81 +2,138 @@ import * as THREE from 'three';
 
 const materialCache = new Map();
 let grassTexture = null;
+let toonGradientMap = null;
+
+/** Stepped gradient for MeshToonMaterial cel shading */
+export function getToonGradientMap() {
+  if (toonGradientMap) return toonGradientMap;
+  const canvas = document.createElement('canvas');
+  canvas.width = 4;
+  canvas.height = 1;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 4, 0);
+  grad.addColorStop(0.0, '#383838');
+  grad.addColorStop(0.42, '#9a9a9a');
+  grad.addColorStop(1.0, '#ffffff');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 4, 1);
+  toonGradientMap = new THREE.CanvasTexture(canvas);
+  toonGradientMap.minFilter = THREE.NearestFilter;
+  toonGradientMap.magFilter = THREE.NearestFilter;
+  toonGradientMap.generateMipmaps = false;
+  return toonGradientMap;
+}
+
+export function convertMaterialToToon(material) {
+  if (!material) return material;
+  if (material.isMeshToonMaterial) return material;
+
+  const toon = new THREE.MeshToonMaterial({
+    color: material.color?.clone() ?? new THREE.Color(0xffffff),
+    map: material.map ?? null,
+    gradientMap: getToonGradientMap(),
+    transparent: material.transparent ?? false,
+    opacity: material.opacity ?? 1,
+    side: material.side ?? THREE.FrontSide,
+    alphaTest: material.alphaTest ?? 0,
+  });
+  if (toon.map) {
+    toon.map.colorSpace = THREE.SRGBColorSpace;
+    toon.map.anisotropy = 8;
+  }
+  return toon;
+}
 
 export function createToonMaterial(color, options = {}) {
-  const { gradientMap: _g, ...rest } = options;
-  const key = `pbr:${color}:${JSON.stringify(rest)}`;
+  const { map, transparent, opacity, emissive, emissiveIntensity, ...rest } = options;
+  const key = `toon:${color}:${map?.uuid ?? ''}:${transparent}:${opacity}:${JSON.stringify(rest)}`;
   if (!materialCache.has(key)) {
-    materialCache.set(
-      key,
-      new THREE.MeshStandardMaterial({
-        color,
-        roughness: rest.roughness ?? 0.82,
-        metalness: rest.metalness ?? 0.0,
-        ...rest,
-      }),
-    );
+    const mat = new THREE.MeshToonMaterial({
+      color,
+      gradientMap: getToonGradientMap(),
+      map: map ?? null,
+      transparent: transparent ?? false,
+      opacity: opacity ?? 1,
+      ...rest,
+    });
+    if (emissive != null) {
+      mat.emissive = new THREE.Color(emissive);
+      mat.emissiveIntensity = emissiveIntensity ?? 0.4;
+    }
+    materialCache.set(key, mat);
   }
   return materialCache.get(key);
 }
 
-export function addOutline(mesh, thickness = 1.03, color = 0x111111) {
-  if (!mesh.geometry) return mesh;
+export function addOutline(mesh, thickness = 1.068, color = 0x0a0a10) {
+  if (!mesh.geometry || mesh.userData.hasOutline) return mesh;
   const outline = new THREE.Mesh(
     mesh.geometry,
     new THREE.MeshBasicMaterial({ color, side: THREE.BackSide }),
   );
   outline.scale.multiplyScalar(thickness);
   outline.userData.isOutline = true;
+  outline.raycast = () => {};
   mesh.add(outline);
+  mesh.userData.hasOutline = true;
   return mesh;
 }
 
-export function createOutlinedMesh(geometry, material, outlineScale = 1.04) {
+export function createOutlinedMesh(geometry, material, outlineScale = 1.068) {
   const mesh = new THREE.Mesh(geometry, material);
   addOutline(mesh, outlineScale);
   return mesh;
 }
 
-/** Lighter outline for large fallback geometry */
-export function createSoftOutlinedMesh(geometry, material, outlineScale = 1.012) {
+/** Slightly thinner outline for very large meshes */
+export function createSoftOutlinedMesh(geometry, material, outlineScale = 1.042) {
   return createOutlinedMesh(geometry, material, outlineScale);
+}
+
+export function applyCelShading(object, outlineScale = 1.04) {
+  object.traverse((child) => {
+    if (!child.isMesh || child.userData.isOutline) return;
+    child.castShadow = true;
+    child.receiveShadow = true;
+
+    if (Array.isArray(child.material)) {
+      child.material = child.material.map(convertMaterialToToon);
+    } else {
+      child.material = convertMaterialToToon(child.material);
+    }
+    if (child.geometry && !child.userData.hasOutline) {
+      addOutline(child, outlineScale, 0x0a0a10);
+    }
+  });
+  return object;
 }
 
 export function createGrassTexture() {
   if (grassTexture) return grassTexture;
-  const size = 256;
+  const size = 128;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#5f8f62';
+  ctx.fillStyle = '#7aaa88';
   ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 14000; i++) {
+  for (let i = 0; i < 3000; i++) {
     const x = Math.random() * size;
     const y = Math.random() * size;
-    const g = 85 + Math.floor(Math.random() * 55);
-    ctx.fillStyle = `rgba(${g - 22},${g + 12},${g - 28},0.38)`;
-    ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 3);
-  }
-  for (let i = 0; i < 500; i++) {
-    const x = Math.random() * size;
-    const y = Math.random() * size;
-    ctx.fillStyle = `rgba(${95 + Math.random() * 45},${125 + Math.random() * 35},${75 + Math.random() * 25},0.22)`;
-    ctx.beginPath();
-    ctx.arc(x, y, 2 + Math.random() * 4, 0, Math.PI * 2);
-    ctx.fill();
+    const g = 110 + Math.floor(Math.random() * 30);
+    ctx.fillStyle = `rgba(${g - 30},${g},${g - 35},0.25)`;
+    ctx.fillRect(x, y, 1, 2);
   }
   grassTexture = new THREE.CanvasTexture(canvas);
   grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping;
-  grassTexture.repeat.set(48, 48);
+  grassTexture.repeat.set(40, 40);
   grassTexture.colorSpace = THREE.SRGBColorSpace;
   return grassTexture;
 }
 
 const vendingDisplayCache = new Map();
 
-export function createVendingDisplayTexture(accentColor = 0x4a9a9a) {
+export function createVendingDisplayTexture(accentColor = 0x5ab0a8) {
   const key = accentColor.toString(16);
   if (vendingDisplayCache.has(key)) return vendingDisplayCache.get(key);
 
@@ -86,7 +143,7 @@ export function createVendingDisplayTexture(accentColor = 0x4a9a9a) {
   const ctx = canvas.getContext('2d');
 
   const accent = `#${new THREE.Color(accentColor).getHexString()}`;
-  ctx.fillStyle = '#1a2830';
+  ctx.fillStyle = '#283038';
   ctx.fillRect(0, 0, 128, 192);
 
   ctx.fillStyle = accent;
@@ -96,14 +153,17 @@ export function createVendingDisplayTexture(accentColor = 0x4a9a9a) {
   ctx.textAlign = 'center';
   ctx.fillText('DRINKS', 64, 16);
 
-  const drinkColors = ['#e85050', '#50a850', '#5080e8', '#f0c040', '#e070c0', '#50c8c8'];
+  const drinkColors = ['#e8a050', '#f0d050', '#70b8c8', '#e87878', '#88c878', '#c8a0e0'];
   for (let row = 0; row < 5; row++) {
     for (let col = 0; col < 3; col++) {
       const x = 18 + col * 32;
       const y = 30 + row * 30;
       ctx.fillStyle = drinkColors[(row * 3 + col) % drinkColors.length];
       ctx.fillRect(x, y, 18, 22);
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.strokeStyle = '#1a1a1a';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, 18, 22);
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.fillRect(x + 2, y + 2, 5, 16);
     }
   }
@@ -121,41 +181,42 @@ export function createVendingDisplayTexture(accentColor = 0x4a9a9a) {
 }
 
 export function createWaterMaterial() {
-  return new THREE.MeshStandardMaterial({
-    color: 0x4a90b0,
-    roughness: 0.15,
-    metalness: 0.35,
+  return new THREE.MeshToonMaterial({
+    color: 0x6ab0c0,
+    gradientMap: getToonGradientMap(),
     transparent: true,
-    opacity: 0.88,
+    opacity: 0.9,
   });
 }
 
 export const PALETTE = {
-  sky:       0xb8dce8,
-  skyCloud:  0xd8ece8,
-  road:      0x3a3a3a,
-  roadLine:  0xf0f0f0,
-  sidewalk:  0xc0b8a8,
-  wall:      0xe8e0d4,
-  wallDark:  0xc8c0b4,
-  roof:      0x5a4a40,
-  roofDark:  0x4a3a32,
-  green:     0x6a9468,
-  meadow:    0x5a8a5a,
-  gravel:    0x989080,
-  vending:   0x4a9a9a,
-  orange:    0xe89050,
-  blue:      0x4a8ae8,
+  sky:       0xa8dcd4,
+  skyCloud:  0xc8ece8,
+  road:      0xc8c4bc,
+  roadLine:  0xe8ece8,
+  sidewalk:  0xd8d4cc,
+  wall:      0xd8d4cc,
+  wallDark:  0xb8b4ac,
+  roof:      0x6a6458,
+  roofDark:  0x524c44,
+  green:     0x7db882,
+  meadow:    0x6a9a78,
+  gravel:    0xa8a49c,
+  vending:   0x5ab0a8,
+  orange:    0xf0b060,
+  yellow:    0xf0d060,
+  blue:      0x6a9ac8,
   skin:      0xf0d0b0,
   hair:      0x1a1a1a,
   shirt:     0xf8f8f8,
   pants:     0x1a1a1a,
-  backpack:  0x3a7ae8,
-  cone:      0xf08030,
-  sign:      0x5a8a6a,
-  metal:     0x888888,
-  awningRed: 0xc05050,
-  awningBlue: 0x5060a0,
+  backpack:  0x989898,
+  cone:      0xf0a050,
+  sign:      0x6a9a7a,
+  metal:     0x909090,
+  awningRed: 0xd87868,
+  awningBlue: 0x6888b0,
+  accent:    0xf0d060,
 };
 
 export function nextFrame() {
