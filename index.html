@@ -39,8 +39,8 @@
         }, 12000);
       }
     </script>
-    <script type="module" crossorigin src="/WalkingSimulation/assets/index-CMusFDVZ.js"></script>
-    <link rel="stylesheet" crossorigin href="/WalkingSimulation/assets/index-BHLP_Xr8.css">
+    <script type="module" crossorigin src="/WalkingSimulation/assets/index-Bf0ac32H.js"></script>
+    <link rel="stylesheet" crossorigin href="/WalkingSimulation/assets/index-DRbylFVL.css">
   </head>
   <body>
     <div id="loading">
@@ -137,7 +137,7 @@
         </div>
       </div>
 
-      <div id="dialogue-box" class="hidden">
+      <div id="dialogue-box" class="hidden bubble-mode">
         <div class="dialogue-portrait" id="dialogue-portrait">📖</div>
         <div class="dialogue-content">
           <div class="dialogue-header">
@@ -153,8 +153,35 @@
             <button id="dialogue-walk" type="button" class="dialogue-action-btn walk hidden">🚶 Walk together</button>
             <button id="dialogue-stop-walk" type="button" class="dialogue-action-btn stop hidden">👋 Stop walking together</button>
           </div>
-          <button id="dialogue-next" class="dialogue-next">▶ Continue</button>
+          <button id="dialogue-next" class="dialogue-next hidden">▶ Continue</button>
         </div>
+      </div>
+
+      <button id="speech-continue" class="hidden" type="button">▶ Continue</button>
+
+      <div id="outfit-modal" class="hidden">
+        <button id="outfit-close" class="outfit-close" type="button" aria-label="Close">✕</button>
+        <div class="outfit-slot outfit-slot-left outfit-model">
+          <button class="outfit-arrow outfit-prev" id="outfit-model-prev" type="button">◀</button>
+          <span class="outfit-slot-label" id="outfit-model-label">Girl A</span>
+          <button class="outfit-arrow outfit-next" id="outfit-model-next" type="button">▶</button>
+        </div>
+        <div class="outfit-slot outfit-slot-right outfit-accent">
+          <button class="outfit-arrow outfit-prev" id="outfit-accent-prev" type="button">◀</button>
+          <span class="outfit-slot-label" id="outfit-accent-label">Default</span>
+          <button class="outfit-arrow outfit-next" id="outfit-accent-next" type="button">▶</button>
+        </div>
+        <div class="outfit-slot outfit-slot-left outfit-hat">
+          <button class="outfit-arrow outfit-prev" id="outfit-hat-prev" type="button">◀</button>
+          <span class="outfit-slot-label" id="outfit-hat-label">None</span>
+          <button class="outfit-arrow outfit-next" id="outfit-hat-next" type="button">▶</button>
+        </div>
+        <div class="outfit-slot outfit-slot-right outfit-shoes">
+          <button class="outfit-arrow outfit-prev" id="outfit-shoes-prev" type="button">◀</button>
+          <span class="outfit-slot-label" id="outfit-shoes-label">Sneakers</span>
+          <button class="outfit-arrow outfit-next" id="outfit-shoes-next" type="button">▶</button>
+        </div>
+        <p class="outfit-hint">Use arrows to change your look</p>
       </div>
 
       <div id="shop-modal" class="hidden">
@@ -178,9 +205,9 @@
       </div>
 
       <div id="bottom-right">
-        <button id="journal-btn" class="hud-btn" aria-label="Journal">📓</button>
-        <button id="music-btn" class="hud-btn" aria-label="Toggle music">♪</button>
-        <button id="custom-btn" class="hud-btn" aria-label="Customize">👕</button>
+        <button id="journal-btn" class="hud-btn hud-btn-icon" aria-label="Journal">📓</button>
+        <button id="music-btn" class="hud-btn hud-btn-icon" aria-label="Toggle music">♪</button>
+        <button id="custom-btn" class="hud-btn hud-btn-icon" aria-label="Change outfit">👕</button>
       </div>
 
       <div id="menu-panel" class="hidden">
