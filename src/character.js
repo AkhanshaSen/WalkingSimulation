@@ -3,13 +3,19 @@ import { createToonMaterial, createOutlinedMesh, PALETTE } from './materials.js'
 import { setupNpcRoutine, updateNpcRoutine } from './npcRoutines.js';
 import { followPlayer, moveToward } from './entities/FollowerBehavior.js';
 
+let _characterLoader = null;
+
+export function setCharacterModelLoader(loader) {
+  _characterLoader = loader;
+}
+
 export class InputManager {
   constructor(canvas) {
     this.keys = {};
     this.move = { x: 0, z: 0 };
     this.cameraAngle = 0;
-    this.cameraPitch = 0.25;
-    this.cameraDistance = 7;
+    this.cameraPitch = 0.33;
+    this.cameraDistance = 8.5;
     this.isDragging = false;
     this.lastPointer = { x: 0, y: 0 };
     this.justPressed = new Set();
@@ -51,12 +57,12 @@ export class InputManager {
       const dx = e.clientX - this.lastPointer.x;
       const dy = e.clientY - this.lastPointer.y;
       this.cameraAngle -= dx * 0.005;
-      this.cameraPitch = THREE.MathUtils.clamp(this.cameraPitch + dy * 0.003, 0.1, 0.6);
+      this.cameraPitch = THREE.MathUtils.clamp(this.cameraPitch + dy * 0.003, 0.18, 0.52);
       this.lastPointer = { x: e.clientX, y: e.clientY };
     });
 
     canvas.addEventListener('wheel', (e) => {
-      this.cameraDistance = THREE.MathUtils.clamp(this.cameraDistance + e.deltaY * 0.01, 4, 14);
+      this.cameraDistance = THREE.MathUtils.clamp(this.cameraDistance + e.deltaY * 0.01, 5.5, 15);
     }, { passive: true });
 
     this._setupTouch(canvas);
@@ -92,7 +98,7 @@ export class InputManager {
         const dx = t.clientX - this.lastPointer.x;
         const dy = t.clientY - this.lastPointer.y;
         this.cameraAngle -= dx * 0.005;
-        this.cameraPitch = THREE.MathUtils.clamp(this.cameraPitch + dy * 0.003, 0.1, 0.6);
+        this.cameraPitch = THREE.MathUtils.clamp(this.cameraPitch + dy * 0.003, 0.18, 0.52);
         this.lastPointer = { x: t.clientX, y: t.clientY };
       }
     }, { passive: true });
@@ -175,6 +181,17 @@ export class InputManager {
 }
 
 export function createCharacter(options = {}) {
+  const modelKey = options.modelKey ?? 'character_female_a';
+  const rigged = _characterLoader?.createCharacterInstance(modelKey);
+  if (rigged) {
+    if (options.nameTag) {
+      const tag = createNameTag(options.nameTag, options.nameTagJa);
+      tag.position.y = 1.75;
+      rigged.add(tag);
+    }
+    return rigged;
+  }
+
   const group = new THREE.Group();
   const shirtColor = options.shirtColor ?? PALETTE.shirt;
   const backpackColor = options.backpackColor ?? PALETTE.backpack;
@@ -349,6 +366,15 @@ function createFaceParts(group) {
 }
 
 export function setExpression(group, expression) {
+  if (group.userData?.isRiggedCharacter) {
+    if (expression === 'happy') {
+      _characterLoader?.playCharacterEmote(group, 'emote-yes');
+    } else if (expression === 'shy' || expression === 'thinking') {
+      _characterLoader?.playCharacterEmote(group, 'emote-no');
+    }
+    return;
+  }
+
   const face = group.userData.face;
   if (!face) return;
 
@@ -443,8 +469,8 @@ function createNameTag(name, nameJa) {
   const texture = new THREE.CanvasTexture(canvas);
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
   const sprite = new THREE.Sprite(material);
-  sprite.position.y = 1.85;
-  sprite.scale.set(1.5, 0.38, 1);
+  sprite.position.y = 1.75;
+  sprite.scale.set(1.2, 0.32, 1);
 
   const hitMaterial = new THREE.SpriteMaterial({
     transparent: true,
@@ -452,8 +478,8 @@ function createNameTag(name, nameJa) {
     depthWrite: false,
   });
   const hitArea = new THREE.Sprite(hitMaterial);
-  hitArea.position.y = 1.85;
-  hitArea.scale.set(2.2, 0.75, 1);
+  hitArea.position.y = 1.75;
+  hitArea.scale.set(1.8, 0.65, 1);
   hitArea.userData.isNameTagHit = true;
 
   const group = new THREE.Group();
@@ -465,6 +491,11 @@ function createNameTag(name, nameJa) {
 
 export function animateCharacter(character, speed, dt) {
   const ud = character.userData;
+
+  if (ud.isRiggedCharacter) {
+    _characterLoader?.updateCharacterAnimation(character, speed, dt);
+    return;
+  }
 
   // Sitting blend — lerp toward sit or stand
   const sitTarget = ud.isSitting ? 1 : 0;
@@ -517,13 +548,13 @@ function _applySitBlend(character, t) {
   });
 }
 
-export const MAX_DIST_FROM_PATH = 9.5;
-export const MAP_BOUNDS = { minX: -42, maxX: 50, minZ: -108, maxZ: 22 };
+export const MAX_DIST_FROM_PATH = 10.5;
+export const MAP_BOUNDS = { minX: -55, maxX: 65, minZ: -145, maxZ: 28 };
 
 export class Player {
   constructor(scene, path) {
     this.path = path;
-    this.mesh = createCharacter();
+    this.mesh = createCharacter({ modelKey: 'character_female_a' });
     this.mesh.position.copy(path.getPointAt(0.05));
     scene.add(this.mesh);
 
@@ -537,6 +568,8 @@ export class Player {
     this.raycaster = new THREE.Raycaster();
     this.restTimer = 0;
     this.restPos = null;
+    this.verticalVelocity = 0;
+    this.isGrounded = true;
   }
 
   applySpeedBoost(amount, duration) {
@@ -566,6 +599,12 @@ export class Player {
         }
       }
     } else {
+      if (input.consumeKey('Space') && this.isGrounded) {
+        this.verticalVelocity = 5.8;
+        this.isGrounded = false;
+        this.mesh.userData.isJumping = true;
+      }
+
       const speed = input.isRunning ? this.runSpeed : this.walkSpeed;
       const camForward = new THREE.Vector3(Math.sin(input.cameraAngle), 0, Math.cos(input.cameraAngle));
       const camRight = new THREE.Vector3(Math.cos(input.cameraAngle), 0, -Math.sin(input.cameraAngle));
@@ -589,7 +628,19 @@ export class Player {
     this._clampToWalkableArea();
 
     const groundY = this._sampleGround(this.mesh.position, groundMeshes);
-    this.mesh.position.y = groundY;
+
+    if (!this.isGrounded || this.verticalVelocity > 0) {
+      this.verticalVelocity -= 16 * dt;
+      this.mesh.position.y += this.verticalVelocity * dt;
+      if (this.mesh.position.y <= groundY) {
+        this.mesh.position.y = groundY;
+        this.verticalVelocity = 0;
+        this.isGrounded = true;
+        this.mesh.userData.isJumping = false;
+      }
+    } else {
+      this.mesh.position.y = groundY;
+    }
 
     this.mesh.rotation.y = THREE.MathUtils.lerp(this.mesh.rotation.y, this.facing, 0.15);
 
@@ -708,6 +759,7 @@ export class NPC {
     this.followSpeed = 3.4;
 
     this.mesh = createCharacter({
+      modelKey: profile.characterModel ?? 'character_male_a',
       shirtColor: profile.shirtColor,
       backpackColor: profile.backpackColor,
       hairColor: profile.hairColor,

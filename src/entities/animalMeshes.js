@@ -1,6 +1,22 @@
 import * as THREE from 'three';
 import { createToonMaterial, createOutlinedMesh } from '../materials.js';
 
+let _modelLoader = null;
+
+export function setAnimalModelLoader(loader) {
+  _modelLoader = loader;
+}
+
+const SPECIES_MODEL = {
+  cat:    { key: 'animal_cat' },
+  shiba:  { key: 'animal_dog' },
+  rabbit: { key: 'animal_bunny' },
+  fox:    { key: 'animal_fox', tint: 0xe87830, tintStrength: 0.5 },
+  duck:   { key: 'animal_duck', tint: 0xf0d040, tintStrength: 0.35 },
+  pig:    { key: 'animal_pig' },
+  parrot: { key: 'animal_parrot', tint: 0x40c0f0, tintStrength: 0.3 },
+};
+
 // ─── reusable hit volume ──────────────────────────────────────────────────────
 function addHitArea(group, scale = { x: 1.2, y: 0.8, z: 1.2 }) {
   const hit = new THREE.Mesh(
@@ -411,6 +427,8 @@ const MESH_BUILDERS = {
   rabbit: createRabbitMesh,
   fox:    createFoxMesh,
   duck:   createDuckMesh,
+  pig:    createCatMesh,
+  parrot: createDuckMesh,
 };
 
 /**
@@ -418,9 +436,24 @@ const MESH_BUILDERS = {
  * Game code uses rotation.y = Math.atan2(dx, dz), which makes the +Z axis face
  * the movement direction.  We wrap the inner model in a pivot and rotate it
  * -90° around Y so the head (inner +X) aligns with the wrapper's +Z (forward).
- * This way the animal always looks where it's going without changing any callers.
+ * Kenney GLB models face -Z, so we flip them 180° instead.
  */
 export function createAnimalMesh(species, color) {
+  const spec = SPECIES_MODEL[species];
+  if (spec) {
+    const model = _modelLoader?.createInstance(spec.key, {
+      tint: spec.tint ?? null,
+      tintStrength: spec.tintStrength ?? 0,
+    });
+    if (model) {
+      model.rotation.y = Math.PI;
+      const wrapper = new THREE.Group();
+      wrapper.add(model);
+      wrapper.userData.isLoadedModel = true;
+      return wrapper;
+    }
+  }
+
   const builder = MESH_BUILDERS[species] ?? createCatMesh;
   const inner   = builder(color);
 
@@ -442,6 +475,8 @@ const SPECIES_LABEL_COLORS = {
   rabbit:{ bg: 'rgba(30,18,40,0.82)', border: '#aa70c8', text: '#e8c8f8' },
   fox:   { bg: 'rgba(42,20,10,0.82)', border: '#d06030', text: '#f8ccb0' },
   duck:  { bg: 'rgba(34,30,10,0.82)', border: '#c8a820', text: '#f0e890' },
+  pig:   { bg: 'rgba(40,18,28,0.82)', border: '#e080a0', text: '#f8d0e0' },
+  parrot:{ bg: 'rgba(18,34,28,0.82)', border: '#40b880', text: '#c8f8e0' },
 };
 
 export function createNameLabel(emoji, name, species = 'cat') {

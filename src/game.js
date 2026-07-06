@@ -5,16 +5,18 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { Town } from './town.js';
-import { Player, NPC, InputManager } from './character.js';
+import { Player, NPC, InputManager, setCharacterModelLoader } from './character.js';
 import { NPC_PROFILES } from './npcData.js';
 import { AMBIENT_NPCS } from './ambientNpcs.js';
 import { DialogueManager } from './dialogue.js';
 import { InteractionSystem } from './interaction/InteractionSystem.js';
 import { InteractableRegistry } from './interaction/InteractableRegistry.js';
 import { Minimap } from './minimap.js';
+import { ModelLoader } from './loaders/ModelLoader.js';
 import { MoodSystem } from './MoodSystem.js';
 import { setExpression } from './character.js';
 import { Animal } from './entities/Animal.js';
+import { setAnimalModelLoader } from './entities/animalMeshes.js';
 import {
   createBenchProp,
   createTreeProp,
@@ -41,15 +43,17 @@ function closestPointOnPath(path, point, samples = 100) {
 }
 
 const LOCATION_ZONES = [
-  { tMax: 0.10, label: '静かな入口 · Town Entrance' },
-  { tMax: 0.20, label: '本屋通り · Bookshop Row' },
-  { tMax: 0.34, label: '桜通り · Sakura Street' },
-  { tMax: 0.46, label: '鳥居坂 · Torii Slope' },
-  { tMax: 0.58, label: '朝市 · Morning Market' },
-  { tMax: 0.70, label: '神社の参道 · Shrine Approach' },
-  { tMax: 0.82, label: '公園 · Town Park' },
-  { tMax: 0.93, label: '港の見晴台 · Harbor View' },
-  { tMax: 1.0, label: '漁港 · Fishing Port' },
+  { tMax: 0.08, label: '静かな入口 · Town Entrance' },
+  { tMax: 0.16, label: '本屋通り · Bookshop Row' },
+  { tMax: 0.28, label: '桜通り · Sakura Street' },
+  { tMax: 0.38, label: '鳥居坂 · Torii Slope' },
+  { tMax: 0.48, label: '朝市 · Morning Market' },
+  { tMax: 0.58, label: '神社の参道 · Shrine Approach' },
+  { tMax: 0.68, label: '公園 · Town Park' },
+  { tMax: 0.78, label: '港の見晴台 · Harbor View' },
+  { tMax: 0.88, label: '漁港 · Fishing Port' },
+  { tMax: 0.96, label: '海岸通り · Coastal Path' },
+  { tMax: 1.0, label: '岬の灯台 · Cape Outlook' },
 ];
 
 export class Game {
@@ -69,19 +73,21 @@ export class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.NoToneMapping;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xa8d8d8);
+    this.scene.background = new THREE.Color(0xa0cce8);
     this.camera = new THREE.PerspectiveCamera(
-      50,
+      48,
       window.innerWidth / window.innerHeight,
       0.1,
-      200,
+      280,
     );
 
     this.input = new InputManager(canvas);
     this.cameraTarget = new THREE.Vector3();
+    this._cameraSmoothed = new THREE.Vector3();
     this.isMusicPlaying = false;
 
     // Post-processing: FXAA anti-aliasing only — no bloom (bloom washes out labels)
@@ -111,7 +117,12 @@ export class Game {
 
     try {
       onProgress?.('Building town…');
-      game.town = new Town(game.scene);
+      game.modelLoader = new ModelLoader();
+      await game.modelLoader.loadAll(undefined, onProgress);
+      setCharacterModelLoader(game.modelLoader);
+      setAnimalModelLoader(game.modelLoader);
+
+      game.town = new Town(game.scene, game.modelLoader);
       await game.town.build(onProgress);
 
       game.path = game.town.getPath();
@@ -432,14 +443,24 @@ export class Game {
     const pitch = this.input.cameraPitch;
     const dist = this.input.cameraDistance;
 
+    const shoulderY = 1.55;
+    const target = playerPos.clone().add(new THREE.Vector3(0, shoulderY, 0));
+    this.cameraTarget.lerp(target, 0.12);
+
+    const horiz = dist * Math.cos(pitch);
     const offset = new THREE.Vector3(
-      Math.sin(angle) * Math.cos(pitch) * dist,
-      Math.sin(pitch) * dist + 2,
-      Math.cos(angle) * Math.cos(pitch) * dist,
+      Math.sin(angle) * horiz,
+      Math.sin(pitch) * dist + dist * 0.2,
+      Math.cos(angle) * horiz,
     );
 
-    this.cameraTarget.lerp(playerPos.clone().add(new THREE.Vector3(0, 1.2, 0)), 0.1);
-    this.camera.position.copy(this.cameraTarget).add(offset);
+    const desired = this.cameraTarget.clone().add(offset);
+    if (this._cameraSmoothed.lengthSq() < 0.001) {
+      this._cameraSmoothed.copy(desired);
+    } else {
+      this._cameraSmoothed.lerp(desired, 0.14);
+    }
+    this.camera.position.copy(this._cameraSmoothed);
     this.camera.lookAt(this.cameraTarget);
   }
 

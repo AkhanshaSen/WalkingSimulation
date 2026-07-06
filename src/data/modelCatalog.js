@@ -1,0 +1,225 @@
+/**
+ * CC0 3D models — Kenney.nl + Polygonal Mind Open Source Initiative
+ * License: CC0 1.0 — https://creativecommons.org/publicdomain/zero/1.0/
+ *
+ * targetHeight / maxFootprint tuned to match procedural town scale (~1 unit ≈ 1 metre).
+ * Kenney GLBs share Textures/colormap.png in public/models/cc0/Textures/
+ */
+export const MODEL_CATALOG = {
+  bench: {
+    file: 'bench.glb',
+    targetHeight: 0.85,
+    maxFootprint: 1.5,
+    credit: 'Kenney Furniture Kit (CC0)',
+  },
+  bench_cushion: {
+    file: 'bench_cushion.glb',
+    targetHeight: 0.88,
+    maxFootprint: 1.5,
+    credit: 'Kenney Furniture Kit (CC0)',
+  },
+  fence_low: {
+    file: 'fence_low.glb',
+    targetHeight: 0.55,
+    maxFootprint: 2.0,
+    credit: 'Kenney City Kit Suburban (CC0)',
+  },
+  tree_normal: {
+    file: 'tree_normal.glb',
+    targetHeight: 3.2,
+    maxFootprint: 2.2,
+    credit: 'Kenney City Kit Suburban (CC0)',
+  },
+  tree_cherry: {
+    file: 'tree_cherry.glb',
+    targetHeight: 2.8,
+    maxFootprint: 1.8,
+    credit: 'Kenney City Kit Suburban (CC0)',
+  },
+  shrine: {
+    file: 'shrine.glb',
+    targetHeight: 2.6,
+    maxFootprint: 3.5,
+    credit: 'Tomb Chaser 2 / Polygonal Mind (CC0)',
+  },
+  shrine_stairs: {
+    file: 'shrine_stairs.glb',
+    targetHeight: 1.1,
+    maxFootprint: 2.8,
+    credit: 'Tomb Chaser 2 / Polygonal Mind (CC0)',
+  },
+  street_lamp: {
+    file: 'street_lamp.glb',
+    targetHeight: 2.4,
+    maxFootprint: 0.8,
+    credit: 'Lunar Year / Polygonal Mind (CC0)',
+  },
+  fountain: {
+    file: 'fountain.glb',
+    targetHeight: 1.6,
+    maxFootprint: 2.2,
+    credit: 'MomusPark / Polygonal Mind (CC0)',
+  },
+  rock: {
+    file: 'rock.glb',
+    targetHeight: 0.42,
+    maxFootprint: 1.0,
+    credit: 'Tomb Chaser 2 / Polygonal Mind (CC0)',
+  },
+  bush: {
+    file: 'bush.glb',
+    targetHeight: 0.65,
+    maxFootprint: 1.2,
+    credit: 'MomusPark / Polygonal Mind (CC0)',
+  },
+  vending: {
+    file: 'vending.glb',
+    targetHeight: 1.85,
+    maxFootprint: 1.0,
+    credit: 'Tomb Chaser 2 / Polygonal Mind (CC0)',
+  },
+  decoration: {
+    file: 'decoration.glb',
+    targetHeight: 0.35,
+    maxFootprint: 0.7,
+    credit: 'Tomb Chaser 2 / Polygonal Mind (CC0)',
+  },
+  animal_cat: {
+    file: 'animal_cat.glb',
+    targetHeight: 0.7,
+    maxFootprint: 0.65,
+    credit: 'Kenney Cube Pets (CC0)',
+  },
+  animal_dog: {
+    file: 'animal_dog.glb',
+    targetHeight: 0.72,
+    maxFootprint: 0.65,
+    credit: 'Kenney Cube Pets (CC0)',
+  },
+  animal_bunny: {
+    file: 'animal_bunny.glb',
+    targetHeight: 0.65,
+    maxFootprint: 0.55,
+    credit: 'Kenney Cube Pets (CC0)',
+  },
+  animal_fox: {
+    file: 'animal_fox.glb',
+    targetHeight: 0.68,
+    maxFootprint: 0.6,
+    credit: 'Kenney Cube Pets (CC0)',
+  },
+  animal_duck: {
+    file: 'animal_duck.glb',
+    targetHeight: 0.55,
+    maxFootprint: 0.5,
+    credit: 'Kenney Cube Pets (CC0)',
+  },
+  animal_pig: {
+    file: 'animal_pig.glb',
+    targetHeight: 0.65,
+    maxFootprint: 0.55,
+    credit: 'Kenney Cube Pets (CC0)',
+  },
+  animal_parrot: {
+    file: 'animal_parrot.glb',
+    targetHeight: 0.6,
+    maxFootprint: 0.5,
+    credit: 'Kenney Cube Pets (CC0)',
+  },
+  shop_a: {
+    file: 'shop_a.glb',
+    targetHeight: 2.8,
+    maxFootprint: 3.8,
+    credit: 'Kenney City Kit Commercial (CC0)',
+  },
+  shop_b: {
+    file: 'shop_b.glb',
+    targetHeight: 2.7,
+    maxFootprint: 3.6,
+    credit: 'Kenney City Kit Commercial (CC0)',
+  },
+  shop_c: {
+    file: 'shop_c.glb',
+    targetHeight: 2.6,
+    maxFootprint: 3.4,
+    credit: 'Kenney City Kit Commercial (CC0)',
+  },
+  shop_d: {
+    file: 'shop_d.glb',
+    targetHeight: 2.5,
+    maxFootprint: 3.2,
+    credit: 'Kenney City Kit Commercial (CC0)',
+  },
+  building_a: {
+    file: 'building_a.glb',
+    targetHeight: 3.4,
+    maxFootprint: 4.2,
+    credit: 'Kenney City Kit Suburban (CC0)',
+  },
+  building_b: {
+    file: 'building_b.glb',
+    targetHeight: 3.6,
+    maxFootprint: 4.5,
+    credit: 'Kenney City Kit Suburban (CC0)',
+  },
+  building_c: {
+    file: 'building_c.glb',
+    targetHeight: 3.2,
+    maxFootprint: 4.0,
+    credit: 'Kenney City Kit Suburban (CC0)',
+  },
+  building_d: {
+    file: 'building_d.glb',
+    targetHeight: 3.0,
+    maxFootprint: 3.6,
+    credit: 'Kenney City Kit Suburban (CC0)',
+  },
+  awning: {
+    file: 'awning.glb',
+    targetHeight: 0.5,
+    maxFootprint: 1.8,
+    credit: 'Kenney City Kit Commercial (CC0)',
+  },
+  character_female_a: {
+    file: 'character_female_a.glb',
+    targetHeight: 1.72,
+    maxFootprint: 0.6,
+    rigged: true,
+    credit: 'Kenney Mini Characters (CC0)',
+  },
+  character_female_b: {
+    file: 'character_female_b.glb',
+    targetHeight: 1.72,
+    maxFootprint: 0.6,
+    rigged: true,
+    credit: 'Kenney Mini Characters (CC0)',
+  },
+  character_female_c: {
+    file: 'character_female_c.glb',
+    targetHeight: 1.72,
+    maxFootprint: 0.6,
+    rigged: true,
+    credit: 'Kenney Mini Characters (CC0)',
+  },
+  character_male_a: {
+    file: 'character_male_a.glb',
+    targetHeight: 1.72,
+    maxFootprint: 0.6,
+    rigged: true,
+    credit: 'Kenney Mini Characters (CC0)',
+  },
+  character_male_b: {
+    file: 'character_male_b.glb',
+    targetHeight: 1.72,
+    maxFootprint: 0.6,
+    rigged: true,
+    credit: 'Kenney Mini Characters (CC0)',
+  },
+  character_male_c: {
+    file: 'character_male_c.glb',
+    targetHeight: 1.72,
+    maxFootprint: 0.6,
+    rigged: true,
+    credit: 'Kenney Mini Characters (CC0)',
+  },
+};

@@ -50,6 +50,7 @@ After the first successful deploy, the game is at:
 - Third-person follow camera
 - Cel-shaded toon materials with black outlines
 - Procedural Japanese town — buildings, vending machines, mailboxes, traffic mirrors, power lines
+- CC0 GLB models for trees, benches, shrine, lamps, fountain, and street props
 - Walking NPCs along the street
 - Top-left minimap tracks your position, NPCs, shops, and nearby interactions
 - Character walk animation
