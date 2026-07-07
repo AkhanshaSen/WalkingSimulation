@@ -552,8 +552,8 @@ function _applySitBlend(character, t) {
   });
 }
 
-export const MAX_DIST_FROM_PATH = 10.5;
-export const MAP_BOUNDS = { minX: -55, maxX: 65, minZ: -145, maxZ: 28 };
+export const MAX_DIST_FROM_PATH = 12;
+export const MAP_BOUNDS = { minX: -75, maxX: 75, minZ: -145, maxZ: 28 };
 
 export class Player {
   constructor(scene, path) {
@@ -577,6 +577,8 @@ export class Player {
     this.restSitY = 0.01;
     this.verticalVelocity = 0;
     this.isGrounded = true;
+    this.colliderWorld = null;
+    this.walkableCurves = null;
   }
 
   applySpeedBoost(amount, duration) {
@@ -667,6 +669,10 @@ export class Player {
     this.mesh.position.x += this.velocity.x * dt;
     this.mesh.position.z += this.velocity.z * dt;
 
+    if (this.colliderWorld) {
+      this.colliderWorld.resolve(this.mesh.position, 0.45);
+    }
+
     this._clampToWalkableArea();
 
     const groundY = this._sampleGround(this.mesh.position, groundMeshes);
@@ -702,17 +708,32 @@ export class Player {
 
   _clampToWalkableArea() {
     const pos = this.mesh.position;
+    const curves = (this.walkableCurves?.length > 0) ? this.walkableCurves : [this.path];
 
-    if (this.path?.getClosestPointT) {
-      this.pathT = this.path.getClosestPointT(pos);
-      const nearest = this.path.getPointAt(this.pathT);
-      const dx = pos.x - nearest.x;
-      const dz = pos.z - nearest.z;
-      const dist = Math.hypot(dx, dz);
-      if (dist > MAX_DIST_FROM_PATH) {
-        const scale = MAX_DIST_FROM_PATH / dist;
-        pos.x = nearest.x + dx * scale;
-        pos.z = nearest.z + dz * scale;
+    let bestDist = Infinity;
+    let bestNearest = null;
+    let bestT = 0;
+
+    for (const curve of curves) {
+      if (!curve?.getPointAt) continue;
+      for (let i = 0; i <= 80; i++) {
+        const t = i / 80;
+        const p = curve.getPointAt(t);
+        const d = Math.hypot(pos.x - p.x, pos.z - p.z);
+        if (d < bestDist) {
+          bestDist = d;
+          bestNearest = p;
+          bestT = t;
+        }
+      }
+    }
+
+    if (bestNearest) {
+      this.pathT = bestT;
+      if (bestDist > MAX_DIST_FROM_PATH) {
+        const scale = MAX_DIST_FROM_PATH / bestDist;
+        pos.x = bestNearest.x + (pos.x - bestNearest.x) * scale;
+        pos.z = bestNearest.z + (pos.z - bestNearest.z) * scale;
       }
     }
 

@@ -78,4 +78,48 @@ export const SHOP_CATALOG = {
       { id: 'water',  name: '水',     nameEn: 'Water',  price: 80,  emoji: '💧', desc: 'Pure mineral water.' },
     ],
   },
+
+  bakery: {
+    id: 'bakery',
+    label: 'パン屋 小麦 · Komugi Bakery',
+    emoji: '🍞',
+    items: [
+      { id: 'melonpan', name: 'メロンパン', nameEn: 'Melon Pan',  price: 280, emoji: '🍞', desc: 'Crispy sweet bread with melon aroma.' },
+      { id: 'anpan',    name: 'あんパン',   nameEn: 'Anpan',      price: 220, emoji: '🥐', desc: 'Soft bun filled with sweet red bean.' },
+      { id: 'currypan', name: 'カレーパン', nameEn: 'Curry Pan',  price: 300, emoji: '🥖', desc: 'Fried bread stuffed with mild curry.' },
+    ],
+  },
+
+  teahouse: {
+    id: 'teahouse',
+    label: '茶屋 静 · Shizuka Tea House',
+    emoji: '🍵',
+    items: [
+      { id: 'sencha',   name: '煎茶',     nameEn: 'Sencha',       price: 400, emoji: '🍵', desc: 'Freshly whisked green tea.' },
+      { id: 'hojicha',  name: 'ほうじ茶', nameEn: 'Hojicha',      price: 380, emoji: '🍵', desc: 'Roasted tea with a nutty warmth.' },
+      { id: 'dango',    name: '団子',     nameEn: 'Dango Set',    price: 350, emoji: '🍡', desc: 'Three sweet rice dumplings on a stick.' },
+    ],
+  },
+
+  konbini: {
+    id: 'konbini',
+    label: 'コンビニ · Mini Mart',
+    emoji: '🏪',
+    items: [
+      { id: 'onigiri2', name: 'おにぎり',   nameEn: 'Onigiri',      price: 150, emoji: '🍙', desc: 'Salmon rice ball, ready to go.' },
+      { id: 'bento',    name: '弁当',       nameEn: 'Bento Box',    price: 650, emoji: '🍱', desc: 'Today\'s special lunch box.' },
+      { id: 'pocky',    name: 'ポッキー',   nameEn: 'Pocky',        price: 180, emoji: '🍫', desc: 'Chocolate-dipped biscuit sticks.' },
+    ],
+  },
+
+  sweets: {
+    id: 'sweets',
+    label: '和菓子 花 · Hana Sweets',
+    emoji: '🍡',
+    items: [
+      { id: 'mochi',    name: '大福',       nameEn: 'Daifuku',      price: 320, emoji: '🍡', desc: 'Soft mochi wrapped around sweet bean.' },
+      { id: 'dorayaki', name: 'どら焼き',   nameEn: 'Dorayaki',     price: 280, emoji: '🥞', desc: 'Pancake sandwich with red bean filling.' },
+      { id: 'sakura2',  name: '桜餅',       nameEn: 'Sakura Mochi', price: 380, emoji: '🌸', desc: 'Pink rice cake wrapped in a cherry leaf.' },
+    ],
+  },
 };

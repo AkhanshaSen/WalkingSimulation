@@ -129,6 +129,8 @@ export class Game {
 
       onProgress?.('Spawning characters…');
       game.player = new Player(game.scene, game.path);
+      game.player.colliderWorld = game.town.colliders;
+      game.player.walkableCurves = game.town.getWalkableCurves();
       // Mark all character meshes as dynamic so the static freeze pass skips them
       game.player.mesh.traverse((c) => { c.userData.dynamic = true; });
 
@@ -136,13 +138,13 @@ export class Game {
       game.input.cameraAngle = Math.atan2(-startTangent.x, -startTangent.z);
 
       game.npcs = [...NPC_PROFILES, ...AMBIENT_NPCS].map(
-        (profile) => new NPC(game.scene, game.path, profile),
+        (profile) => new NPC(game.scene, game.town.getPathForId(profile.pathId), profile),
       );
       game.npcs.forEach((npc) => npc.mesh.traverse((c) => { c.userData.dynamic = true; }));
 
       onProgress?.('Spawning animals…');
       game.animals = ANIMAL_DEFINITIONS.map(
-        (def) => new Animal(game.scene, game.path, def),
+        (def) => new Animal(game.scene, game.town.getPathForId(def.pathId), def),
       );
       game.animals.forEach((a) => a.mesh.traverse((c) => { c.userData.dynamic = true; }));
 
@@ -170,13 +172,13 @@ export class Game {
       game.interactables.registerAll(game.npcs, game.animals, game.worldProps);
 
       // ── GPU performance pass ──────────────────────────────────────────────
-      // Shadow culling: only the player, NPCs and animals cast shadows.
-      // Static scene objects (buildings, road, ground, props, trees) only
-      // receive shadows. This cuts the shadow-map draw list from ~thousands
-      // of objects down to a handful of moving characters.
+      // Shadow culling + static matrix freeze for non-dynamic objects.
       game.scene.traverse((obj) => {
-        if (obj.isMesh && !obj.userData.dynamic) {
-          obj.castShadow    = false;
+        if (obj.userData.dynamic) return;
+        obj.updateMatrix();
+        obj.matrixAutoUpdate = false;
+        if (obj.isMesh) {
+          obj.castShadow = false;
           obj.receiveShadow = true;
         }
       });
@@ -242,7 +244,7 @@ export class Game {
     const minimapCanvas = document.getElementById('minimap');
     const minimapWrap = document.getElementById('minimap-wrap');
     if (minimapCanvas) {
-      this.minimap = new Minimap(minimapCanvas, this.path, minimapWrap);
+      this.minimap = new Minimap(minimapCanvas, this.path, minimapWrap, this.town.getWalkableCurves());
       this.minimap.setPlayer(this.player);
       this.minimap.setNpcs(this.npcs);
       this.minimap.setAnimals(this.animals);
@@ -522,6 +524,15 @@ export class Game {
     }
     this.minimap?.update();
     this.town.update(this.clock.elapsedTime);
+
+    // Follow player with sun shadow camera for sharper local shadows
+    if (this.town?.sun && this.player) {
+      const pp = this.player.position;
+      this.town.sun.position.set(pp.x + 18, 28, pp.z + 12);
+      this.town.sun.target.position.set(pp.x, 0, pp.z);
+      this.town.sun.target.updateMatrixWorld();
+    }
+
     this._updateCamera();
     this.input.endFrame();
   }

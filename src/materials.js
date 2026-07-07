@@ -110,19 +110,30 @@ export function applyCelShading(object, outlineScale = 1.04) {
 
 export function createGrassTexture() {
   if (grassTexture) return grassTexture;
-  const size = 128;
+  const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#7aaa88';
+  ctx.fillStyle = '#6a9a78';
   ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 3000; i++) {
+  // Two-tone mottling patches
+  for (let i = 0; i < 120; i++) {
     const x = Math.random() * size;
     const y = Math.random() * size;
-    const g = 110 + Math.floor(Math.random() * 30);
-    ctx.fillStyle = `rgba(${g - 30},${g},${g - 35},0.25)`;
-    ctx.fillRect(x, y, 1, 2);
+    const r = 8 + Math.random() * 22;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = Math.random() > 0.5 ? 'rgba(90,140,100,0.35)' : 'rgba(110,160,115,0.28)';
+    ctx.fill();
+  }
+  // Fine blade detail
+  for (let i = 0; i < 6000; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const g = 100 + Math.floor(Math.random() * 40);
+    ctx.fillStyle = `rgba(${g - 25},${g + 10},${g - 30},0.22)`;
+    ctx.fillRect(x, y, 1, 2 + Math.random() * 2);
   }
   grassTexture = new THREE.CanvasTexture(canvas);
   grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping;
@@ -180,13 +191,42 @@ export function createVendingDisplayTexture(accentColor = 0x5ab0a8) {
   return texture;
 }
 
+let waterWaveTexture = null;
+
+function createWaterWaveTexture() {
+  if (waterWaveTexture) return waterWaveTexture;
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#4a90a8';
+  ctx.fillRect(0, 0, size, size);
+  for (let y = 0; y < size; y += 4) {
+    for (let x = 0; x < size; x += 4) {
+      const v = 0.15 + Math.sin(x * 0.08 + y * 0.05) * 0.12 + Math.random() * 0.08;
+      ctx.fillStyle = `rgba(255,255,255,${v.toFixed(2)})`;
+      ctx.fillRect(x, y, 3, 2);
+    }
+  }
+  waterWaveTexture = new THREE.CanvasTexture(canvas);
+  waterWaveTexture.wrapS = waterWaveTexture.wrapT = THREE.RepeatWrapping;
+  waterWaveTexture.repeat.set(4, 4);
+  waterWaveTexture.colorSpace = THREE.SRGBColorSpace;
+  return waterWaveTexture;
+}
+
 export function createWaterMaterial() {
-  return new THREE.MeshToonMaterial({
+  const map = createWaterWaveTexture();
+  const mat = new THREE.MeshToonMaterial({
     color: 0x6ab0c0,
     gradientMap: getToonGradientMap(),
+    map,
     transparent: true,
     opacity: 0.9,
   });
+  mat.userData.waterMap = map;
+  return mat;
 }
 
 export const PALETTE = {

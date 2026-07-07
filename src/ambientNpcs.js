@@ -232,4 +232,181 @@ export const AMBIENT_NPCS = [
       ],
     },
   },
+
+  {
+    id: 'hana',
+    name: 'Hana Ito',
+    nameJa: '伊藤 花',
+    characterModel: 'character_female_a',
+    personality: 'Baker',
+    tagline: 'Runs the bakery on Shopping Lane.',
+    approachInvite: 'Fresh bread just came out! Want to walk and eat while it\'s warm?',
+    walkAccept: 'Perfect — the lane smells like butter right now.',
+    partWayLine: 'Back to the oven! Save me a melon pan next time.',
+    emoji: '🍞',
+    shirtColor: 0xf0e0c8,
+    backpackColor: 0x806040,
+    hairColor: 0x3a2a20,
+    pathId: 'shopping',
+    startT: 0.12,
+    defaultExpression: 'happy',
+    routine: 'work',
+    social: {
+      befriend: { expression: 'happy', text: 'You appreciate good bread! I\'ll save the best batch for you.' },
+    },
+    firstMeet: {
+      greeting: { expression: 'happy', text: 'Welcome to Komugi Bakery! The melon pan is still warm — smell that?' },
+      choices: [
+        { label: '"Smells incredible!"', response: { expression: 'happy', text: 'The secret is butter and patience. Come early before the fishermen buy everything.' }, end: true },
+        { label: '"Walk with me?"', response: { expression: 'happy', text: 'I\'d love a break! Let me grab a bag.' }, reward: { type: 'friendship' }, end: true },
+      ],
+    },
+    revisit: {
+      greeting: { expression: 'happy', text: 'Back for more? Anpan just came out of the oven.' },
+      choices: [
+        { label: '"How\'s business?"', response: { expression: 'happy', text: 'The shopping lane brings good foot traffic. Even the cats wait outside.' }, end: true },
+        { label: '"Walk together?"', response: { expression: 'happy', text: 'Always! Walking helps the dough rise in my mind.' }, reward: { type: 'friendship' }, end: true },
+      ],
+    },
+    companionTalk: {
+      greeting: { expression: 'happy', text: 'This lane used to be just grass. Now look — four shops and a bicycle.' },
+      choices: [
+        { label: '"Best bread in town?"', response: { expression: 'happy', text: 'Obviously! Kenji at the market agrees. We\'re friendly rivals.' }, end: true },
+        { label: '"I\'ll head on alone."', response: { expression: 'happy', text: 'Take a melon pan for the road!' }, reward: { type: 'dismissCompanion' }, end: true },
+      ],
+    },
+  },
+
+  {
+    id: 'umi',
+    name: 'Umi Tanaka',
+    nameJa: '田中 海',
+    characterModel: 'character_male_b',
+    personality: 'Fisherman',
+    tagline: 'Casts lines from the riverside bridge.',
+    approachInvite: 'The river\'s calm today. Walk the bank with me?',
+    walkAccept: 'Good — I\'ll show you where the big trout hide.',
+    partWayLine: 'Tide\'s turning. I\'ll stay here and cast a few more.',
+    emoji: '🎣',
+    shirtColor: 0xd0e8f0,
+    backpackColor: 0x406080,
+    hairColor: 0x2a3040,
+    pathId: 'riverside',
+    startT: 0.15,
+    defaultExpression: 'neutral',
+    routine: 'work',
+    social: {
+      befriend: { expression: 'happy', text: 'You understand the river. Come back at dawn — that\'s when the magic happens.' },
+    },
+    firstMeet: {
+      greeting: { expression: 'neutral', text: 'Quiet spot, isn\'t it? The bridge creaks when the wind picks up. I like that sound.' },
+      choices: [
+        { label: '"Catch anything?"', response: { expression: 'happy', text: 'A few trout this morning. The river feeds the harbor — everything\'s connected.' } },
+        { label: '"Walk the bank?"', response: { expression: 'neutral', text: 'Sure. The reeds are thick on the south bend.' }, reward: { type: 'friendship' }, end: true },
+      ],
+    },
+    revisit: {
+      greeting: { expression: 'happy', text: 'The herons are out today. Three of them near the second bridge.' },
+      choices: [
+        { label: '"Beautiful river."', response: { expression: 'thinking', text: 'It winds like it has somewhere to be. I respect that.' }, end: true },
+        { label: '"Walk together?"', response: { expression: 'happy', text: 'Lead the way. I\'ll point out the lily pads.' }, reward: { type: 'friendship' }, end: true },
+      ],
+    },
+    companionTalk: {
+      greeting: { expression: 'neutral', text: 'See those stepping stones? Kids use them in summer. I used to, too.' },
+      choices: [
+        { label: '"How deep is the river?"', response: { expression: 'thinking', text: 'Waist-deep in the middle. The banks are shallow — safe for wading.' }, end: true },
+        { label: '"I\'ll fish alone."', response: { expression: 'happy', text: 'Enjoy the quiet. That\'s the best part.' }, reward: { type: 'dismissCompanion' }, end: true },
+      ],
+    },
+  },
+
+  {
+    id: 'ako',
+    name: 'Ako Fujita',
+    nameJa: '藤田 亜子',
+    characterModel: 'character_female_c',
+    personality: 'Painter',
+    tagline: 'Sketches the grove in watercolor.',
+    approachInvite: 'The light in the grove is perfect right now. Sit with me?',
+    walkAccept: 'Wonderful. I\'ll bring my sketchbook.',
+    partWayLine: 'The shadows shifted — I need to capture this angle. See you in the grove.',
+    emoji: '🎨',
+    shirtColor: 0xe8d0f0,
+    backpackColor: 0x8060a0,
+    hairColor: 0x2a1a30,
+    pathId: 'grove',
+    startT: 0.5,
+    defaultExpression: 'shy',
+    routine: 'sit',
+    social: {
+      befriend: { expression: 'happy', text: 'You see the world the way I do. I\'ll paint something for you someday.' },
+    },
+    firstMeet: {
+      greeting: { expression: 'shy', text: 'Oh — I didn\'t hear you approach. I was watching the light through the cherry branches.' },
+      choices: [
+        { label: '"What are you painting?"', response: { expression: 'happy', text: 'The picnic blanket and mushrooms. This grove changes every hour — never the same green twice.' } },
+        { label: '"Sit together?"', response: { expression: 'shy', text: 'I\'d like that. The bench has the best view of the trees.' }, reward: { type: 'friendship' }, end: true },
+      ],
+    },
+    revisit: {
+      greeting: { expression: 'happy', text: 'You\'re back! The mushrooms grew since yesterday — little red caps everywhere.' },
+      choices: [
+        { label: '"Your art is lovely."', response: { expression: 'shy', text: 'Thank you... I paint for myself, mostly. But it\'s nice when someone notices.' }, end: true },
+        { label: '"Walk with me?"', response: { expression: 'happy', text: 'Let me pack my brushes. The lane has good light too.' }, reward: { type: 'friendship' }, end: true },
+      ],
+    },
+    companionTalk: {
+      greeting: { expression: 'happy', text: 'The cherry trees here were planted by the old shopkeepers. Each one has a story.' },
+      choices: [
+        { label: '"Tell me one."', response: { expression: 'happy', text: 'The tallest one? Yoko\'s grandmother planted it when the shop opened. It\'s eighty years old now.' }, end: true },
+        { label: '"I\'ll explore alone."', response: { expression: 'shy', text: 'Take your time. The grove isn\'t going anywhere.' }, reward: { type: 'dismissCompanion' }, end: true },
+      ],
+    },
+  },
+
+  {
+    id: 'runa',
+    name: 'Runa Hayashi',
+    nameJa: '林 瑠奈',
+    characterModel: 'character_female_b',
+    personality: 'Jogger',
+    tagline: 'Runs the riverside path every morning.',
+    approachInvite: 'I\'m doing another lap of the river path. Join me?',
+    walkAccept: 'Great pace! The bridge to bridge loop is my favorite.',
+    partWayLine: 'Good run! I\'ll cool down by the water.',
+    emoji: '🏃',
+    shirtColor: 0xf0f0f0,
+    backpackColor: 0x4080c0,
+    hairColor: 0x1a1a2a,
+    pathId: 'riverside',
+    startT: 0.3,
+    defaultExpression: 'happy',
+    routine: 'jog',
+    patrolTs: [0.1, 0.5, 0.85, 0.5],
+    social: {
+      befriend: { expression: 'happy', text: 'A running buddy! Meet me at the first bridge at sunrise.' },
+    },
+    firstMeet: {
+      greeting: { expression: 'happy', text: 'Morning! Well — anytime morning. I run this path four times a day.' },
+      choices: [
+        { label: '"How far is the loop?"', response: { expression: 'happy', text: 'Bridge to bridge and back — about a kilometer. The gravel path is easy on the knees.' } },
+        { label: '"Run with me?"', response: { expression: 'happy', text: 'Let\'s go! Start at the bridge — I\'ll set the pace.' }, reward: { type: 'friendship' }, end: true },
+      ],
+    },
+    revisit: {
+      greeting: { expression: 'happy', text: 'Perfect timing — I was about to start another lap!' },
+      choices: [
+        { label: '"You run a lot!"', response: { expression: 'happy', text: 'The river air is the best in town. Better than the main road, anyway.' }, end: true },
+        { label: '"Run together?"', response: { expression: 'happy', text: 'Race you to the second bridge!' }, reward: { type: 'friendship' }, end: true },
+      ],
+    },
+    companionTalk: {
+      greeting: { expression: 'happy', text: 'See how the path follows the river? Someone planned this well. Best addition to the town in years.' },
+      choices: [
+        { label: '"Favorite spot?"', response: { expression: 'happy', text: 'The stepping stones near the first bridge. I hop across them every time.' }, end: true },
+        { label: '"I\'ll walk, not run."', response: { expression: 'happy', text: 'Fair enough! Catch you at the bridge.' }, reward: { type: 'dismissCompanion' }, end: true },
+      ],
+    },
+  },
 ];

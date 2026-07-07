@@ -105,7 +105,7 @@ function getInteractablePosition(item) {
   return item.mesh?.position;
 }
 
-function computeMapBounds(path, npcs, animals, worldProps, padding = 10) {
+function computeMapBounds(path, npcs, animals, worldProps, padding = 10, extraCurves = []) {
   let minX = Infinity;
   let maxX = -Infinity;
   let minZ = Infinity;
@@ -118,11 +118,17 @@ function computeMapBounds(path, npcs, animals, worldProps, padding = 10) {
     if (z > maxZ) maxZ = z;
   };
 
-  if (path?.getPointAt) {
+  const sampleCurve = (curve) => {
+    if (!curve?.getPointAt) return;
     for (let i = 0; i <= 60; i++) {
-      const p = path.getPointAt(i / 60);
+      const p = curve.getPointAt(i / 60);
       add(p.x, p.z);
     }
+  };
+
+  sampleCurve(path);
+  for (const curve of extraCurves) {
+    if (curve !== path) sampleCurve(curve);
   }
 
   for (const npc of npcs) {
@@ -150,10 +156,11 @@ function computeMapBounds(path, npcs, animals, worldProps, padding = 10) {
 }
 
 export class Minimap {
-  constructor(canvas, path, wrapEl = null) {
+  constructor(canvas, path, wrapEl = null, walkableCurves = []) {
     this.canvas = canvas;
     this.wrapEl = wrapEl;
     this.path = path;
+    this.walkableCurves = walkableCurves ?? [];
     this.player = null;
     this.npcs = [];
     this.animals = [];
@@ -192,7 +199,9 @@ export class Minimap {
   setNearbyInteractables(entries) { this.nearbyInteractables = entries ?? []; }
 
   _recomputeBounds() {
-    this.bounds = computeMapBounds(this.path, this.npcs, this.animals, this.worldProps, 10);
+    this.bounds = computeMapBounds(
+      this.path, this.npcs, this.animals, this.worldProps, 10, this.walkableCurves,
+    );
   }
 
   resize(logicalSize) {
@@ -258,6 +267,23 @@ export class Minimap {
     ctx.strokeStyle = 'rgba(220,210,180,0.55)';
     ctx.lineWidth = 2.5;
     ctx.stroke();
+
+    // Side paths — lighter strokes
+    if (this.walkableCurves?.length) {
+      for (const curve of this.walkableCurves) {
+        if (curve === this.path) continue;
+        ctx.strokeStyle = 'rgba(138,132,120,0.7)';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        for (let i = 0; i <= 40; i++) {
+          const p = curve.getPointAt(i / 40);
+          const { mx, my } = this._worldToMap(p.x, p.z);
+          if (i === 0) ctx.moveTo(mx, my);
+          else ctx.lineTo(mx, my);
+        }
+        ctx.stroke();
+      }
+    }
 
     for (const prop of this.worldProps) {
       const pos = prop.mesh.position;
