@@ -182,6 +182,22 @@ export class InputManager {
   }
 }
 
+function createBlobShadow(radius = 0.38) {
+  const shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(radius, 16),
+    new THREE.MeshBasicMaterial({
+      color: 0x1a1a18,
+      transparent: true,
+      opacity: 0.28,
+      depthWrite: false,
+    }),
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = 0.02;
+  shadow.userData.isBlobShadow = true;
+  return shadow;
+}
+
 export function createCharacter(options = {}) {
   const modelKey = options.modelKey ?? 'character_female_a';
   const rigged = _characterLoader?.createCharacterInstance(modelKey, {
@@ -194,6 +210,7 @@ export function createCharacter(options = {}) {
       tag.position.y = 2.45;
       rigged.add(tag);
     }
+    rigged.add(createBlobShadow());
     return rigged;
   }
 
@@ -289,6 +306,7 @@ export function createCharacter(options = {}) {
     group.add(createNameTag(options.nameTag, options.nameTagJa));
   }
 
+  group.add(createBlobShadow());
   return group;
 }
 

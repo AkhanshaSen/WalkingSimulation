@@ -65,7 +65,7 @@ export class Game {
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
+      antialias: false,
       powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -73,10 +73,11 @@ export class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.NoToneMapping;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.08;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xa8dcd4);
+    this.scene.background = new THREE.Color(0x91d3c8);
     this.camera = new THREE.PerspectiveCamera(
       42,
       window.innerWidth / window.innerHeight,
@@ -137,7 +138,10 @@ export class Game {
       const startTangent = game.path.getTangentAt(0.05);
       game.input.cameraAngle = Math.atan2(-startTangent.x, -startTangent.z);
 
-      game.npcs = [...NPC_PROFILES, ...AMBIENT_NPCS].map(
+      game.npcs = [
+        ...NPC_PROFILES,
+        ...AMBIENT_NPCS.map((profile) => ({ ...profile, isAmbient: true })),
+      ].map(
         (profile) => new NPC(game.scene, game.town.getPathForId(profile.pathId), profile),
       );
       game.npcs.forEach((npc) => npc.mesh.traverse((c) => { c.userData.dynamic = true; }));

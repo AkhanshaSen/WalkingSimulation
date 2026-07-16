@@ -242,7 +242,7 @@ export class Minimap {
     ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
     ctx.clip();
 
-    ctx.fillStyle = '#2d4a2d';
+    ctx.fillStyle = '#243c24';
     ctx.fillRect(0, 0, size, size);
 
     const harbor = this._worldToMap(22, -78);

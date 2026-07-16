@@ -443,7 +443,7 @@ const MESH_BUILDERS = {
  * Game code uses rotation.y = Math.atan2(dx, dz), which makes the +Z axis face
  * the movement direction.  We wrap the inner model in a pivot and rotate it
  * -90° around Y so the head (inner +X) aligns with the wrapper's +Z (forward).
- * Kenney GLB models face -Z, so we flip them 180° instead.
+ * Kenney Cube Pets GLBs already face +Z (head at +Z, tail at -Z) — no extra flip.
  */
 export function createAnimalMesh(species, color) {
   const spec = SPECIES_MODEL[species];
@@ -453,7 +453,6 @@ export function createAnimalMesh(species, color) {
       tintStrength: spec.tintStrength ?? 0,
     });
     if (model) {
-      model.rotation.y = Math.PI;
       const wrapper = new THREE.Group();
       wrapper.add(model);
       wrapper.userData.isLoadedModel = true;

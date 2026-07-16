@@ -29,8 +29,44 @@ function placeAlongPath(group, path, t, side, offset, y = 0) {
   group.position.copy(pos).add(perp.multiplyScalar(offset));
   group.position.y = y;
   group.lookAt(group.position.x + tangent.x, group.position.y, group.position.z + tangent.z);
-  if (group.userData.isLoadedModel) snapToGround(group, y);
+  snapGroupToGround(group, y);
   return group;
+}
+
+/** Snap a group so its lowest mesh bottom sits on y. */
+function snapGroupToGround(group, y = 0) {
+  if (group.userData?.isLoadedModel) {
+    snapToGround(group, y);
+    return group;
+  }
+  group.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(group);
+  if (Number.isFinite(box.min.y)) {
+    group.position.y += y - box.min.y;
+  }
+  return group;
+}
+
+function isTooClose(pos, placed, minDist = 4) {
+  for (const p of placed) {
+    if (Math.hypot(pos.x - p.x, pos.z - p.z) < minDist) return true;
+  }
+  return false;
+}
+
+/** Register a solid for later spacing checks. Optional radius stored as userData hint via length of placed list only. */
+function registerSolid(list, position, radius = 3) {
+  const p = position.clone();
+  p.userData = { radius };
+  list.push(p);
+}
+
+function isTooCloseSolid(pos, placed, defaultRadius = 3) {
+  for (const p of placed) {
+    const r = (p.userData?.radius ?? defaultRadius) + defaultRadius;
+    if (Math.hypot(pos.x - p.x, pos.z - p.z) < r * 0.85) return true;
+  }
+  return false;
 }
 
 /** Seamless ribbon mesh along the path — no gaps on curves. */
@@ -86,9 +122,9 @@ function createSidePathStrip(curve, groundMeshes, scene, {
   divisions = 120,
   closed = false,
 } = {}) {
-  const cobbleMat = createToonMaterial(0x8a8478);
-  const curbMat = createToonMaterial(0x7a7568);
-  const lineMat = createToonMaterial(0xb8b4ac);
+  const cobbleMat = createToonMaterial(PALETTE.road);
+  const curbMat = createToonMaterial(PALETTE.curb);
+  const lineMat = createToonMaterial(PALETTE.roadLine);
 
   const road = createPathRibbon(curve, pathHalf, y, cobbleMat, 0, divisions);
   scene.add(road);
@@ -122,7 +158,7 @@ function createJunctionFan(junction, tangent, perp, side, branchTarget, scene, g
   const roadHalf = 1.75;
   const pathHalf = 1.45;
   const y = 0.084;
-  const cobbleMat = createToonMaterial(0x8a8478);
+  const cobbleMat = createToonMaterial(PALETTE.road);
 
   const inner = junction.clone().add(perp.clone().multiplyScalar(side * (roadHalf - 0.2)));
   const outer = junction.clone().add(perp.clone().multiplyScalar(side * (roadHalf + pathHalf + 0.3)));
@@ -657,18 +693,201 @@ function createInfoKiosk() {
   return group;
 }
 
+function createCatenaryWire(start, end, sag = 0.25) {
+  const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+  mid.y -= sag;
+  const curve = new THREE.QuadraticBezierCurve3(
+    start.clone(),
+    mid,
+    end.clone(),
+  );
+  const tube = new THREE.TubeGeometry(curve, 10, 0.015, 4, false);
+  const wire = createOutlinedMesh(tube, createToonMaterial(0x1a1a1a), 1.02);
+  wire.raycast = () => {};
+  return wire;
+}
+
+function createBusStopSignTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f5f5f0';
+  ctx.fillRect(0, 0, 128, 64);
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(2, 2, 124, 60);
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = 'bold 18px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('バス停', 64, 26);
+  ctx.font = '11px sans-serif';
+  ctx.fillText('BUS STOP', 64, 46);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function createBusStop() {
+  const group = new THREE.Group();
+  const orange = 0xef6b2a;
+
+  const pole = createOutlinedMesh(
+    new THREE.CylinderGeometry(0.05, 0.06, 3.2, 6),
+    createToonMaterial(orange),
+  );
+  pole.position.y = 1.6;
+  group.add(pole);
+
+  const disc = createOutlinedMesh(
+    new THREE.CircleGeometry(0.42, 16),
+    createToonMaterial(orange),
+  );
+  disc.position.set(0, 3.15, 0.02);
+  group.add(disc);
+
+  const frame = createOutlinedMesh(
+    new THREE.TorusGeometry(0.42, 0.04, 6, 16),
+    createToonMaterial(0x1a1a1a),
+  );
+  frame.position.set(0, 3.15, 0.01);
+  group.add(frame);
+
+  const board = createOutlinedMesh(
+    new THREE.BoxGeometry(0.55, 0.32, 0.04),
+    createToonMaterial(0xf5f5f0, { map: createBusStopSignTexture() }),
+  );
+  board.position.set(0, 2.55, 0.08);
+  group.add(board);
+
+  return group;
+}
+
+function createDirectionalSign(direction = 'right') {
+  const group = new THREE.Group();
+  const post = createOutlinedMesh(
+    new THREE.CylinderGeometry(0.05, 0.06, 1.8, 6),
+    createToonMaterial(0x8a7060),
+  );
+  post.position.y = 0.9;
+  group.add(post);
+
+  const panel = createOutlinedMesh(
+    new THREE.BoxGeometry(0.9, 0.7, 0.06),
+    createToonMaterial(0xf0a030),
+  );
+  panel.position.y = 1.75;
+  group.add(panel);
+
+  const shape = new THREE.Shape();
+  if (direction === 'right') {
+    shape.moveTo(-0.22, 0.14);
+    shape.lineTo(0.08, 0.14);
+    shape.lineTo(0.08, 0.24);
+    shape.lineTo(0.32, 0);
+    shape.lineTo(0.08, -0.24);
+    shape.lineTo(0.08, -0.14);
+    shape.lineTo(-0.22, -0.14);
+    shape.closePath();
+  } else {
+    shape.moveTo(0.22, 0.14);
+    shape.lineTo(-0.08, 0.14);
+    shape.lineTo(-0.08, 0.24);
+    shape.lineTo(-0.32, 0);
+    shape.lineTo(-0.08, -0.24);
+    shape.lineTo(-0.08, -0.14);
+    shape.lineTo(0.22, -0.14);
+    shape.closePath();
+  }
+
+  const arrow = createOutlinedMesh(
+    new THREE.ShapeGeometry(shape),
+    createToonMaterial(0x1a1a1a),
+  );
+  arrow.position.set(0, 1.75, 0.04);
+  group.add(arrow);
+
+  return group;
+}
+
+function createInfoBoardTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#3a9090';
+  ctx.fillRect(0, 0, 128, 256);
+  ctx.fillStyle = '#e8f4f4';
+  ctx.font = 'bold 14px sans-serif';
+  ctx.textAlign = 'center';
+  const lines = ['町の案内', 'Community', 'お知らせ', 'Notice', '案内図'];
+  lines.forEach((line, i) => {
+    ctx.fillText(line, 64, 36 + i * 38);
+  });
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i < lines.length; i++) {
+    ctx.beginPath();
+    ctx.moveTo(16, 20 + i * 38);
+    ctx.lineTo(112, 20 + i * 38);
+    ctx.stroke();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function createTallInfoBoard() {
+  const group = new THREE.Group();
+  const post = createOutlinedMesh(
+    new THREE.CylinderGeometry(0.06, 0.08, 1.4, 6),
+    createToonMaterial(0x6a7a78),
+  );
+  post.position.y = 0.7;
+  group.add(post);
+
+  const board = createOutlinedMesh(
+    new THREE.BoxGeometry(1.2, 2.2, 0.1),
+    createToonMaterial(0x3a9090, { map: createInfoBoardTexture() }),
+  );
+  board.position.y = 2.5;
+  group.add(board);
+
+  return group;
+}
+
+function createTrashCan() {
+  const group = new THREE.Group();
+  const body = createOutlinedMesh(
+    new THREE.CylinderGeometry(0.18, 0.18, 0.55, 8),
+    createToonMaterial(0x2a6060),
+  );
+  body.position.y = 0.275;
+  group.add(body);
+
+  const lid = createOutlinedMesh(
+    new THREE.CylinderGeometry(0.21, 0.21, 0.04, 8),
+    createToonMaterial(0x1e4848),
+  );
+  lid.position.y = 0.57;
+  group.add(lid);
+
+  return group;
+}
+
 function createUtilityPole() {
   const group = new THREE.Group();
+  const poleMat = createToonMaterial(0x6a5a4a);
   const pole = createOutlinedMesh(
     new THREE.CylinderGeometry(0.07, 0.09, 4.5, 6),
-    createToonMaterial(0x6a5a4a),
+    poleMat,
   );
   pole.position.y = 2.25;
   group.add(pole);
 
   const crossbar = createOutlinedMesh(
     new THREE.BoxGeometry(1.2, 0.06, 0.06),
-    createToonMaterial(0x6a5a4a),
+    poleMat,
   );
   crossbar.position.y = 4.0;
   group.add(crossbar);
@@ -680,6 +899,37 @@ function createUtilityPole() {
   sign.position.set(0, 3.2, 0.12);
   group.add(sign);
 
+  const wireY = 4.0;
+  const wireOffsets = [-0.55, 0, 0.55];
+  wireOffsets.forEach((xOff) => {
+    const wire = createCatenaryWire(
+      new THREE.Vector3(xOff - 0.35, wireY, 0),
+      new THREE.Vector3(xOff + 0.35, wireY, 0),
+      0.18,
+    );
+    group.add(wire);
+  });
+
+  group.userData.wireAnchor = new THREE.Vector3(0, wireY, 0);
+  return group;
+}
+
+function createUtilityWireSpan(startWorld, endWorld) {
+  const group = new THREE.Group();
+  const start = startWorld.clone();
+  const end = endWorld.clone();
+  const sag = Math.min(0.45, Math.max(0.2, start.distanceTo(end) * 0.04));
+  [-0.12, 0, 0.12].forEach((offset) => {
+    const perp = new THREE.Vector3().subVectors(end, start).normalize();
+    const lateral = new THREE.Vector3(-perp.z, 0, perp.x).multiplyScalar(offset);
+    const wire = createCatenaryWire(
+      start.clone().add(lateral),
+      end.clone().add(lateral),
+      sag,
+    );
+    group.add(wire);
+  });
+  group.raycast = () => {};
   return group;
 }
 
@@ -848,8 +1098,8 @@ function createPainterlyCloudTexture(seed = 0) {
   for (let b = 0; b < blobs; b++) {
     const cx = size * (0.25 + rng(b + 1) * 0.5);
     const cy = size * (0.3 + rng(b + 2) * 0.4);
-    const rx = size * (0.22 + rng(b + 3) * 0.18);
-    const ry = size * (0.14 + rng(b + 4) * 0.12);
+    const rx = size * (0.32 + rng(b + 3) * 0.22);
+    const ry = size * (0.08 + rng(b + 4) * 0.08);
     const alpha = 0.55 + rng(b + 5) * 0.35;
 
     ctx.save();
@@ -878,8 +1128,8 @@ function createCloud(x, y, z, scale) {
       opacity: 0.88,
     }),
   );
-  const aspect = 1.6 + (seed % 0.6);
-  const height = scale * 1.8;
+  const aspect = 2.4 + (seed % 1.2);
+  const height = scale * 1.2;
   sprite.scale.set(height * aspect, height, 1);
   sprite.position.set(x, y, z);
   sprite.userData.driftSpeed = 0.15 + (seed % 0.2);
@@ -917,26 +1167,101 @@ function createHarborPier() {
   return group;
 }
 
-/** Wooden footbridge with railings — registered as walkable ground. */
-function createBridge(width = 5.5, depth = 3.8) {
-  const group = new THREE.Group();
-  const plankMat = createToonMaterial(0x8a7060);
-  const railMat = createToonMaterial(0x6a5848);
+/**
+ * Raised stone-pier footbridge.
+ * The deck sits at BRIDGE_DECK_Y above ground; piers descend into the channel;
+ * approach ramps connect ground-level to the deck on each side.
+ * width  = span across the river (X axis after rotation)
+ * length = how far it stretches along the river (Z axis after rotation)
+ */
+const BRIDGE_DECK_Y = 0.78; // deck top — must clear RIVER_Y + water ribbon height
 
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(width, 0.18, depth), plankMat);
-  deck.position.y = 0.12;
+function createBridge(width = 6.2, length = 4.8) {
+  const group = new THREE.Group();
+  const plankMat = createToonMaterial(0x9a8070);
+  const stoneMat = createToonMaterial(0x808878);
+  const railMat  = createToonMaterial(0x6a5848);
+
+  // ── Deck ──────────────────────────────────────────────────────────────────
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(width, 0.22, length), plankMat);
+  deck.position.y = BRIDGE_DECK_Y;
+  deck.castShadow = true;
   deck.receiveShadow = true;
+  deck.userData.isWalkableGround = true;
   group.add(deck);
 
-  [-depth / 2 + 0.12, depth / 2 - 0.12].forEach((z) => {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(width, 0.45, 0.1), railMat);
-    rail.position.set(0, 0.42, z);
+  // Plank lines (thin dark strips on top of deck)
+  const stripMat = createToonMaterial(0x7a6858);
+  const plankCount = Math.round(length / 0.38);
+  for (let i = 0; i < plankCount; i++) {
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(width - 0.1, 0.01, 0.06), stripMat);
+    strip.position.set(0, BRIDGE_DECK_Y + 0.12, -length / 2 + 0.19 + i * (length / plankCount));
+    group.add(strip);
+  }
+
+  // ── Stone piers ───────────────────────────────────────────────────────────
+  // Four piers, one at each corner, reaching from deck bottom to riverbed
+  const pierH = BRIDGE_DECK_Y + 0.9;  // total pier height (goes below ground)
+  const pierY = BRIDGE_DECK_Y - pierH / 2;
+  [[-width * 0.3, -length * 0.3], [-width * 0.3, length * 0.3],
+   [ width * 0.3, -length * 0.3], [ width * 0.3, length * 0.3]].forEach(([px, pz]) => {
+    const pier = new THREE.Mesh(new THREE.BoxGeometry(0.48, pierH, 0.48), stoneMat);
+    pier.position.set(px, pierY, pz);
+    pier.castShadow = true;
+    group.add(pier);
+    // Pier cap
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.12, 0.6), stoneMat);
+    cap.position.set(px, BRIDGE_DECK_Y - 0.05, pz);
+    group.add(cap);
+  });
+
+  // Central arch lintel (visual beam under deck centre)
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(width * 0.62, 0.18, 0.28), stoneMat);
+  lintel.position.set(0, BRIDGE_DECK_Y - 0.22, 0);
+  group.add(lintel);
+
+  // ── Railings ──────────────────────────────────────────────────────────────
+  const postH = 0.70;
+  const postY = BRIDGE_DECK_Y + postH / 2;
+  const railY = BRIDGE_DECK_Y + postH - 0.08;
+
+  [-length / 2 + 0.12, length / 2 - 0.12].forEach((z) => {
+    // Top rail bar
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(width - 0.05, 0.10, 0.10), railMat);
+    rail.position.set(0, railY, z);
     group.add(rail);
-    [-width / 2 + 0.2, width / 2 - 0.2].forEach((x) => {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.45, 6), railMat);
-      post.position.set(x, 0.42, z);
-      group.add(post);
-    });
+    // Balusters
+    const balCount = Math.max(3, Math.round(width / 0.7));
+    for (let i = 0; i <= balCount; i++) {
+      const bx = -width / 2 + 0.15 + i * ((width - 0.3) / balCount);
+      const bal = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, postH, 5), railMat);
+      bal.position.set(bx, postY, z);
+      group.add(bal);
+    }
+  });
+
+  // ── Approach ramps ────────────────────────────────────────────────────────
+  // One ramp on each far side (±Z), sloping from BRIDGE_DECK_Y at the deck
+  // edge down to y=0 at the ground, covering ~1.8 m of Z travel.
+  const rampLen = 2.2;
+  const rampThick = 0.14;
+  const rampAngle = -Math.atan2(BRIDGE_DECK_Y, rampLen);
+
+  [-1, 1].forEach((side) => {
+    const rampCentreZ = side * (length / 2 + rampLen / 2);
+    const rampCentreY = BRIDGE_DECK_Y / 2;
+    const ramp = new THREE.Mesh(
+      new THREE.BoxGeometry(width - 0.1, rampThick, rampLen),
+      plankMat,
+    );
+    ramp.position.set(0, rampCentreY, rampCentreZ);
+    ramp.rotation.x = side * rampAngle;
+    ramp.castShadow = true;
+    ramp.receiveShadow = true;
+    group.add(ramp);
+
+    // Ramp railings
+    [-length / 2 + 0.12, length / 2 - 0.12].map((rz) => rz); // not used for ramp; skip for clarity
   });
 
   group.userData.isBridge = true;
@@ -1355,17 +1680,43 @@ export class Town {
     return this.walkableCurves;
   }
 
-  _placeBridge(x, z, rotY, width = 5.5, depth = 4.0) {
-    const bridge = createBridge(width, depth);
+  _placeBridge(x, z, rotY, width = 6.2, length = 4.8) {
+    const bridge = createBridge(width, length);
+    // Bridge sits at world y=0 — the BRIDGE_DECK_Y offset is baked into createBridge
     bridge.position.set(x, 0, z);
     bridge.rotation.y = rotY;
-    snapToGround(bridge, 0);
     this.scene.add(bridge);
-    const deck = bridge.children[0];
-    if (deck?.isMesh) {
-      deck.userData.isWalkableGround = true;
-      this.groundMeshes.push(deck);
-    }
+
+    // Register all walkable deck-like meshes
+    bridge.traverse((child) => {
+      if (child.isMesh && child.userData.isWalkableGround) {
+        this.groundMeshes.push(child);
+      }
+    });
+
+    // Channel cutout: a dark rectangle at river level under the bridge so it
+    // reads as "water flowing through", not grass under the deck.
+    const RIVER_Y = -0.42;
+    const channelMat = createToonMaterial(0x3a5a68);
+    // Orient same as bridge
+    const channelW = width * 0.90;
+    const channelL = length + 3.2; // slightly wider than deck to show beyond rails
+    const channel = new THREE.Mesh(new THREE.PlaneGeometry(channelW, channelL), channelMat);
+    channel.rotation.x = -Math.PI / 2;
+    channel.rotation.z = rotY;
+    channel.position.set(x, RIVER_Y + 0.02, z);
+    this.scene.add(channel);
+
+    // Narrow water shimmer strip centred in channel
+    const waterMat = createWaterMaterial();
+    const shimmer = new THREE.Mesh(new THREE.PlaneGeometry(channelW * 0.7, channelL), waterMat);
+    shimmer.rotation.x = -Math.PI / 2;
+    shimmer.rotation.z = rotY;
+    shimmer.position.set(x, RIVER_Y + 0.04, z);
+    shimmer.userData.isWater = true;
+    this.scene.add(shimmer);
+    this.waterMeshes.push(shimmer);
+
     this._bridgeCenters.push({ x, z });
     return bridge;
   }
@@ -1459,9 +1810,9 @@ export class Town {
     this.waterMeshes.forEach((water, i) => {
       if (!water?.material?.color) return;
       const wave = 0.92 + Math.sin(elapsed * 0.8 + i * 2.1) * 0.08;
-      water.material.color.setHex(0x6ab0c0);
+      water.material.color.setHex(0x97c5dd);
       water.material.color.multiplyScalar(wave);
-      water.material.opacity = 0.84 + Math.sin(elapsed * 1.1 + i) * 0.06;
+      water.material.opacity = 0.78 + Math.sin(elapsed * 1.1 + i) * 0.06;
       const wmap = water.material.userData?.waterMap ?? water.material.map;
       if (wmap) {
         wmap.offset.x = elapsed * 0.02;
@@ -1570,19 +1921,19 @@ export class Town {
   }
 
   _createSky() {
-    this.scene.fog = new THREE.Fog(0xcfe8e2, 60, 210);
-    this.scene.background = new THREE.Color(0xb8dcd8);
+    this.scene.fog = new THREE.Fog(PALETTE.fog, 45, 200);
+    this.scene.background = new THREE.Color(PALETTE.sky);
 
     const skyGeo = new THREE.SphereGeometry(220, 24, 16);
     const skyCanvas = document.createElement('canvas');
     skyCanvas.width = 1; skyCanvas.height = 64;
     const skyCtx = skyCanvas.getContext('2d');
     const grad = skyCtx.createLinearGradient(0, 0, 0, 64);
-    grad.addColorStop(0,   '#68a8a8');
-    grad.addColorStop(0.35, '#98d0c8');
-    grad.addColorStop(0.68, '#c0e8e0');
-    grad.addColorStop(0.88, '#e0d8c8');
-    grad.addColorStop(1,   '#f0e8d8');
+    grad.addColorStop(0,   '#97c5dd');
+    grad.addColorStop(0.35, '#91d3c8');
+    grad.addColorStop(0.68, '#cde8e4');
+    grad.addColorStop(0.88, '#f0dab2');
+    grad.addColorStop(1,   '#e8ddd9');
     skyCtx.fillStyle = grad;
     skyCtx.fillRect(0, 0, 1, 64);
     const skyTex = new THREE.CanvasTexture(skyCanvas);
@@ -1601,7 +1952,7 @@ export class Town {
   _spawnGlobalPetals() {
     const count = 80;
     const geo = new THREE.PlaneGeometry(0.12, 0.09);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffb8cc, side: THREE.DoubleSide });
+    const mat = new THREE.MeshBasicMaterial({ color: 0xeda0b9, side: THREE.DoubleSide });
     const mesh = new THREE.InstancedMesh(geo, mat, count);
     mesh.userData.dynamic = true;
 
@@ -1636,7 +1987,7 @@ export class Town {
   }
 
   _createEdgeBackdrop() {
-    const mat = createToonMaterial(0x6a8a7a, { roughness: 0.95 });
+    const mat = createToonMaterial(0x91d3c8, { roughness: 0.95 });
     const hills = [
       [-58, -88, 10, 7], [-48, -115, 12, 8], [52, -92, 11, 7],
       [58, -120, 9, 6], [-55, -135, 13, 8], [48, -138, 10, 7],
@@ -1745,13 +2096,18 @@ export class Town {
     this.scene.add(leftWalk, rightWalk);
     this.groundMeshes.push(leftWalk, rightWalk);
 
-    const curbMat = createToonMaterial(0x989080);
+    const curbMat = createToonMaterial(PALETTE.curb);
     const leftCurb = createPathRibbon(this.path, 0.06, 0.1, curbMat, -(roadHalf + 0.12), 200);
     const rightCurb = createPathRibbon(this.path, 0.06, 0.1, curbMat, roadHalf + 0.12, 200);
     this.scene.add(leftCurb, rightCurb);
 
-    const points = this.path.getSpacedPoints(200);
     const lineMat = createToonMaterial(PALETTE.roadLine);
+    const edgeHalf = 0.03;
+    const leftEdge = createPathRibbon(this.path, edgeHalf, 0.066, lineMat, -(roadHalf - 0.15), 200);
+    const rightEdge = createPathRibbon(this.path, edgeHalf, 0.066, lineMat, roadHalf - 0.15, 200);
+    this.scene.add(leftEdge, rightEdge);
+
+    const points = this.path.getSpacedPoints(200);
     for (let i = 0; i < points.length - 1; i += 6) {
       const t = i / (points.length - 1);
       const p = points[i];
@@ -1781,155 +2137,132 @@ export class Town {
   }
 
   _createBuildings() {
+    // Sparse houses — leave gaps for shops/landmarks. Offset far enough for Kenney decks.
     const buildingDefs = [
       { t: 0.03, side: 1, modelKey: 'building_d', height: 3.0, w: 3, d: 4, h: 3.5, wall: PALETTE.wall, roof: PALETTE.roof, style: 'house' },
-      { t: 0.06, side: -1, modelKey: 'building_c', height: 3.0, w: 3.5, d: 3, h: 3.4, wall: 0xe8e0d0, roof: 0x6a5040, style: 'house' },
-      { t: 0.11, side: 1, modelKey: 'building_b', height: 3.6, w: 3.5, d: 3, h: 4.2, wall: 0xc8d0c0, roof: 0x5a7a6a, style: 'apartment' },
-      { t: 0.17, side: -1, modelKey: 'building_a', height: 3.4, w: 5, d: 4, h: 4.5, wall: PALETTE.wallDark, roof: PALETTE.roof, style: 'house' },
-      { t: 0.24, side: 1, modelKey: 'building_b', height: 3.2, w: 3, d: 3.5, h: 3.2, wall: 0xe0d8c8, roof: 0x6a9a7a, style: 'apartment' },
-      { t: 0.31, side: -1, modelKey: 'building_c', height: 3.2, w: 4, d: 3, h: 3.8, wall: 0xd8d0c0, roof: PALETTE.roofDark, style: 'apartment' },
-      { t: 0.38, side: 1, modelKey: 'building_d', height: 3.0, w: 3.5, d: 4, h: 3.5, wall: PALETTE.wall, roof: PALETTE.roof, style: 'house' },
-      { t: 0.44, side: -1, modelKey: 'building_a', height: 3.4, w: 4.5, d: 3.5, h: 4.2, wall: 0xc0b8a8, roof: 0x5a8a6a, style: 'house' },
-      { t: 0.52, side: 1, modelKey: 'building_a', height: 3.4, w: 4, d: 3.5, h: 3.6, wall: 0xf0e8d8, roof: PALETTE.roofDark, style: 'house' },
-      { t: 0.58, side: -1, modelKey: 'building_d', height: 3.0, w: 3.5, d: 3, h: 3.2, wall: 0xd0c8b8, roof: PALETTE.roof, style: 'house' },
-      { t: 0.64, side: 1, modelKey: 'building_c', height: 3.0, w: 3, d: 3, h: 3.0, wall: 0xe8e0d0, roof: PALETTE.roofDark, style: 'house' },
-      { t: 0.70, side: -1, modelKey: 'building_b', height: 3.4, w: 4, d: 3.5, h: 3.6, wall: 0xd0c8b8, roof: PALETTE.roof, style: 'apartment' },
-      { t: 0.76, side: 1, modelKey: 'building_d', height: 3.0, w: 3.5, d: 3.2, h: 3.4, wall: 0xd8e0d0, roof: 0x6a8a7a, style: 'house' },
-      { t: 0.82, side: -1, modelKey: 'building_a', height: 3.4, w: 4.2, d: 3.8, h: 3.8, wall: 0xc8c0b0, roof: PALETTE.roofDark, style: 'house' },
-      { t: 0.88, side: 1, modelKey: 'building_c', height: 3.0, w: 3.2, d: 3, h: 3.2, wall: 0xe0d8c8, roof: PALETTE.roof, style: 'apartment' },
-      { t: 0.94, side: -1, modelKey: 'building_c', height: 3.2, w: 4, d: 3.5, h: 3.5, wall: 0xc8d0d8, roof: 0x5080a0, style: 'apartment' },
+      { t: 0.14, side: 1, modelKey: 'building_b', height: 3.4, w: 3.5, d: 3, h: 4.0, wall: 0xc8d0c0, roof: 0x5a7a6a, style: 'apartment' },
+      { t: 0.28, side: -1, modelKey: 'building_a', height: 3.4, w: 4.5, d: 4, h: 4.2, wall: PALETTE.wallDark, roof: PALETTE.roof, style: 'house' },
+      { t: 0.35, side: 1, modelKey: 'building_d', height: 3.0, w: 3.5, d: 3.5, h: 3.4, wall: PALETTE.wall, roof: PALETTE.roof, style: 'house' },
+      { t: 0.56, side: 1, modelKey: 'building_a', height: 3.2, w: 4, d: 3.5, h: 3.6, wall: 0xf0e8d8, roof: PALETTE.roofDark, style: 'house' },
+      { t: 0.68, side: -1, modelKey: 'building_b', height: 3.4, w: 4, d: 3.5, h: 3.6, wall: 0xd0c8b8, roof: PALETTE.roof, style: 'apartment' },
+      { t: 0.78, side: 1, modelKey: 'building_d', height: 3.0, w: 3.5, d: 3.2, h: 3.4, wall: 0xd8e0d0, roof: 0x6a8a7a, style: 'house' },
+      { t: 0.88, side: 1, modelKey: 'building_c', height: 3.0, w: 3.5, d: 3.2, h: 3.4, wall: 0xc8d0d8, roof: 0x5080a0, style: 'apartment' },
     ];
 
+    this._placedPositions = [];
     buildingDefs.forEach(({ t, side, modelKey, height, w, d, h, wall, roof, style }) => {
       const pos = this.path.getPointAt(t);
       const tangent = this.path.getTangentAt(t);
       const perp = new THREE.Vector3(-tangent.z, 0, tangent.x).multiplyScalar(side);
+      const buildingOffset = 8.5;
 
       const building = createPathBuilding(modelKey, height, w, d, h, wall, roof, style);
-      building.position.copy(pos).add(perp.multiplyScalar(5));
+      building.position.copy(pos).add(perp.multiplyScalar(buildingOffset));
       building.lookAt(
         building.position.x + tangent.x,
         building.position.y,
         building.position.z + tangent.z,
       );
+      snapGroupToGround(building, 0);
       this.scene.add(building);
-      this._addBoxCollider(building.position.x, building.position.z, w * 0.5 + 0.25, d * 0.5 + 0.25, building.rotation.y);
-
-      const fence = withModel('fence_low', 0.55, () => null, { rotationY: Math.PI });
-      if (fence) {
-        fence.position.copy(pos).add(perp.clone().normalize().multiplyScalar(3.4));
-        fence.lookAt(
-          fence.position.x + tangent.x,
-          fence.position.y,
-          fence.position.z + tangent.z,
-        );
-        this.scene.add(fence);
-        this._addBoxCollider(fence.position.x, fence.position.z, 1.0, 0.12, fence.rotation.y);
-      }
+      this._addBoxCollider(building.position.x, building.position.z, w * 0.55 + 0.5, d * 0.55 + 0.7, building.rotation.y);
+      registerSolid(this._placedPositions, building.position, 4.2);
     });
   }
 
   _createLandmarks() {
-    const shrine = createShrine();
-    placeAlongPath(shrine, this.path, 0.64, 1, 7.5);
-    this.scene.add(shrine);
-    this._addBoxCollider(shrine.position.x, shrine.position.z, 2.2, 2.0, shrine.rotation.y);
-    this._recordSpawn('shrine', shrine.position, shrine.rotation.y);
+    const landmarkDefs = [
+      { id: 'shrine',      t: 0.64, side: 1,  offset: 8.0, halfW: 2.2, halfD: 2.0, spawn: 'shrine', make: () => createShrine() },
+      { id: 'steps',       t: 0.61, side: 1,  offset: 5.8, halfW: 1.4, halfD: 1.6, make: () => createStoneSteps(5) },
+      { id: 'torii',       t: 0.36, side: -1, offset: 5.0, halfW: 1.8, halfD: 0.5, make: () => createTorii() },
+      { id: 'garden',      t: 0.19, side: -1, offset: 8.0, radius: 1.5, make: () => createGardenPatch() },
+      { id: 'lookout',     t: 0.86, side: -1, offset: 7.5, halfW: 2.0, halfD: 1.5, make: () => createLookoutDeck() },
+      { id: 'pier',        t: 0.97, side: 1,  offset: 7.0, halfW: 2.5, halfD: 1.2, make: () => createHarborPier(), extraRot: Math.PI / 6 },
+      { id: 'harborTorii', t: 0.91, side: -1, offset: 5.5, halfW: 1.2, halfD: 0.4, make: () => createTorii(), scale: 0.65 },
+    ];
 
-    const steps = createStoneSteps(5);
-    placeAlongPath(steps, this.path, 0.62, 1, 5.5);
-    this.scene.add(steps);
-    this._addBoxCollider(steps.position.x, steps.position.z, 1.5, 1.8, steps.rotation.y);
-
-    const torii = createTorii();
-    placeAlongPath(torii, this.path, 0.36, -1, 6);
-    this.scene.add(torii);
-    this._addBoxCollider(torii.position.x, torii.position.z, 1.8, 0.5, torii.rotation.y);
-
-    const garden = createGardenPatch();
-    placeAlongPath(garden, this.path, 0.14, 1, 7);
-    this.scene.add(garden);
-    this._addCircleCollider(garden.position.x, garden.position.z, 1.5);
-
-    const lookout = createLookoutDeck();
-    placeAlongPath(lookout, this.path, 0.86, -1, 6.5);
-    this.scene.add(lookout);
-    this._addBoxCollider(lookout.position.x, lookout.position.z, 2.0, 1.5, lookout.rotation.y);
-
-    const pier = createHarborPier();
-    placeAlongPath(pier, this.path, 0.97, 1, 5);
-    pier.rotation.y += Math.PI / 6;
-    this.scene.add(pier);
-    this._addBoxCollider(pier.position.x, pier.position.z, 2.5, 1.2, pier.rotation.y);
-
-    const harborTorii = createTorii();
-    placeAlongPath(harborTorii, this.path, 0.93, -1, 7);
-    harborTorii.scale.setScalar(0.65);
-    this.scene.add(harborTorii);
-    this._addBoxCollider(harborTorii.position.x, harborTorii.position.z, 1.2, 0.4, harborTorii.rotation.y);
-
-    const park = createParkGazebo();
-    placeAlongPath(park, this.path, 0.80, 1, 8);
-    this.scene.add(park);
-    this._addCircleCollider(park.position.x, park.position.z, 2.0);
+    landmarkDefs.forEach((def) => {
+      const item = def.make();
+      placeAlongPath(item, this.path, def.t, def.side, def.offset);
+      if (def.scale) item.scale.setScalar(def.scale);
+      if (def.extraRot) item.rotation.y += def.extraRot;
+      if (isTooCloseSolid(item.position, this._placedPositions, 2.8)) {
+        // Nudge farther from path if jammed
+        placeAlongPath(item, this.path, def.t, def.side, def.offset + 2.2);
+      }
+      this.scene.add(item);
+      if (def.radius != null) {
+        this._addCircleCollider(item.position.x, item.position.z, def.radius);
+      } else {
+        this._addBoxCollider(item.position.x, item.position.z, def.halfW, def.halfD, item.rotation.y);
+      }
+      registerSolid(this._placedPositions, item.position, def.radius ?? 2.5);
+      if (def.spawn) this._recordSpawn(def.spawn, item.position, item.rotation.y);
+    });
   }
 
   _createShopsAndPlaces() {
-    const bookshop = createModelShop(3.0, '書店 文房', 'Bunbou Books', 0x8060a0, 1.8, 0xf0ece4, 0x6a5040, 3.4, 3.2, 'crates', 'BOOKS', '📚');
-    placeAlongPath(bookshop, this.path, 0.08, -1, 5.5);
-    this.scene.add(bookshop);
-    this._addBoxCollider(bookshop.position.x, bookshop.position.z, 1.8, 1.6, bookshop.rotation.y);
-    this._recordSpawn('shop_bookshop', bookshop.position, bookshop.rotation.y);
+    const shops = [
+      {
+        t: 0.08, side: -1, offset: 7.2, halfW: 1.8, halfD: 1.6, spawn: 'shop_bookshop',
+        make: () => createModelShop(3.0, '書店 文房', 'Bunbou Books', 0x8060a0, 1.8, 0xf0ece4, 0x6a5040, 3.4, 3.2, 'crates', 'BOOKS', '📚'),
+      },
+      {
+        t: 0.22, side: 1, offset: 7.2, halfW: 1.6, halfD: 1.4, spawn: 'shop_ramen',
+        make: () => createModelShop(2.9, '麺処 山田', 'Yamada Ramen', 0xc04040, 1.7, 0xfff4ec, 0x8a3030, 3.2, 3.0, 'crates', 'RAMEN', '🍜'),
+      },
+      {
+        t: 0.42, side: 1, offset: 7.5, halfW: 2.0, halfD: 1.8, spawn: 'shop_cafe',
+        make: () => createCafePatio(),
+      },
+      {
+        t: 0.48, side: -1, offset: 7.2, halfW: 1.5, halfD: 1.3, spawn: 'shop_florist',
+        make: () => createModelShop(2.7, '花屋 はな', 'Hana Florist', 0xe08090, 1.6, 0xfaf0f2, 0xc06080, 3.0, 2.8, 'flowers', 'FLOWERS', '🌸'),
+      },
+      {
+        t: 0.54, side: -1, offset: 8.0, halfW: 2.5, halfD: 1.8, spawn: 'shop_market',
+        make: () => createMarketStalls(),
+      },
+      {
+        t: 0.95, side: -1, offset: 8.0, halfW: 2.2, halfD: 1.6, spawn: 'shop_fishmarket',
+        make: () => createFishMarket(),
+      },
+    ];
 
-    const ramen = createModelShop(2.9, '麺処 山田', 'Yamada Ramen', 0xc04040, 1.7, 0xfff4ec, 0x8a3030, 3.2, 3.0, 'crates', 'RAMEN', '🍜');
-    placeAlongPath(ramen, this.path, 0.22, 1, 5.8);
-    this.scene.add(ramen);
-    this._addBoxCollider(ramen.position.x, ramen.position.z, 1.6, 1.4, ramen.rotation.y);
-    this._recordSpawn('shop_ramen', ramen.position, ramen.rotation.y);
-
-    const florist = createModelShop(2.7, '花屋 はな', 'Hana Florist', 0xe08090, 1.6, 0xfaf0f2, 0xc06080, 3.0, 2.8, 'flowers', 'FLOWERS', '🌸');
-    placeAlongPath(florist, this.path, 0.50, -1, 5.5);
-    this.scene.add(florist);
-    this._addBoxCollider(florist.position.x, florist.position.z, 1.5, 1.3, florist.rotation.y);
-    this._recordSpawn('shop_florist', florist.position, florist.rotation.y);
-
-    const cafe = createCafePatio();
-    placeAlongPath(cafe, this.path, 0.46, 1, 6.5);
-    this.scene.add(cafe);
-    this._addBoxCollider(cafe.position.x, cafe.position.z, 2.0, 1.8, cafe.rotation.y);
-    this._recordSpawn('shop_cafe', cafe.position, cafe.rotation.y);
-
-    const market = createMarketStalls();
-    placeAlongPath(market, this.path, 0.54, -1, 7);
-    this.scene.add(market);
-    this._addBoxCollider(market.position.x, market.position.z, 2.5, 1.8, market.rotation.y);
-    this._recordSpawn('shop_market', market.position, market.rotation.y);
-
-    const fishMarket = createFishMarket();
-    placeAlongPath(fishMarket, this.path, 0.95, -1, 6);
-    this.scene.add(fishMarket);
-    this._addBoxCollider(fishMarket.position.x, fishMarket.position.z, 2.2, 1.6, fishMarket.rotation.y);
-    this._recordSpawn('shop_fishmarket', fishMarket.position, fishMarket.rotation.y);
+    shops.forEach((def) => {
+      const shop = def.make();
+      placeAlongPath(shop, this.path, def.t, def.side, def.offset);
+      if (isTooCloseSolid(shop.position, this._placedPositions, 3.0)) {
+        placeAlongPath(shop, this.path, def.t, def.side, def.offset + 2.0);
+      }
+      this.scene.add(shop);
+      this._addBoxCollider(shop.position.x, shop.position.z, def.halfW, def.halfD, shop.rotation.y);
+      this._recordSpawn(def.spawn, shop.position, shop.rotation.y);
+      registerSolid(this._placedPositions, shop.position, 3.5);
+    });
   }
 
   _createProps() {
     const props = [
-      { t: 0.06, side: -1, type: 'vending', offset: 2.8, color: PALETTE.vending },
-      { t: 0.10, side: 1, type: 'mailbox', offset: 2.5 },
-      { t: 0.16, side: -1, type: 'mirror', offset: 2.2 },
-      { t: 0.20, side: 1, type: 'cone', offset: 2.0 },
-      { t: 0.28, side: -1, type: 'vending', offset: 2.8, color: 0x4060a0 },
-      { t: 0.36, side: 1, type: 'kiosk', offset: 2.6 },
-      { t: 0.44, side: -1, type: 'bicycle', offset: 2.3 },
-      { t: 0.50, side: 1, type: 'vending', offset: 2.8, color: 0xc04060 },
-      { t: 0.58, side: -1, type: 'lantern', offset: 2.4 },
-      { t: 0.64, side: 1, type: 'cone', offset: 2.0 },
-      { t: 0.70, side: -1, type: 'utility', offset: 2.5 },
-      { t: 0.76, side: 1, type: 'mailbox', offset: 2.5 },
-      { t: 0.82, side: -1, type: 'mirror', offset: 2.2 },
-      { t: 0.88, side: 1, type: 'vending', offset: 2.8, color: 0x4080a0 },
-      { t: 0.94, side: -1, type: 'bicycle', offset: 2.4 },
+      { t: 0.03, side: 1, type: 'busStop', offset: 2.7 },
+      { t: 0.05, side: -1, type: 'vending', offset: 2.6, color: PALETTE.vending },
+      { t: 0.12, side: 1, type: 'mailbox', offset: 2.4 },
+      { t: 0.18, side: -1, type: 'dirSign', offset: 2.5 },
+      { t: 0.20, side: -1, type: 'mirror', offset: 2.3 },
+      { t: 0.25, side: 1, type: 'infoBoard', offset: 2.6 },
+      { t: 0.30, side: 1, type: 'cone', offset: 2.1 },
+      { t: 0.40, side: -1, type: 'kiosk', offset: 2.5 },
+      { t: 0.45, side: -1, type: 'trashCan', offset: 2.2 },
+      { t: 0.58, side: 1, type: 'vending', offset: 2.6, color: 0xc04060 },
+      { t: 0.70, side: 1, type: 'trashCan', offset: 2.2 },
+      { t: 0.72, side: -1, type: 'utility', offset: 2.4 },
+      { t: 0.74, side: -1, type: 'utility', offset: 2.4 },
+      { t: 0.75, side: -1, type: 'busStop', offset: 2.7 },
+      { t: 0.84, side: 1, type: 'mailbox', offset: 2.4 },
+      { t: 0.91, side: -1, type: 'vending', offset: 2.6, color: 0x4080a0 },
     ];
+
+    const utilityAnchors = [];
 
     props.forEach(({ t, side, type, offset, color }) => {
       let prop;
@@ -1949,32 +2282,35 @@ export class Town {
         case 'kiosk':
           prop = createInfoKiosk();
           break;
-        case 'bicycle':
-          prop = createBicycle();
-          break;
-        case 'lantern': {
-          prop = createLantern();
-          const lanternPart = prop.userData.lanternMesh;
-          if (lanternPart) this.lanterns.push(lanternPart);
-          break;
-        }
         case 'utility':
           prop = createUtilityPole();
+          break;
+        case 'busStop':
+          prop = createBusStop();
+          break;
+        case 'dirSign':
+          prop = createDirectionalSign('right');
+          break;
+        case 'infoBoard':
+          prop = createTallInfoBoard();
+          break;
+        case 'trashCan':
+          prop = createTrashCan();
           break;
         default:
           return;
       }
 
       placeAlongPath(prop, this.path, t, side, offset);
+      if (isTooCloseSolid(prop.position, this._placedPositions, 1.6)) return;
 
       const propRadii = {
         vending: 0.55, mailbox: 0.35, mirror: 0.4, cone: 0.25,
-        kiosk: 0.7, bicycle: 0.55, lantern: 0.35, utility: 0.3,
+        kiosk: 0.7, utility: 0.3, busStop: 0.45, dirSign: 0.5,
+        infoBoard: 0.75, trashCan: 0.25,
       };
-      const pr = propRadii[type] ?? 0.4;
-      this._addCircleCollider(prop.position.x, prop.position.z, pr);
+      this._addCircleCollider(prop.position.x, prop.position.z, propRadii[type] ?? 0.4);
 
-      // Vending machines should face the road, not run parallel to it
       if (type === 'vending') {
         const roadCenter = this.path.getPointAt(t);
         prop.lookAt(roadCenter.x, prop.position.y, roadCenter.z);
@@ -1982,22 +2318,32 @@ export class Town {
         this._recordSpawn('vending', prop.position, prop.rotation.y);
       }
 
+      if (type === 'utility') {
+        const anchor = prop.userData.wireAnchor
+          ? prop.localToWorld(prop.userData.wireAnchor.clone())
+          : prop.position.clone().add(new THREE.Vector3(0, 4.0, 0));
+        utilityAnchors.push(anchor);
+      }
+
       this.scene.add(prop);
+      registerSolid(this._placedPositions, prop.position, propRadii[type] ?? 0.5);
     });
+
+    if (utilityAnchors.length >= 2) {
+      for (let i = 0; i < utilityAnchors.length - 1; i++) {
+        const span = createUtilityWireSpan(utilityAnchors[i], utilityAnchors[i + 1]);
+        this.scene.add(span);
+      }
+    }
   }
 
   _createStreetFurniture() {
     const furniture = [
-      { t: 0.12, side: 1, type: 'bench', offset: 2.2, benchVariant: 'normal' },
-      { t: 0.24, side: -1, type: 'bollard', offset: 2.0 },
-      { t: 0.26, side: -1, type: 'bollard', offset: 2.4 },
-      { t: 0.34, side: 1, type: 'plant', offset: 2.1 },
-      { t: 0.36, side: 1, type: 'plant', offset: 2.5 },
-      { t: 0.48, side: -1, type: 'bench', offset: 2.3, benchVariant: 'cushion' },
-      { t: 0.68, side: -1, type: 'lantern', offset: 2.3 },
-      { t: 0.74, side: 1, type: 'bench', offset: 2.2, benchVariant: 'normal' },
-      { t: 0.84, side: -1, type: 'plant', offset: 2.2 },
-      { t: 0.62, side: 1, type: 'plant', offset: 2.4 },
+      { t: 0.10, side: -1, type: 'bench', offset: 2.3, benchVariant: 'normal' },
+      { t: 0.26, side: 1, type: 'bollard', offset: 2.0 },
+      { t: 0.45, side: 1, type: 'plant', offset: 2.2 },
+      { t: 0.60, side: -1, type: 'bench', offset: 2.3, benchVariant: 'cushion' },
+      { t: 0.80, side: -1, type: 'plant', offset: 2.2 },
     ];
 
     furniture.forEach(({ t, side, type, offset, benchVariant }) => {
@@ -2012,19 +2358,15 @@ export class Town {
         case 'plant':
           item = createPottedPlant();
           break;
-        case 'lantern': {
-          item = createLantern();
-          const lanternPart = item.userData.lanternMesh;
-          if (lanternPart) this.lanterns.push(lanternPart);
-          break;
-        }
         default:
           return;
       }
       placeAlongPath(item, this.path, t, side, offset);
-      const furnRadii = { bench: 0.9, bollard: 0.2, plant: 0.35, lantern: 0.35 };
+      if (isTooCloseSolid(item.position, this._placedPositions, 1.4)) return;
+      const furnRadii = { bench: 0.9, bollard: 0.2, plant: 0.35 };
       this._addCircleCollider(item.position.x, item.position.z, furnRadii[type] ?? 0.4);
       this.scene.add(item);
+      registerSolid(this._placedPositions, item.position, furnRadii[type] ?? 0.4);
       if (type === 'bench') {
         this._recordSpawn('bench', item.position, item.rotation.y);
       }
@@ -2033,53 +2375,63 @@ export class Town {
 
   _createVegetation() {
     const treeSpots = [
-      { t: 0.08, side: 1, dist: 9.5, variant: 'cherry' },
-      { t: 0.16, side: -1, dist: 10, variant: 'normal' },
-      { t: 0.28, side: 1, dist: 9.5, variant: 'pine' },
-      { t: 0.38, side: -1, dist: 10.5, variant: 'cherry' },
-      { t: 0.48, side: 1, dist: 9.5, variant: 'normal' },
-      { t: 0.58, side: -1, dist: 10, variant: 'pine' },
-      { t: 0.68, side: 1, dist: 10.5, variant: 'cherry' },
-      { t: 0.78, side: -1, dist: 9.5, variant: 'normal' },
-      { t: 0.86, side: 1, dist: 10, variant: 'pine' },
-      { t: 0.94, side: -1, dist: 11, variant: 'normal' },
+      { t: 0.07, side: 1, dist: 11.5, variant: 'cherry' },
+      { t: 0.16, side: -1, dist: 12, variant: 'normal' },
+      { t: 0.38, side: -1, dist: 12, variant: 'cherry' },
+      { t: 0.50, side: 1, dist: 11.5, variant: 'normal' },
+      { t: 0.66, side: 1, dist: 11.5, variant: 'pine', shrineTree: true },
+      { t: 0.80, side: -1, dist: 12, variant: 'normal' },
+      { t: 0.96, side: 1, dist: 12, variant: 'normal' },
     ];
 
-    treeSpots.forEach(({ t, side, dist, variant }) => {
+    const placedTrees = [];
+    treeSpots.forEach(({ t, side, dist, variant, shrineTree }) => {
       const pos = this.path.getPointAt(t);
       const tangent = this.path.getTangentAt(t);
       const perp = new THREE.Vector3(-tangent.z, 0, tangent.x).multiplyScalar(side);
+      const treePos = pos.clone().add(perp.multiplyScalar(dist));
+      if (isTooCloseSolid(treePos, this._placedPositions, 2.5)) return;
       const tree = createTree(variant);
-      tree.position.copy(pos).add(perp.multiplyScalar(dist));
+      tree.position.copy(treePos);
       snapToGround(tree, 0);
       this.scene.add(tree);
       this._addCircleCollider(tree.position.x, tree.position.z, 0.9);
+      placedTrees.push(tree.position.clone());
+      registerSolid(this._placedPositions, tree.position, 2.0);
       if (variant === 'cherry') {
         this._recordSpawn('cherry_tree', tree.position);
-      } else if (variant === 'pine' && t > 0.55 && t < 0.65) {
+      } else if (shrineTree) {
         this._recordSpawn('shrine_tree', tree.position);
       }
     });
 
-    for (let i = 0; i < 16; i++) {
+    let randomPlaced = 0;
+    for (let attempt = 0; attempt < 40 && randomPlaced < 6; attempt++) {
       const t = 0.04 + Math.random() * 0.92;
       const pos = this.path.getPointAt(t);
       const tangent = this.path.getTangentAt(t);
       const side = Math.random() > 0.5 ? 1 : -1;
       const perp = new THREE.Vector3(-tangent.z, 0, tangent.x).multiplyScalar(side);
+      const treePos = pos.clone().add(perp.multiplyScalar(12 + Math.random() * 3));
+      if (isTooClose(treePos, placedTrees, 4.0)) continue;
+      if (isTooCloseSolid(treePos, this._placedPositions, 3.0)) continue;
       const tree = createTree('normal');
-      tree.position.copy(pos).add(perp.multiplyScalar(9 + Math.random() * 4));
+      tree.position.copy(treePos);
       tree.scale.setScalar(0.75 + Math.random() * 0.35);
       snapToGround(tree, 0);
       this.scene.add(tree);
       this._addCircleCollider(tree.position.x, tree.position.z, 0.7 * tree.scale.x);
+      placedTrees.push(tree.position.clone());
+      randomPlaced += 1;
     }
 
-    [0.22, 0.48, 0.72, 0.88].forEach((t) => {
+    [0.25, 0.74].forEach((t) => {
       const bamboo = createBambooCluster();
-      placeAlongPath(bamboo, this.path, t, 1, 8 + Math.random() * 2);
+      placeAlongPath(bamboo, this.path, t, -1, 11.5);
+      if (isTooCloseSolid(bamboo.position, this._placedPositions, 2.5)) return;
       this.scene.add(bamboo);
       this._addCircleCollider(bamboo.position.x, bamboo.position.z, 1.0);
+      registerSolid(this._placedPositions, bamboo.position, 1.2);
     });
   }
 
@@ -2087,44 +2439,38 @@ export class Town {
     if (!this.modelLoader) return;
 
     const decor = [
-      { t: 0.10, side: 1, key: 'rock', offset: 10.5, height: 0.45 },
-      { t: 0.14, side: 1, key: 'bush', offset: 10.2, height: 0.6 },
-      { t: 0.26, side: -1, key: 'rock', offset: 11, height: 0.5 },
-      { t: 0.30, side: -1, key: 'bush', offset: 10.8, height: 0.58 },
-      { t: 0.42, side: 1, key: 'bush', offset: 10.5, height: 0.62 },
-      { t: 0.44, side: 1, key: 'rock', offset: 11.2, height: 0.42 },
-      { t: 0.56, side: -1, key: 'bush', offset: 10.6, height: 0.55 },
-      { t: 0.58, side: -1, key: 'decoration', offset: 10.3, height: 0.35 },
-      { t: 0.66, side: 1, key: 'decoration', offset: 10.2, height: 0.32 },
-      { t: 0.72, side: -1, key: 'rock', offset: 11.5, height: 0.48 },
-      { t: 0.80, side: 1, key: 'bush', offset: 10.4, height: 0.6 },
-      { t: 0.84, side: -1, key: 'bush', offset: 10.7, height: 0.52 },
-      { t: 0.90, side: 1, key: 'rock', offset: 11.3, height: 0.4 },
-      { t: 0.92, side: -1, key: 'decoration', offset: 10.5, height: 0.3 },
+      { t: 0.10, side: 1, key: 'rock', offset: 13.0, height: 0.45 },
+      { t: 0.26, side: -1, key: 'rock', offset: 13.0, height: 0.5 },
+      { t: 0.42, side: 1, key: 'bush', offset: 12.5, height: 0.62 },
+      { t: 0.58, side: -1, key: 'bush', offset: 13.0, height: 0.55 },
+      { t: 0.74, side: 1, key: 'rock', offset: 13.0, height: 0.48 },
+      { t: 0.90, side: -1, key: 'bush', offset: 13.0, height: 0.5 },
     ];
 
     decor.forEach(({ t, side, key, offset, height, scale = 1 }) => {
       const item = this.modelLoader.createInstance(key, { targetHeight: height, scale });
       if (!item) return;
       placeAlongPath(item, this.path, t, side, offset);
+      if (isTooCloseSolid(item.position, this._placedPositions, 2.5)) return;
       this.scene.add(item);
       this._addCircleCollider(item.position.x, item.position.z, 0.45);
+      registerSolid(this._placedPositions, item.position, 0.8);
     });
 
     const bgFiller = [
-      { x: -38, z: -28, key: 'building_d', h: 2.8, ry: 0.4 },
-      { x: 40, z: -42, key: 'building_d', h: 2.4, ry: -0.5 },
-      { x: -44, z: -68, key: 'building_c', h: 2.6, ry: 0.2 },
-      { x: 42, z: -95, key: 'building_c', h: 2.3, ry: -0.3 },
-      { x: -36, z: -118, key: 'building_b', h: 2.5, ry: 0.6 },
+      { x: -42, z: -28, key: 'building_d', h: 2.8, ry: 0.4 },
+      { x: 44, z: -42, key: 'building_d', h: 2.4, ry: -0.5 },
+      { x: -46, z: -68, key: 'building_c', h: 2.6, ry: 0.2 },
+      { x: 46, z: -95, key: 'building_c', h: 2.3, ry: -0.3 },
+      { x: -40, z: -118, key: 'building_b', h: 2.5, ry: 0.6 },
     ];
     bgFiller.forEach(({ x, z, key, h, ry }) => {
       const b = this.modelLoader.createInstance(key, { targetHeight: h });
       if (!b) return;
       b.position.set(x, 0, z);
       b.rotation.y = ry;
+      snapToGround(b, 0);
       this.scene.add(b);
-      this._addBoxCollider(x, z, 2.0, 1.8, ry);
     });
   }
 
@@ -2147,22 +2493,38 @@ export class Town {
   _createRiver() {
     this.riverCurve = this._createRiverCurve();
     const waterHalf = 2.8;
-    const bankHalf = 0.6;
-    const waterMat = createWaterMaterial();
+    const bankHalf = 0.55;
+    const RIVER_Y = -0.42;  // water surface sits in a channel below ground
 
-    const water = createPathRibbon(this.riverCurve, waterHalf, -0.06, waterMat, 0, 160);
+    const waterMat = createWaterMaterial();
+    const water = createPathRibbon(this.riverCurve, waterHalf, RIVER_Y, waterMat, 0, 160);
     water.userData.isWater = true;
     this.scene.add(water);
     this.waterMeshes.push(water);
 
-    const bankMat = createToonMaterial(0x5a8068);
-    const leftBank = createPathRibbon(this.riverCurve, bankHalf, 0.04, bankMat, -(waterHalf + bankHalf + 0.1), 160);
-    const rightBank = createPathRibbon(this.riverCurve, bankHalf, 0.04, bankMat, waterHalf + bankHalf + 0.1, 160);
+    // Riverbed (dark silt under the water, slightly lower)
+    const bedMat = createToonMaterial(0x4a5a50);
+    const bed = createPathRibbon(this.riverCurve, waterHalf + 0.3, RIVER_Y - 0.04, bedMat, 0, 160);
+    this.scene.add(bed);
+
+    // Sloped embankment walls: angled panels connecting ground (y=0) to channel (RIVER_Y)
+    // We build these as a custom ribbon that has a vertical component.
+    // Approximate with a slightly-below-ground flat bank strip at RIVER_Y+0.06.
+    const bankMat = createToonMaterial(0x6aaa84);
+    const leftBank  = createPathRibbon(this.riverCurve, bankHalf, RIVER_Y + 0.08, bankMat, -(waterHalf + bankHalf + 0.05), 160);
+    const rightBank = createPathRibbon(this.riverCurve, bankHalf, RIVER_Y + 0.08, bankMat,   waterHalf + bankHalf + 0.05, 160);
     this.scene.add(leftBank, rightBank);
 
-    const gravelMat = createToonMaterial(0x909888);
-    const leftGravel = createPathRibbon(this.riverCurve, 0.35, 0.06, gravelMat, -(waterHalf + bankHalf * 2 + 0.5), 160);
-    const rightGravel = createPathRibbon(this.riverCurve, 0.35, 0.06, gravelMat, waterHalf + bankHalf * 2 + 0.5, 160);
+    // Upper bank — ground-level lips bridging to the embankment
+    const lipMat = createToonMaterial(0x78be94);
+    const leftLip  = createPathRibbon(this.riverCurve, 0.5, -0.02, lipMat, -(waterHalf + bankHalf * 2 + 0.4), 160);
+    const rightLip = createPathRibbon(this.riverCurve, 0.5, -0.02, lipMat,   waterHalf + bankHalf * 2 + 0.4, 160);
+    this.scene.add(leftLip, rightLip);
+
+    // Gravel path along the banks
+    const gravelMat = createToonMaterial(PALETTE.road);
+    const leftGravel  = createPathRibbon(this.riverCurve, 0.3, 0.01, gravelMat, -(waterHalf + bankHalf * 2 + 1.1), 160);
+    const rightGravel = createPathRibbon(this.riverCurve, 0.3, 0.01, gravelMat,   waterHalf + bankHalf * 2 + 1.1, 160);
     this.scene.add(leftGravel, rightGravel);
 
     // Bank colliders — block walking into water
@@ -2302,53 +2664,73 @@ export class Town {
     shopSign.lookAt(shopJunction.x + shopTan.x, 0, shopJunction.z + shopTan.z);
     this.scene.add(shopSign);
 
-    // 4 new shops along shopping lane
+    // Shops sit outside the loop so the walkway stays clear
     const newShops = [
-      { t: 0.12, key: 'bakery',   ja: 'パン屋 小麦', en: 'Komugi Bakery', color: 0xe8a040, wall: 0xfff8ec, roof: 0xc08030, emoji: '🍞', label: 'BREAD', goods: 'bread' },
-      { t: 0.35, key: 'teahouse', ja: '茶屋 静',     en: 'Shizuka Tea',   color: 0x408060, wall: 0xf0f4ec, roof: 0x3a6048, emoji: '🍵', label: 'TEA',   goods: 'crates' },
+      { t: 0.10, key: 'bakery',   ja: 'パン屋 小麦', en: 'Komugi Bakery', color: 0xe8a040, wall: 0xfff8ec, roof: 0xc08030, emoji: '🍞', label: 'BREAD', goods: 'bread' },
+      { t: 0.34, key: 'teahouse', ja: '茶屋 静',     en: 'Shizuka Tea',   color: 0x408060, wall: 0xf0f4ec, roof: 0x3a6048, emoji: '🍵', label: 'TEA',   goods: 'crates' },
       { t: 0.58, key: 'konbini',  ja: 'コンビニ',    en: 'Mini Mart',     color: 0x4060a0, wall: 0xf0f0f8, roof: 0x304878, emoji: '🏪', label: 'OPEN',  goods: 'crates' },
       { t: 0.82, key: 'sweets',   ja: '和菓子 花',   en: 'Hana Sweets',   color: 0xe08090, wall: 0xfff0f4, roof: 0xc06070, emoji: '🍡', label: 'SWEET', goods: 'flowers' },
     ];
+    const shopLanePlaced = [];
     newShops.forEach(({ t, key, ja, en, color, wall, roof, emoji, label, goods }) => {
       const pos = shoppingLoop.getPointAt(t);
-      const tan = shoppingLoop.getTangentAt(t);
+      const tan = shoppingLoop.getTangentAt(t).normalize();
+      const perp = new THREE.Vector3(-tan.z, 0, tan.x);
+      const shopPos = pos.clone().add(perp.multiplyScalar(4.2));
+      if (isTooClose(shopPos, shopLanePlaced, 5.5)) return;
       const shop = createStorefront({
         targetHeight: 2.6, labelJa: ja, labelEn: en,
         signColor: color, awningColor: color, wallColor: wall, roofColor: roof,
         windowLabel: label, windowEmoji: emoji, goodsType: goods,
         w: 3.0, d: 2.8,
       });
-      shop.position.copy(pos);
-      shop.lookAt(pos.x + tan.x, pos.y, pos.z + tan.z);
+      shop.position.copy(shopPos);
+      shop.lookAt(pos.x, shop.position.y, pos.z);
+      snapGroupToGround(shop, 0);
       this.scene.add(shop);
-      this._addBoxCollider(pos.x, pos.z, 1.6, 1.4, shop.rotation.y);
-      this._recordSpawn(`shop_${key}`, pos, shop.rotation.y);
+      this._addBoxCollider(shopPos.x, shopPos.z, 1.6, 1.4, shop.rotation.y);
+      this._recordSpawn(`shop_${key}`, shopPos, shop.rotation.y);
+      shopLanePlaced.push(shopPos.clone());
     });
 
-    // Shopping lane decor: chalkboards + bicycle
-    [0.25, 0.65].forEach((t) => {
+    // Sidewalk chalkboards — spaced between shops, not on top of them
+    [0.22, 0.70].forEach((t) => {
       const pos = shoppingLoop.getPointAt(t);
+      const tan = shoppingLoop.getTangentAt(t).normalize();
+      const perp = new THREE.Vector3(-tan.z, 0, tan.x);
+      const boardPos = pos.clone().add(perp.multiplyScalar(2.2));
+      if (isTooClose(boardPos, shopLanePlaced, 3.0)) return;
       const board = createOutlinedMesh(new THREE.BoxGeometry(0.6, 0.5, 0.06), createToonMaterial(0x3a3020));
-      board.position.set(pos.x + 2, 0.5, pos.z);
+      board.position.copy(boardPos);
+      board.position.y = 0.5;
+      board.lookAt(pos.x, 0.5, pos.z);
       this.scene.add(board);
     });
-    const bike = createBicycle();
-    bike.position.copy(shoppingLoop.getPointAt(0.5));
-    bike.position.y = 0;
-    this.scene.add(bike);
-    this._addCircleCollider(bike.position.x, bike.position.z, 0.55);
+    {
+      const pos = shoppingLoop.getPointAt(0.46);
+      const tan = shoppingLoop.getTangentAt(0.46).normalize();
+      const perp = new THREE.Vector3(-tan.z, 0, tan.x);
+      const bike = createBicycle();
+      bike.position.copy(pos).add(perp.multiplyScalar(-2.0));
+      snapGroupToGround(bike, 0);
+      this.scene.add(bike);
+      this._addCircleCollider(bike.position.x, bike.position.z, 0.55);
+    }
 
-    // Hanging lantern string between shops
-    for (let i = 0; i < 5; i++) {
-      const t = 0.1 + i * 0.18;
+    // Lanterns on the outer curb between shops
+    [0.22, 0.46, 0.70].forEach((t) => {
       const pos = shoppingLoop.getPointAt(t);
+      const tan = shoppingLoop.getTangentAt(t).normalize();
+      const perp = new THREE.Vector3(-tan.z, 0, tan.x);
       const lantern = createLantern();
-      lantern.position.set(pos.x, 2.8, pos.z);
+      lantern.position.copy(pos).add(perp.multiplyScalar(2.5));
+      lantern.position.y = 0;
       lantern.scale.setScalar(0.7);
+      snapGroupToGround(lantern, 0);
       this.scene.add(lantern);
       const lp = lantern.userData.lanternMesh;
       if (lp) this.lanterns.push(lp);
-    }
+    });
 
     // ── Park grove spur ───────────────────────────────────────────────────
     const groveT = 0.80;
@@ -2375,35 +2757,39 @@ export class Town {
     parkSign.lookAt(groveJunction.x + groveTan.x, 0, groveJunction.z + groveTan.z);
     this.scene.add(parkSign);
 
-    // Grove picnic area
+    // Grove picnic area — keep blanket clear of the tree ring
     const groveCenter = grove.getPointAt(0.85);
     const blanket = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.5, 2.0),
+      new THREE.PlaneGeometry(2.2, 1.8),
       createToonMaterial(0xc04060),
     );
     blanket.rotation.x = -Math.PI / 2;
     blanket.position.set(groveCenter.x, 0.03, groveCenter.z);
     this.scene.add(blanket);
 
-    // Tree ring at grove
-    [0, 1, 2, 3, 4].forEach((i) => {
-      const angle = (i / 5) * Math.PI * 2;
+    // Wider tree ring so trunks don't cover the picnic blanket
+    [0, 1, 2, 3].forEach((i) => {
+      const angle = (i / 4) * Math.PI * 2 + 0.35;
       const variant = i % 2 === 0 ? 'cherry' : 'normal';
       const tree = createTree(variant);
       tree.position.set(
-        groveCenter.x + Math.sin(angle) * 4,
+        groveCenter.x + Math.sin(angle) * 5.5,
         0,
-        groveCenter.z + Math.cos(angle) * 4,
+        groveCenter.z + Math.cos(angle) * 5.5,
       );
       snapToGround(tree, 0);
       this.scene.add(tree);
       this._addCircleCollider(tree.position.x, tree.position.z, 0.9);
     });
 
-    // Grove bench
+    // Grove bench — off the path tip of the spur
     const groveBench = createBench('cushion');
-    groveBench.position.copy(grove.getPointAt(0.5));
-    groveBench.position.y = 0;
+    const benchPos = grove.getPointAt(0.55);
+    const benchTan = grove.getTangentAt(0.55).normalize();
+    const benchPerp = new THREE.Vector3(-benchTan.z, 0, benchTan.x);
+    groveBench.position.copy(benchPos).add(benchPerp.multiplyScalar(2.4));
+    snapGroupToGround(groveBench, 0);
+    groveBench.lookAt(benchPos.x, groveBench.position.y, benchPos.z);
     this.scene.add(groveBench);
     this._addCircleCollider(groveBench.position.x, groveBench.position.z, 0.9);
     this._recordSpawn('bench', groveBench.position, groveBench.rotation.y);
@@ -2425,44 +2811,12 @@ export class Town {
     this.walkableCurves = [this.path, riverside, shoppingLoop, grove];
   }
 
-  _createRiversideTrail() {
-    if (!this.riverCurve) return;
-    const trailHalf = 0.8;
-    const trailMat = createToonMaterial(PALETTE.gravel);
-    const trail = createPathRibbon(this.riverCurve, trailHalf, 0.07, trailMat, -(2.8 + 0.6 + 0.8 + 1.2), 160);
-    this.scene.add(trail);
-    this.groundMeshes.push(trail);
-
-    // Benches and lanterns along riverside
-    [0.15, 0.45, 0.68, 0.88].forEach((t) => {
-      const pos = this.riverCurve.getPointAt(t);
-      const tangent = this.riverCurve.getTangentAt(t).normalize();
-      const perp = new THREE.Vector3(-tangent.z, 0, tangent.x);
-      const benchPos = pos.clone().add(perp.multiplyScalar(-7.5));
-      const bench = createBench('normal');
-      bench.position.copy(benchPos);
-      bench.position.y = 0;
-      bench.lookAt(benchPos.x + tangent.x, 0, benchPos.z + tangent.z);
-      this.scene.add(bench);
-      this._addCircleCollider(bench.position.x, bench.position.z, 0.9);
-
-      const lantern = createLantern();
-      const lanternPos = pos.clone().add(perp.multiplyScalar(-6.8));
-      lantern.position.copy(lanternPos);
-      lantern.position.y = 0;
-      this.scene.add(lantern);
-      const lanternPart = lantern.userData.lanternMesh;
-      if (lanternPart) this.lanterns.push(lanternPart);
-      this._addCircleCollider(lantern.position.x, lantern.position.z, 0.35);
-    });
-  }
-
   _createEnvironmentDetails() {
     const flowerColors = [0xff6090, 0xf0d040, 0x60b0ff, 0xff8040, 0xc070e0];
     const flowerGeo = new THREE.SphereGeometry(0.06, 6, 5);
-    flowerColors.forEach((color, ci) => {
+    flowerColors.forEach((color) => {
       const mat = createToonMaterial(color);
-      scatterInstanced(this.scene, flowerGeo, mat, 16, () => {
+      scatterInstanced(this.scene, flowerGeo, mat, 11, () => {
         const x = -50 + Math.random() * 100;
         const z = -130 + Math.random() * 150;
         if (this._isNearPath(x, z, 5)) return null;
@@ -2473,7 +2827,7 @@ export class Town {
 
     const grassGeo = new THREE.ConeGeometry(0.08, 0.2, 4);
     const grassMat = createToonMaterial(0x5a9a60);
-    scatterInstanced(this.scene, grassGeo, grassMat, 60, () => {
+    scatterInstanced(this.scene, grassGeo, grassMat, 42, () => {
       const x = -50 + Math.random() * 100;
       const z = -130 + Math.random() * 150;
       if (this._isNearPath(x, z, 4.5)) return null;
@@ -2482,7 +2836,7 @@ export class Town {
 
     const stoneGeo = new THREE.DodecahedronGeometry(0.12, 0);
     const stoneMat = createToonMaterial(0x888880);
-    scatterInstanced(this.scene, stoneGeo, stoneMat, 30, () => {
+    scatterInstanced(this.scene, stoneGeo, stoneMat, 21, () => {
       const x = -50 + Math.random() * 100;
       const z = -130 + Math.random() * 150;
       if (this._isNearPath(x, z, 3.5)) return null;
@@ -2532,10 +2886,15 @@ export class Town {
 
   _isNearPath(x, z, minDist) {
     let best = Infinity;
-    for (let i = 0; i <= 80; i++) {
-      const p = this.path.getPointAt(i / 80);
-      const d = Math.hypot(x - p.x, z - p.z);
-      if (d < best) best = d;
+    const curves = this.walkableCurves?.length ? this.walkableCurves : [this.path];
+    for (const curve of curves) {
+      if (!curve?.getPointAt) continue;
+      const samples = curve === this.path ? 80 : 40;
+      for (let i = 0; i <= samples; i++) {
+        const p = curve.getPointAt(i / samples);
+        const d = Math.hypot(x - p.x, z - p.z);
+        if (d < best) best = d;
+      }
     }
     return best < minDist;
   }
@@ -2553,28 +2912,36 @@ export class Town {
 
   _createClouds() {
     const cloudPositions = [
-      [-18, 20, -2, 2.2],
-      [12, 22, -8, 2.6],
-      [-10, 24, -22, 2.0],
-      [24, 21, -18, 2.4],
-      [-24, 23, 2, 1.8],
-      [6, 25, -28, 2.2],
-      [-14, 20, -38, 2.5],
-      [18, 22, -42, 2.0],
-      [0, 26, -14, 3.0],
-      [26, 21, -55, 2.3],
-      [-22, 24, -65, 2.1],
-      [10, 25, -72, 2.6],
-      [32, 22, -50, 2.0],
-      [-8, 23, -95, 2.2],
-      [20, 24, -105, 2.4],
-      [-28, 21, -115, 2.0],
-      [14, 25, -128, 2.3],
-      [-32, 19, -48, 1.9],
-      [8, 28, -88, 2.1],
-      [30, 20, -108, 2.5],
-      [-16, 27, -78, 2.0],
-      [22, 23, -32, 2.2],
+      [-18, 20, -2, 2.8],
+      [12, 22, -8, 3.2],
+      [-10, 24, -22, 2.6],
+      [24, 21, -18, 3.0],
+      [-24, 23, 2, 2.4],
+      [6, 25, -28, 2.8],
+      [-14, 20, -38, 3.1],
+      [18, 22, -42, 2.6],
+      [0, 26, -14, 3.6],
+      [26, 21, -55, 2.9],
+      [-22, 24, -65, 2.7],
+      [10, 25, -72, 3.2],
+      [32, 22, -50, 2.6],
+      [-8, 23, -95, 2.8],
+      [20, 24, -105, 3.0],
+      [-28, 21, -115, 2.6],
+      [14, 25, -128, 2.9],
+      [-32, 19, -48, 2.5],
+      [8, 28, -88, 2.7],
+      [30, 20, -108, 3.1],
+      [-16, 27, -78, 2.6],
+      [22, 23, -32, 2.8],
+      [-40, 19, -25, 3.4],
+      [38, 20, -35, 3.0],
+      [-35, 18, -60, 3.2],
+      [42, 21, -75, 2.9],
+      [-45, 19, -90, 3.1],
+      [36, 20, -120, 2.8],
+      [0, 19, -55, 3.5],
+      [-20, 18, -130, 3.0],
     ];
     cloudPositions.forEach(([x, y, z, s]) => {
       const cloud = createCloud(x, y, z, s);
@@ -2584,7 +2951,7 @@ export class Town {
   }
 
   _createLighting() {
-    const hemi = new THREE.HemisphereLight(0xc0e8e0, 0x6a9888, 1.25);
+    const hemi = new THREE.HemisphereLight(0x97c5dd, 0x91d3c8, 1.35);
     this.scene.add(hemi);
 
     const sun = new THREE.DirectionalLight(0xfff4e8, 0.65);
@@ -2592,26 +2959,26 @@ export class Town {
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.camera.near = 0.5;
-    sun.shadow.camera.far = 120;
-    sun.shadow.camera.left   = -40;
-    sun.shadow.camera.right  = 40;
-    sun.shadow.camera.top    = 40;
-    sun.shadow.camera.bottom = -40;
+    sun.shadow.camera.far = 100;
+    sun.shadow.camera.left   = -22;
+    sun.shadow.camera.right  = 22;
+    sun.shadow.camera.top    = 22;
+    sun.shadow.camera.bottom = -22;
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.02;
     this.scene.add(sun);
     this.scene.add(sun.target);
     this.sun = sun;
 
-    const fill = new THREE.DirectionalLight(0xc8e0f0, 0.55);
+    const fill = new THREE.DirectionalLight(0x97c5dd, 0.5);
     fill.position.set(-14, 12, -8);
     this.scene.add(fill);
 
-    const ambient = new THREE.AmbientLight(0xe8f0ec, 0.55);
+    const ambient = new THREE.AmbientLight(0xe8ddd9, 0.45);
     this.scene.add(ambient);
 
-    // Capped decorative point lights (max ~8)
-    [[-3, 2.5, -10], [-5, 2.5, -22], [4, 2.5, -34], [6, 2.5, -62]].forEach(([x, y, z]) => {
+    // Capped decorative point lights (max 6)
+    [[-3, 2.5, -10], [-5, 2.5, -22], [4, 2.5, -34]].forEach(([x, y, z]) => {
       const pl = new THREE.PointLight(0xffc878, 0.28, 12);
       pl.position.set(x, y, z);
       this.scene.add(pl);
@@ -2628,10 +2995,6 @@ export class Town {
     const shrineLight = new THREE.PointLight(0xc0a0e0, 0.22, 14);
     shrineLight.position.set(-8, 3, -68);
     this.scene.add(shrineLight);
-
-    const coastLight = new THREE.PointLight(0xa8d0e8, 0.22, 16);
-    coastLight.position.set(12, 3, -128);
-    this.scene.add(coastLight);
   }
 
   getInteractableSpawns() {

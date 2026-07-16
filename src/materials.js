@@ -8,15 +8,16 @@ let toonGradientMap = null;
 export function getToonGradientMap() {
   if (toonGradientMap) return toonGradientMap;
   const canvas = document.createElement('canvas');
-  canvas.width = 4;
+  canvas.width = 5;
   canvas.height = 1;
   const ctx = canvas.getContext('2d');
-  const grad = ctx.createLinearGradient(0, 0, 4, 0);
-  grad.addColorStop(0.0, '#383838');
-  grad.addColorStop(0.42, '#9a9a9a');
+  const grad = ctx.createLinearGradient(0, 0, 5, 0);
+  grad.addColorStop(0.0, '#3a3a3a');
+  grad.addColorStop(0.28, '#6e6e6e');
+  grad.addColorStop(0.55, '#a8a8a8');
   grad.addColorStop(1.0, '#ffffff');
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 4, 1);
+  ctx.fillRect(0, 0, 5, 1);
   toonGradientMap = new THREE.CanvasTexture(canvas);
   toonGradientMap.minFilter = THREE.NearestFilter;
   toonGradientMap.magFilter = THREE.NearestFilter;
@@ -115,7 +116,7 @@ export function createGrassTexture() {
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#6a9a78';
+  ctx.fillStyle = '#6aad90';
   ctx.fillRect(0, 0, size, size);
   // Two-tone mottling patches
   for (let i = 0; i < 120; i++) {
@@ -124,20 +125,20 @@ export function createGrassTexture() {
     const r = 8 + Math.random() * 22;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = Math.random() > 0.5 ? 'rgba(90,140,100,0.35)' : 'rgba(110,160,115,0.28)';
+    ctx.fillStyle = Math.random() > 0.5 ? 'rgba(100,180,150,0.32)' : 'rgba(120,200,170,0.25)';
     ctx.fill();
   }
   // Fine blade detail
   for (let i = 0; i < 6000; i++) {
     const x = Math.random() * size;
     const y = Math.random() * size;
-    const g = 100 + Math.floor(Math.random() * 40);
-    ctx.fillStyle = `rgba(${g - 25},${g + 10},${g - 30},0.22)`;
+    const g = 140 + Math.floor(Math.random() * 40);
+    ctx.fillStyle = `rgba(${g - 40},${g + 20},${g - 10},0.2)`;
     ctx.fillRect(x, y, 1, 2 + Math.random() * 2);
   }
   grassTexture = new THREE.CanvasTexture(canvas);
   grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping;
-  grassTexture.repeat.set(40, 40);
+  grassTexture.repeat.set(28, 28);
   grassTexture.colorSpace = THREE.SRGBColorSpace;
   return grassTexture;
 }
@@ -154,15 +155,17 @@ export function createVendingDisplayTexture(accentColor = 0x5ab0a8) {
   const ctx = canvas.getContext('2d');
 
   const accent = `#${new THREE.Color(accentColor).getHexString()}`;
-  ctx.fillStyle = '#283038';
+  ctx.fillStyle = '#1a3040';
   ctx.fillRect(0, 0, 128, 192);
 
   ctx.fillStyle = accent;
   ctx.fillRect(0, 0, 128, 22);
-  ctx.fillStyle = '#f0f8ff';
-  ctx.font = 'bold 14px sans-serif';
+  ctx.fillStyle = '#e8f4ff';
+  ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('DRINKS', 64, 16);
+  ctx.fillText('COLD', 64, 14);
+  ctx.font = 'bold 13px sans-serif';
+  ctx.fillText('DRINKS', 64, 20);
 
   const drinkColors = ['#e8a050', '#f0d050', '#70b8c8', '#e87878', '#88c878', '#c8a0e0'];
   for (let row = 0; row < 5; row++) {
@@ -170,12 +173,12 @@ export function createVendingDisplayTexture(accentColor = 0x5ab0a8) {
       const x = 18 + col * 32;
       const y = 30 + row * 30;
       ctx.fillStyle = drinkColors[(row * 3 + col) % drinkColors.length];
-      ctx.fillRect(x, y, 18, 22);
+      ctx.fillRect(x + 1, y, 16, 26);
       ctx.strokeStyle = '#1a1a1a';
       ctx.lineWidth = 2;
-      ctx.strokeRect(x, y, 18, 22);
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.fillRect(x + 2, y + 2, 5, 16);
+      ctx.strokeRect(x + 1, y, 16, 26);
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.fillRect(x + 3, y + 2, 4, 18);
     }
   }
 
@@ -219,44 +222,53 @@ function createWaterWaveTexture() {
 export function createWaterMaterial() {
   const map = createWaterWaveTexture();
   const mat = new THREE.MeshToonMaterial({
-    color: 0x6ab0c0,
+    color: 0x97c5dd,
     gradientMap: getToonGradientMap(),
     map,
     transparent: true,
-    opacity: 0.9,
+    opacity: 0.86,
   });
   mat.userData.waterMap = map;
   return mat;
 }
 
 export const PALETTE = {
-  sky:       0xa8dcd4,
-  skyCloud:  0xc8ece8,
-  road:      0xc8c4bc,
-  roadLine:  0xe8ece8,
-  sidewalk:  0xd8d4cc,
-  wall:      0xd8d4cc,
-  wallDark:  0xb8b4ac,
-  roof:      0x6a6458,
-  roofDark:  0x524c44,
-  green:     0x7db882,
-  meadow:    0x6a9a78,
-  gravel:    0xa8a49c,
-  vending:   0x5ab0a8,
-  orange:    0xf0b060,
-  yellow:    0xf0d060,
-  blue:      0x6a9ac8,
+  // Source swatches (blush → pink → cream → mint → sky blue)
+  blush:     0xe8ddd9,
+  pink:      0xeda0b9,
+  cream:     0xf0dab2,
+  mint:      0x91d3c8,
+  skyBlue:   0x97c5dd,
+
+  sky:       0x91d3c8,
+  skyCloud:  0xe8ddd9,
+  fog:       0xcde8e4,
+  road:      0xb0b8bf,
+  roadLine:  0xfafafa,
+  sidewalk:  0xc8cdd2,
+  curb:      0xa0a8af,
+  wall:      0xdde0e4,
+  wallDark:  0xc8cdd2,
+  roof:      0x7aa8a0,
+  roofDark:  0x5a8880,
+  green:     0x7cbc9a,
+  meadow:    0x6aad90,
+  gravel:    0xe8ddd9,
+  vending:   0x91d3c8,
+  orange:    0xf0dab2,
+  yellow:    0xf0dab2,
+  blue:      0x97c5dd,
   skin:      0xf0d0b0,
   hair:      0x1a1a1a,
   shirt:     0xf8f8f8,
   pants:     0x1a1a1a,
   backpack:  0x989898,
-  cone:      0xf0a050,
-  sign:      0x6a9a7a,
-  metal:     0x909090,
-  awningRed: 0xd87868,
-  awningBlue: 0x6888b0,
-  accent:    0xf0d060,
+  cone:      0xf0dab2,
+  sign:      0x91d3c8,
+  metal:     0xb0c0c8,
+  awningRed: 0xeda0b9,
+  awningBlue: 0x97c5dd,
+  accent:    0xeda0b9,
 };
 
 export function nextFrame() {
