@@ -1128,37 +1128,82 @@ function scatterInstanced(scene, geometry, material, count, placeFn, scaleRange 
   return mesh;
 }
 
-function createStoneSteps(count = 4) {
-  return withModel('shrine_stairs', 1.4, () => {
+/** Stone stairway up to a raised platform with the shrine hall on top. */
+function createElevatedShrine() {
   const group = new THREE.Group();
-  const mat = createToonMaterial(0x989890);
-  for (let i = 0; i < count; i++) {
-    const step = createOutlinedMesh(new THREE.BoxGeometry(1.8 - i * 0.1, 0.12, 0.45), mat);
-    step.position.set(0, 0.06 + i * 0.12, -i * 0.4);
-    group.add(step);
+  const stepCount = 5;
+  const stepRise = 0.13;
+  const stepRun = 0.34;
+  const stepWidth = 2.6;
+  const stoneMat = createToonMaterial(0x9a9a92);
+  const railMat = createToonMaterial(0x7a7068);
+  const platformMat = createToonMaterial(0x848480);
+
+  // Flanking walls along the stair run (+Z faces the street)
+  for (const xSign of [-1, 1]) {
+    const wall = createSoftOutlinedMesh(
+      new THREE.BoxGeometry(0.16, stepCount * stepRise + 0.55, stepCount * stepRun + 1.0),
+      railMat,
+    );
+    wall.position.set(
+      xSign * (stepWidth * 0.5 + 0.1),
+      (stepCount * stepRise) * 0.48 + 0.08,
+      0.05,
+    );
+    group.add(wall);
   }
-  return group;
+
+  for (let i = 0; i < stepCount; i++) {
+    const stairs = withModel('shrine_stairs', 0.32, () => {
+      const w = stepWidth - i * 0.05;
+      return createOutlinedMesh(new THREE.BoxGeometry(w, stepRise, stepRun), stoneMat);
+    });
+    stairs.position.set(0, stepRise * 0.5 + i * stepRise, 1.05 - i * stepRun);
+    group.add(stairs);
+  }
+
+  const platformY = stepCount * stepRise;
+  const platform = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(3.5, 0.3, 3.1),
+    platformMat,
+  );
+  platform.position.set(0, platformY + 0.15, -0.9);
+  group.add(platform);
+
+  const backWall = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(3.6, 0.5, 0.22),
+    railMat,
+  );
+  backWall.position.set(0, platformY + 0.38, -2.25);
+  group.add(backWall);
+
+  const shrineHall = withModel('shrine', 2.4, () => {
+    const inner = new THREE.Group();
+    const base = createOutlinedMesh(new THREE.BoxGeometry(2.1, 0.22, 1.7), platformMat);
+    base.position.y = 0.11;
+    inner.add(base);
+    const building = createBuilding(1.65, 1.4, 1.45, 0xf0e8d8, 0x3a3a3a, 'shrine');
+    building.position.set(0, 0, -0.15);
+    inner.add(building);
+    return inner;
   });
-}
+  shrineHall.position.set(0, platformY + 0.3, -1.05);
+  group.add(shrineHall);
 
-function createShrine() {
-  return withModel('shrine', 3.2, () => {
-  const group = new THREE.Group();
-  const base = createOutlinedMesh(new THREE.BoxGeometry(2.2, 0.25, 1.8), createToonMaterial(0x888880));
-  base.position.y = 0.12;
-  group.add(base);
-
-  const building = createBuilding(1.8, 1.5, 1.6, 0xf0e8d8, 0x3a3a3a, 'shrine');
-  building.position.set(0, 0, -0.3);
-  group.add(building);
-
-  const torii = createTorii();
-  torii.position.set(0, 0, 1.6);
-  torii.scale.setScalar(0.75);
-  group.add(torii);
+  [-1.05, 1.05].forEach((x) => {
+    const lantern = withModel('street_lamp', 0.55, () => {
+      const post = createOutlinedMesh(
+        new THREE.CylinderGeometry(0.035, 0.045, 0.5, 6),
+        createToonMaterial(PALETTE.metal),
+      );
+      post.position.y = 0.25;
+      return post;
+    });
+    lantern.position.set(x, platformY, 0.35);
+    group.add(lantern);
+  });
 
   return group;
-  });
 }
 
 function seededRandom(seed) {
@@ -1988,8 +2033,11 @@ export class Town {
   _createLandmarks() {
     const landmarkDefs = [
       { id: 'torii',  t: 0.34, side: -1, offset: LANDMARK_NEAR_OFFSET, halfW: 1.6, halfD: 0.45, make: () => createTorii(), face: 'street', spawn: 'torii' },
-      { id: 'steps',  t: 0.60, side: 1,  offset: LANDMARK_NEAR_OFFSET, halfW: 1.2, halfD: 1.4, make: () => createStoneSteps(5), face: 'street' },
-      { id: 'shrine', t: 0.70, side: 1,  offset: LANDMARK_DEEP_OFFSET, halfW: 2.0, halfD: 1.8, spawn: 'shrine', make: () => createShrine(), face: 'street' },
+      {
+        id: 'shrine', t: 0.66, side: 1, offset: LANDMARK_DEEP_OFFSET,
+        halfW: 2.4, halfD: 2.6, spawn: 'shrine',
+        make: () => createElevatedShrine(), face: 'street',
+      },
     ];
 
     landmarkDefs.forEach((def) => {
@@ -2206,7 +2254,7 @@ export class Town {
     const ffMat = new THREE.MeshBasicMaterial({ color: 0xc0ff80 });
     this._fireflies = new THREE.InstancedMesh(ffGeo, ffMat, ffCount);
     this._fireflyData = [];
-    const shrineT = 0.64;
+    const shrineT = 0.66;
     const shrinePos = this.path.getPointAt(shrineT);
     for (let i = 0; i < ffCount; i++) {
       this._fireflyData.push({

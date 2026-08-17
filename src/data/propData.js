@@ -41,8 +41,8 @@ export const PROP_DEFINITIONS = {
   shrine: {
     id: 'shrine',
     label: 'Shrine',
-    range: 7,
-    hitRadius: 2.5,
+    range: 8,
+    hitRadius: 2.8,
   },
 
   torii: {
