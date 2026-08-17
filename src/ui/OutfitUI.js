@@ -38,25 +38,25 @@ export class OutfitUI {
     const hat    = OUTFIT_HATS[this.indices.hat];
     const shoes  = OUTFIT_SHOES[this.indices.shoes];
 
-    // Accent overrides the skin's own tint; otherwise use the skin's built-in tint.
     let tint, tintStrength;
-    if (accent.tint !== null) {
+    if (model.tint != null) {
+      tint = model.tint;
+      tintStrength = model.tintStrength ?? 0.45;
+    } else if (accent.tint !== null) {
       tint = accent.tint;
       tintStrength = 0.30;
     } else if (shoes.tint !== null) {
       tint = shoes.tint;
       tintStrength = 0.22;
     } else {
-      tint = model.tint ?? null;
-      tintStrength = model.tintStrength ?? 0.22;
+      tint = null;
+      tintStrength = 0.22;
     }
 
     const player = this.game?.player;
     if (!player) return;
 
     player.setOutfit({ modelKey: model.key, tint, tintStrength });
-
-    // Apply headgear after the skin swap (new mesh was just created).
     attachAccessory(player.mesh, hat.id);
   }
 
@@ -92,9 +92,9 @@ export class OutfitUI {
         pitch: this.game.input.cameraPitch,
         distance: this.game.input.cameraDistance,
       };
-      this.game.input.cameraPitch = 0.38;
-      this.game.input.cameraDistance = 3.8;
-      this.game.input.cameraAngle = this.game.player.facing + Math.PI;
+      this.game.input.cameraAngle = this.game.player.facing;
+      this.game.input.cameraPitch = 0.12;
+      this.game.input.cameraDistance = 6.1;
     }
   }
 

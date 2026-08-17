@@ -1,16 +1,10 @@
 export const OUTFIT_MODELS = [
-  // ── Mage variants ──────────────────────────────────────────────────────────
+  // ── Female ───────────────────────────────────────────────────────────────
   { key: 'character_female_a', label: 'Mage' },
-  { key: 'character_female_a', label: 'Arcane Mage',    tint: 0x8820cc, tintStrength: 0.45 },
-  { key: 'character_female_a', label: 'Ice Mage',       tint: 0x20b0ff, tintStrength: 0.45 },
-  { key: 'character_female_a', label: 'Fire Mage',      tint: 0xff3800, tintStrength: 0.48 },
-  { key: 'character_female_a', label: 'Nature Druid',   tint: 0x38a840, tintStrength: 0.45 },
-  // ── Rogue variants ─────────────────────────────────────────────────────────
   { key: 'character_female_b', label: 'Rogue' },
   { key: 'character_female_b', label: 'Shadow Rogue',   tint: 0x18183a, tintStrength: 0.60 },
   { key: 'character_female_b', label: 'Forest Scout',   tint: 0x3a7a30, tintStrength: 0.42 },
   { key: 'character_female_b', label: 'Crimson Thief',  tint: 0xcc2020, tintStrength: 0.45 },
-  // ── Hooded variants ────────────────────────────────────────────────────────
   { key: 'character_female_c', label: 'Wanderer' },
   { key: 'character_female_c', label: 'Desert Wanderer', tint: 0xd09030, tintStrength: 0.42 },
   { key: 'character_female_c', label: 'Sea Wanderer',   tint: 0x1890c0, tintStrength: 0.42 },

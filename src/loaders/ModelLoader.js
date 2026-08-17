@@ -79,6 +79,10 @@ export function snapToGround(object, y = 0) {
   return object;
 }
 
+/** Ground speed (m/s) that matches one walk/sprint cycle at timeScale 1 for 1.72 m rigs. */
+const WALK_GROUND_SPEED = 2.4;
+const SPRINT_GROUND_SPEED = 5.0;
+
 function buildActionMap(mixer, animations) {
   const actions = {};
   for (const clip of animations) {
@@ -252,6 +256,10 @@ export class ModelLoader {
     wrapper.userData.sitBlend = 0;
     wrapper.userData.modelKey = key;
     wrapper.userData.dynamic = true;
+    model.traverse((c) => {
+      c.userData.dynamic = true;
+      c.matrixAutoUpdate = true;
+    });
 
     this._playCharacterAnim(wrapper, 'idle', 0);
 
@@ -268,6 +276,10 @@ export class ModelLoader {
     }
 
     const prevName = character.userData.currentAnim;
+    if (prevName === animName && next.isRunning() && next.getEffectiveWeight() > 0.45) {
+      return;
+    }
+
     const prev = (prevName && prevName !== animName) ? actions[prevName] : null;
 
     const loopOnce = ['sit', 'static'].includes(animName);
@@ -300,25 +312,25 @@ export class ModelLoader {
     let target = 'idle';
     if (isJumping) target = 'jump';
     else if (isSitting) target = 'sit';
-    else if (speed > 4.5) target = 'sprint';
-    else if (speed > 0.15) target = 'walk';
+    else if (speed > 3.6) target = 'sprint';
+    else if (speed > 0.1) target = 'walk';
 
     const actions = character.userData.actions;
-    const currentAction = actions?.[character.userData.currentAnim];
+    const currentName = character.userData.currentAnim;
 
-    // Switch animation if target changed, OR if current action somehow stopped running.
-    if (character.userData.currentAnim !== target ||
-        (currentAction && !currentAction.isRunning() && !['sit'].includes(target))) {
-      this._playCharacterAnim(character, target, 0.18);
+    if (currentName !== target) {
+      this._playCharacterAnim(character, target, 0.15);
+    } else {
+      const currentAction = actions?.[currentName];
+      if (currentAction && !currentAction.isRunning() && target !== 'sit') {
+        this._playCharacterAnim(character, target, 0.05);
+      }
     }
 
-    // Scale walk/sprint playback rate to match movement speed (avoids foot-slide).
-    if (target === 'walk' || target === 'sprint') {
-      const walkAction = actions?.[target];
-      if (walkAction) {
-        const baseSpeed = target === 'sprint' ? 6.5 : 3.2;
-        walkAction.setEffectiveTimeScale(Math.min(speed / baseSpeed, 2.5));
-      }
+    const active = actions?.[target];
+    if (active && (target === 'walk' || target === 'sprint')) {
+      const base = target === 'sprint' ? SPRINT_GROUND_SPEED : WALK_GROUND_SPEED;
+      active.setEffectiveTimeScale(THREE.MathUtils.clamp(speed / base, 0.4, 2.6));
     }
   }
 

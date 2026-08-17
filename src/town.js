@@ -436,119 +436,170 @@ function createTorii() {
 }
 
 function createLantern() {
-  const model = _modelLoader?.createInstance('street_lamp', { targetHeight: 2.8 });
+  const model = _modelLoader?.createInstance('street_lamp', { targetHeight: 3.2 });
+  const group = new THREE.Group();
+
   if (model) {
-    const group = new THREE.Group();
     group.add(model);
-    group.userData.lanternMesh = findFirstMesh(model) ?? model;
-    return group;
+    const lanternMesh = findLanternGlowMesh(model) ?? findFirstMesh(model);
+    if (lanternMesh) group.userData.lanternMesh = lanternMesh;
+  } else {
+    const post = createOutlinedMesh(
+      new THREE.CylinderGeometry(0.05, 0.07, 2.35, 8),
+      createToonMaterial(PALETTE.metal),
+    );
+    post.position.y = 1.18;
+    group.add(post);
+
+    const arm = createOutlinedMesh(
+      new THREE.BoxGeometry(0.32, 0.05, 0.05),
+      createToonMaterial(PALETTE.metal),
+    );
+    arm.position.set(0.12, 2.38, 0);
+    group.add(arm);
+
+    const housing = createOutlinedMesh(
+      new THREE.CylinderGeometry(0.14, 0.18, 0.32, 8),
+      createToonMaterial(0x2a3038),
+    );
+    housing.position.y = 2.52;
+    group.add(housing);
+
+    const paper = createOutlinedMesh(
+      new THREE.CylinderGeometry(0.16, 0.2, 0.28, 8, 1, true),
+      createToonMaterial(0xfff0c8, { emissive: 0xffd080, emissiveIntensity: 0.35 }),
+    );
+    paper.position.y = 2.52;
+    group.add(paper);
+    group.userData.lanternMesh = paper;
   }
 
-  const group = new THREE.Group();
-  const post = createOutlinedMesh(
-    new THREE.CylinderGeometry(0.04, 0.05, 1.6, 6),
-    createToonMaterial(PALETTE.metal),
-  );
-  post.position.y = 0.8;
-  group.add(post);
+  const lampLight = new THREE.PointLight(0xffd898, 0, 16, 1.6);
+  lampLight.position.set(0, 2.65, 0.15);
+  group.add(lampLight);
+  group.userData.streetLampLight = lampLight;
 
-  const paper = createOutlinedMesh(
-    new THREE.CylinderGeometry(0.18, 0.22, 0.45, 8, 1, true),
-    createToonMaterial(0xf06050),
-  );
-  paper.position.y = 1.75;
-  group.add(paper);
-
-  const cap = createOutlinedMesh(
-    new THREE.ConeGeometry(0.12, 0.15, 4),
-    createToonMaterial(0x333333),
-  );
-  cap.position.y = 2.05;
-  cap.rotation.y = Math.PI / 4;
-  group.add(cap);
-
-  group.userData.lanternMesh = paper;
   return group;
 }
 
+function findLanternGlowMesh(object) {
+  let best = null;
+  let bestY = -Infinity;
+  object.traverse((child) => {
+    if (!child.isMesh || child.userData.isOutline) return;
+    const y = child.position.y;
+    if (y > bestY) {
+      bestY = y;
+      best = child;
+    }
+  });
+  return best;
+}
+
+function createStreetLampPost() {
+  return createLantern();
+}
+
 function createVendingMachine(color = PALETTE.vending) {
-  const group = withModel('vending', 1.85, () => {
+  const group = withModel('vending', 2.05, () => {
     const root = new THREE.Group();
     const bodyColor = color;
-    const trimColor = new THREE.Color(bodyColor).offsetHSL(0, 0, -0.12).getHex();
-    const topColor = new THREE.Color(bodyColor).offsetHSL(0, 0, 0.08).getHex();
+    const trimColor = new THREE.Color(bodyColor).offsetHSL(0, 0, -0.14).getHex();
+    const topColor = new THREE.Color(bodyColor).offsetHSL(0, 0, 0.1).getHex();
+    const panelColor = 0x2a3238;
 
     const base = createSoftOutlinedMesh(
-      new THREE.BoxGeometry(0.95, 0.12, 0.75),
-      createToonMaterial(trimColor, { roughness: 0.9 }),
+      new THREE.BoxGeometry(1.02, 0.14, 0.82),
+      createToonMaterial(trimColor, { roughness: 0.92 }),
     );
-    base.position.y = 0.06;
+    base.position.y = 0.07;
     root.add(base);
 
     const body = createSoftOutlinedMesh(
-      new THREE.BoxGeometry(0.9, 1.65, 0.7),
-      createToonMaterial(bodyColor, { roughness: 0.75 }),
+      new THREE.BoxGeometry(0.96, 1.78, 0.76),
+      createToonMaterial(bodyColor, { roughness: 0.78 }),
     );
-    body.position.y = 0.95;
+    body.position.y = 1.03;
     root.add(body);
 
-    const topCap = createSoftOutlinedMesh(
-      new THREE.BoxGeometry(0.94, 0.1, 0.74),
-      createToonMaterial(topColor, { roughness: 0.7 }),
+    const sidePanel = createSoftOutlinedMesh(
+      new THREE.BoxGeometry(0.06, 1.5, 0.68),
+      createToonMaterial(panelColor, { roughness: 0.88 }),
     );
-    topCap.position.y = 1.82;
+    sidePanel.position.set(-0.48, 1.02, 0);
+    root.add(sidePanel);
+
+    const topCap = createSoftOutlinedMesh(
+      new THREE.BoxGeometry(1.0, 0.12, 0.8),
+      createToonMaterial(topColor, { roughness: 0.68 }),
+    );
+    topCap.position.y = 1.96;
     root.add(topCap);
 
     const awning = createSoftOutlinedMesh(
-      new THREE.BoxGeometry(1.0, 0.06, 0.22),
-      createToonMaterial(topColor, { roughness: 0.65 }),
+      new THREE.BoxGeometry(1.08, 0.07, 0.28),
+      createToonMaterial(topColor, { roughness: 0.6 }),
     );
-    awning.position.set(0, 1.9, 0.38);
-    awning.rotation.x = -0.12;
+    awning.position.set(0, 2.06, 0.42);
+    awning.rotation.x = -0.14;
     root.add(awning);
 
     const displayTex = createVendingDisplayTexture(color);
     const glass = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.68, 1.15),
+      new THREE.PlaneGeometry(0.72, 1.22),
       createToonMaterial(0xffffff, {
         map: displayTex,
-        emissive: 0x306878,
-        emissiveIntensity: 0.35,
+        emissive: 0x4098b8,
+        emissiveIntensity: 0.55,
       }),
     );
-    glass.position.set(0, 1.02, 0.36);
+    glass.position.set(0, 1.08, 0.395);
     root.add(glass);
 
     const frame = createSoftOutlinedMesh(
-      new THREE.BoxGeometry(0.76, 1.22, 0.04),
-      createToonMaterial(0x2a3038, { roughness: 0.85 }),
+      new THREE.BoxGeometry(0.8, 1.28, 0.05),
+      createToonMaterial(panelColor, { roughness: 0.85 }),
     );
-    frame.position.set(0, 1.02, 0.34);
+    frame.position.set(0, 1.08, 0.375);
     root.add(frame);
 
-    const coinPanel = createSoftOutlinedMesh(
-      new THREE.BoxGeometry(0.18, 0.28, 0.05),
-      createToonMaterial(0x8898a8, { roughness: 0.55, metalness: 0.2 }),
+    const brandStrip = createSoftOutlinedMesh(
+      new THREE.BoxGeometry(0.72, 0.1, 0.04),
+      createToonMaterial(0xf0f4f8, { roughness: 0.4 }),
     );
-    coinPanel.position.set(0.34, 0.55, 0.36);
+    brandStrip.position.set(0, 1.72, 0.395);
+    root.add(brandStrip);
+
+    const coinPanel = createSoftOutlinedMesh(
+      new THREE.BoxGeometry(0.2, 0.32, 0.06),
+      createToonMaterial(0x788898, { roughness: 0.5 }),
+    );
+    coinPanel.position.set(0.36, 0.58, 0.395);
     root.add(coinPanel);
 
     const slot = createSoftOutlinedMesh(
-      new THREE.BoxGeometry(0.1, 0.04, 0.06),
-      createToonMaterial(0x1a1a1a, { roughness: 0.95 }),
+      new THREE.BoxGeometry(0.12, 0.05, 0.07),
+      createToonMaterial(0x101418, { roughness: 0.95 }),
     );
-    slot.position.set(0.34, 0.62, 0.39);
+    slot.position.set(0.36, 0.66, 0.41);
     root.add(slot);
 
     const dispense = createSoftOutlinedMesh(
-      new THREE.BoxGeometry(0.28, 0.14, 0.2),
-      createToonMaterial(0x1a2028, { roughness: 0.9 }),
+      new THREE.BoxGeometry(0.32, 0.16, 0.24),
+      createToonMaterial(0x141a20, { roughness: 0.92 }),
     );
-    dispense.position.set(0, 0.28, 0.38);
+    dispense.position.set(0, 0.3, 0.4);
     root.add(dispense);
 
+    const dripTray = createSoftOutlinedMesh(
+      new THREE.BoxGeometry(0.36, 0.04, 0.28),
+      createToonMaterial(0x1a2028, { roughness: 0.9 }),
+    );
+    dripTray.position.set(0, 0.2, 0.4);
+    root.add(dripTray);
+
     return root;
-  }, { tint: color, tintStrength: 0.32 });
+  }, { tint: color, tintStrength: 0.22, scale: 1.05 });
 
   decorateVendingMachine(group, color);
   return group;
@@ -560,41 +611,46 @@ function decorateVendingMachine(group, color) {
   if (isLoaded && !group.userData.vendingDisplay) {
     const displayTex = createVendingDisplayTexture(color);
     const panel = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.64, 1.0),
+      new THREE.PlaneGeometry(0.7, 1.08),
       createToonMaterial(0xffffff, {
         map: displayTex,
-        emissive: 0x306878,
-        emissiveIntensity: 0.42,
+        emissive: 0x4098b8,
+        emissiveIntensity: 0.55,
         transparent: true,
-        opacity: 0.94,
+        opacity: 0.96,
         depthWrite: false,
       }),
     );
-    panel.position.set(0, 0.98, 0.4);
+    panel.position.set(0, 1.05, 0.42);
     group.add(panel);
     group.userData.vendingDisplay = panel;
     group.userData.vendingGlow = panel;
   } else if (!group.userData.vendingGlow) {
     const glow = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.55, 0.9),
+      new THREE.PlaneGeometry(0.62, 1.0),
       createToonMaterial(0x90d0e8, {
         emissive: 0x4098b8,
-        emissiveIntensity: 0.45,
+        emissiveIntensity: 0.55,
         transparent: true,
-        opacity: 0.55,
+        opacity: 0.62,
         depthWrite: false,
       }),
     );
-    glow.position.set(0, 1.05, 0.37);
+    glow.position.set(0, 1.08, 0.4);
     group.add(glow);
     group.userData.vendingGlow = glow;
   }
 
-  const lightColor = new THREE.Color(color);
-  const light = new THREE.PointLight(lightColor, 0.7, 6);
-  light.position.set(0, 1.45, 0.5);
-  group.add(light);
-  group.userData.vendingLight = light;
+  const lightColor = new THREE.Color(color).lerp(new THREE.Color(0xfff0d0), 0.45);
+  const displayLight = new THREE.PointLight(lightColor, 0, 14, 1.8);
+  displayLight.position.set(0, 1.55, 0.65);
+  group.add(displayLight);
+  group.userData.vendingLight = displayLight;
+
+  const spillLight = new THREE.PointLight(0xffe8c8, 0, 8, 2);
+  spillLight.position.set(0, 0.35, 0.55);
+  group.add(spillLight);
+  group.userData.vendingSpillLight = spillLight;
   group.userData.vendingColor = color;
 }
 
@@ -1471,6 +1527,32 @@ function createShopWindowTexture(goodsLabel = 'OPEN', goodsEmoji = '🛍️', bg
   return tex;
 }
 
+function attachShopNightLights(group, { signColor, faceZ, h, w, windowOverlay, signBoard }) {
+  const warm = new THREE.Color(signColor);
+  const lights = [];
+
+  const windowLight = new THREE.PointLight(warm, 0, 12, 1.8);
+  windowLight.position.set(0, h * 0.38, faceZ + 0.85);
+  group.add(windowLight);
+  lights.push(windowLight);
+
+  const signLight = new THREE.PointLight(0xfff4dc, 0, 9, 1.6);
+  signLight.position.set(0, h * 0.88, faceZ + 0.95);
+  group.add(signLight);
+  lights.push(signLight);
+
+  const porchLight = new THREE.PointLight(0xffe8c0, 0, 7, 2);
+  porchLight.position.set(0, 2.4, faceZ + 0.55);
+  group.add(porchLight);
+  lights.push(porchLight);
+
+  group.userData.shopLights = lights;
+  group.userData.shopWindowMaterials = [];
+  if (windowOverlay?.material) group.userData.shopWindowMaterials.push(windowOverlay.material);
+  if (signBoard?.material) group.userData.shopWindowMaterials.push(signBoard.material);
+  return lights;
+}
+
 /**
  * Procedural storefront: full shop building + sign + display + goods.
  * Kenney shop GLBs are narrow 0.5 m props — not used as the main body.
@@ -1500,7 +1582,7 @@ function createStorefront({
   // Lit display window overlay (goods visible from the street)
   const bandH = Math.min(1.4, h * 0.35);
   const winTex = createShopWindowTexture(windowLabel, windowEmoji);
-  const winMat = createToonMaterial(0x8898a8, { map: winTex, emissive: 0x334455, emissiveIntensity: 0.45 });
+  const winMat = createToonMaterial(0x8898a8, { map: winTex, emissive: 0x557080, emissiveIntensity: 0.5 });
   const windowOverlay = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.55, bandH - 0.22), winMat);
   windowOverlay.position.set(0, bandH * 0.5 + 0.08, faceZ + 0.1);
   group.add(windowOverlay);
@@ -1509,6 +1591,9 @@ function createStorefront({
   const sign = createShopSign(labelJa, labelEn, signColor, h * 0.82);
   sign.position.set(0, 0, faceZ + 0.75);
   group.add(sign);
+  const signBoard = sign.children.find((c) => c.isMesh && !c.userData?.isOutline) ?? null;
+
+  attachShopNightLights(group, { signColor, faceZ, h, w, windowOverlay, signBoard });
 
   // Street-facing porch pad
   const porch = createSoftOutlinedMesh(
@@ -1595,28 +1680,267 @@ function createNamedShop(w, d, h, wall, roof, style, labelJa, labelEn, signColor
   return group;
 }
 
+function createStripedAwningTexture(baseColor, stripeColor = 0xffffff) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const base = `#${new THREE.Color(baseColor).getHexString()}`;
+  const stripe = `#${new THREE.Color(stripeColor).getHexString()}`;
+  for (let x = 0; x < 128; x += 16) {
+    ctx.fillStyle = (x / 16) % 2 === 0 ? base : stripe;
+    ctx.fillRect(x, 0, 16, 64);
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.08)';
+  ctx.fillRect(0, 56, 128, 8);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.repeat.set(2, 1);
+  return tex;
+}
+
+function createMarketStall({ awningColor = 0xe85050, stripeColor = 0xffffff, goods = 'produce' } = {}) {
+  const group = new THREE.Group();
+  const wood = 0xc8b098;
+  const darkWood = 0x806050;
+
+  const counter = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(1.45, 0.88, 0.92),
+    createToonMaterial(wood, { roughness: 0.88 }),
+  );
+  counter.position.y = 0.44;
+  group.add(counter);
+
+  const skirt = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(1.48, 0.12, 0.94),
+    createToonMaterial(darkWood, { roughness: 0.9 }),
+  );
+  skirt.position.y = 0.06;
+  group.add(skirt);
+
+  const back = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(1.45, 1.05, 0.07),
+    createToonMaterial(darkWood, { roughness: 0.85 }),
+  );
+  back.position.set(0, 0.98, -0.42);
+  group.add(back);
+
+  [-0.62, 0.62].forEach((x) => {
+    const post = createOutlinedMesh(
+      new THREE.CylinderGeometry(0.035, 0.045, 1.45, 6),
+      createToonMaterial(darkWood),
+    );
+    post.position.set(x, 1.28, 0.08);
+    group.add(post);
+  });
+
+  const awningTex = createStripedAwningTexture(awningColor, stripeColor);
+  const fabric = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(1.62, 0.035, 1.05),
+    createToonMaterial(0xffffff, { map: awningTex, roughness: 0.72 }),
+  );
+  fabric.position.set(0, 1.68, 0.28);
+  fabric.rotation.x = -0.24;
+  group.add(fabric);
+
+  const valance = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(1.62, 0.16, 0.04),
+    createToonMaterial(awningColor, { roughness: 0.75 }),
+  );
+  valance.position.set(0, 1.58, 0.78);
+  valance.rotation.x = -0.24;
+  group.add(valance);
+
+  if (goods === 'produce') {
+    const crate = createOutlinedMesh(new THREE.BoxGeometry(0.55, 0.28, 0.42), createToonMaterial(darkWood));
+    crate.position.set(-0.28, 0.96, 0.05);
+    group.add(crate);
+    [[-0.28, 0xc04040], [-0.1, 0xf0a030], [0.12, 0x80c060], [0.32, 0xf0d040]].forEach(([x, c], i) => {
+      const item = createOutlinedMesh(
+        new THREE.SphereGeometry(i % 2 === 0 ? 0.11 : 0.09, 8, 6),
+        createToonMaterial(c),
+      );
+      item.position.set(x, 1.12 + (i % 2) * 0.04, 0.08 + (i % 3) * 0.06);
+      group.add(item);
+    });
+    const basket = createOutlinedMesh(new THREE.CylinderGeometry(0.22, 0.18, 0.18, 8), createToonMaterial(0xa08060));
+    basket.position.set(0.38, 0.97, 0.02);
+    group.add(basket);
+  } else if (goods === 'bread') {
+    const cloth = createSoftOutlinedMesh(
+      new THREE.PlaneGeometry(0.95, 0.55),
+      createToonMaterial(0xf5ece0, { roughness: 0.95, side: THREE.DoubleSide }),
+    );
+    cloth.rotation.x = -Math.PI / 2;
+    cloth.position.set(0, 0.895, 0.02);
+    group.add(cloth);
+    [-0.28, 0, 0.3].forEach((x, i) => {
+      const loaf = createSoftOutlinedMesh(
+        new THREE.BoxGeometry(i === 2 ? 0.22 : 0.34, 0.12, 0.16),
+        createToonMaterial(i === 2 ? 0xf0d878 : 0xe8c060, { roughness: 0.7 }),
+      );
+      loaf.position.set(x, 0.98, 0.04);
+      loaf.rotation.y = (i - 1) * 0.25;
+      group.add(loaf);
+    });
+  } else if (goods === 'fish') {
+    const ice = createSoftOutlinedMesh(
+      new THREE.BoxGeometry(1.05, 0.08, 0.55),
+      createToonMaterial(0xd8eef8, { roughness: 0.35, metalness: 0.05 }),
+    );
+    ice.position.set(0, 0.92, 0.02);
+    group.add(ice);
+    [-0.25, 0.18].forEach((x, i) => {
+      const fish = createSoftOutlinedMesh(
+        new THREE.BoxGeometry(0.42, 0.1, 0.16),
+        createToonMaterial(i === 0 ? 0xb0c0d0 : 0x90a8b8, { roughness: 0.55 }),
+      );
+      fish.position.set(x, 1.02, 0.04);
+      fish.rotation.y = i === 0 ? 0.15 : -0.2;
+      group.add(fish);
+    });
+    const lemon = createOutlinedMesh(new THREE.SphereGeometry(0.07, 8, 6), createToonMaterial(0xf0e040));
+    lemon.position.set(0.42, 0.99, 0.08);
+    group.add(lemon);
+  } else if (goods === 'flowers') {
+    [-0.32, 0.32].forEach((x, i) => {
+      const pot = createOutlinedMesh(new THREE.CylinderGeometry(0.16, 0.13, 0.2, 8), createToonMaterial(0x708090));
+      pot.position.set(x, 0.98, 0.02);
+      group.add(pot);
+      const bloom = createOutlinedMesh(
+        new THREE.SphereGeometry(0.2, 8, 6),
+        createToonMaterial(i === 0 ? 0xf08090 : 0xf0c050),
+      );
+      bloom.position.set(x, 1.18, 0.02);
+      bloom.scale.set(1, 0.75, 1);
+      group.add(bloom);
+    });
+  }
+
+  const tagCanvas = document.createElement('canvas');
+  tagCanvas.width = 96;
+  tagCanvas.height = 48;
+  const tagCtx = tagCanvas.getContext('2d');
+  tagCtx.fillStyle = '#2a2420';
+  tagCtx.fillRect(0, 0, 96, 48);
+  tagCtx.fillStyle = '#f8f0e0';
+  tagCtx.font = 'bold 14px sans-serif';
+  tagCtx.textAlign = 'center';
+  tagCtx.fillText(
+    { produce: '野菜', bread: 'パン', fish: '鮮魚', flowers: '花' }[goods] ?? '出店',
+    48,
+    30,
+  );
+  const tagTex = new THREE.CanvasTexture(tagCanvas);
+  tagTex.colorSpace = THREE.SRGBColorSpace;
+  const tag = createOutlinedMesh(
+    new THREE.PlaneGeometry(0.32, 0.16),
+    createToonMaterial(0xffffff, { map: tagTex }),
+  );
+  tag.position.set(0, 1.22, -0.38);
+  group.add(tag);
+
+  return group;
+}
+
+function createMarketEntranceSign(labelJa, labelEn, boardColor = 0xe85050) {
+  const group = new THREE.Group();
+  const post = createOutlinedMesh(
+    new THREE.CylinderGeometry(0.05, 0.07, 1.55, 6),
+    createToonMaterial(0x706050),
+  );
+  post.position.y = 0.78;
+  group.add(post);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 96;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = `#${new THREE.Color(boardColor).getHexString()}`;
+  ctx.fillRect(0, 0, 256, 96);
+  ctx.strokeStyle = '#fff8f0';
+  ctx.lineWidth = 5;
+  ctx.strokeRect(6, 6, 244, 84);
+  ctx.fillStyle = '#fffef8';
+  ctx.font = 'bold 28px "Noto Sans JP", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(labelJa, 128, 42);
+  ctx.font = '16px sans-serif';
+  ctx.fillText(labelEn, 128, 72);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+
+  const board = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(1.35, 0.52, 0.06),
+    createToonMaterial(0xffffff, { map: tex }),
+  );
+  board.position.y = 1.48;
+  group.add(board);
+  return group;
+}
+
 function createMarketStalls() {
   const group = new THREE.Group();
-  const colors = [0xc04040, 0x4080a0, 0x40a060, 0xf0a030];
-  [-3.5, -1.2, 1.2, 3.5].forEach((x, i) => {
-    const stall = createOutlinedMesh(new THREE.BoxGeometry(1.6, 0.85, 1.1), createToonMaterial(0xd0c0a0));
-    stall.position.set(x, 0.42, 0);
+
+  const pad = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(9.2, 0.07, 3.8),
+    createToonMaterial(0xaca498, { roughness: 0.92 }),
+  );
+  pad.position.set(0, 0.035, -0.15);
+  group.add(pad);
+
+  const curb = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(9.4, 0.1, 0.14),
+    createToonMaterial(0x989088),
+  );
+  curb.position.set(0, 0.05, 1.72);
+  group.add(curb);
+
+  const stalls = [
+    { x: -2.85, goods: 'produce', awning: 0xe85050, stripe: 0xfff0f0 },
+    { x: -0.95, goods: 'bread', awning: 0xf0a030, stripe: 0xfff8e8 },
+    { x: 0.95, goods: 'fish', awning: 0x4080a0, stripe: 0xe8f4f8 },
+    { x: 2.85, goods: 'flowers', awning: 0xe08090, stripe: 0xfff0f4 },
+  ];
+
+  stalls.forEach(({ x, goods, awning, stripe }) => {
+    const stall = createMarketStall({ awningColor: awning, stripeColor: stripe, goods });
+    stall.position.set(x, 0, -0.05);
     group.add(stall);
-    const awning = withModel('awning', 0.45, () => (
-      createOutlinedMesh(new THREE.BoxGeometry(1.8, 0.06, 1.3), createToonMaterial(colors[i]))
-    ), { scale: 0.9, tint: colors[i], tintStrength: 0.35 });
-    awning.position.set(x, 0.95, 0.25);
-    group.add(awning);
-    const goods = createOutlinedMesh(
-      new THREE.BoxGeometry(0.45, 0.25, 0.35),
-      createToonMaterial([0xf0a040, 0xf06060, 0x80c080, 0xf0e060][i]),
-    );
-    goods.position.set(x, 0.92, 0.1);
-    group.add(goods);
   });
-  const sign = createShopSign('朝市', 'Morning Market', 0xe85050, 2.2);
-  sign.position.set(0, 0, 2.2);
+
+  const sign = createMarketEntranceSign('朝市', 'Morning Market', 0xe85050);
+  sign.position.set(0, 0, 1.55);
   group.add(sign);
+
+  [-2.85, -0.95, 0.95, 2.85].forEach((x) => {
+    const ropePost = createOutlinedMesh(
+      new THREE.CylinderGeometry(0.025, 0.03, 0.55, 5),
+      createToonMaterial(0x706050),
+    );
+    ropePost.position.set(x, 1.95, 0.55);
+    group.add(ropePost);
+  });
+  const bunting = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(6.2, 0.02, 0.02),
+    createToonMaterial(0xf0e8d8),
+  );
+  bunting.position.set(0, 2.18, 0.55);
+  group.add(bunting);
+
+  const marketLights = [];
+  stalls.forEach(({ x, awning }) => {
+    const stallLight = new THREE.PointLight(new THREE.Color(awning).lerp(new THREE.Color(0xfff0d0), 0.5), 0, 8, 1.8);
+    stallLight.position.set(x, 1.45, 0.65);
+    group.add(stallLight);
+    marketLights.push(stallLight);
+  });
+  group.userData.shopLights = marketLights;
+  // Tight collider on stall counters only — leave the street-facing apron walkable.
+  group.userData.collider = { halfW: 4.05, halfD: 0.78, offsetZ: -0.92 };
+  group.userData.placementRadius = 3.6;
+
   return group;
 }
 
@@ -1680,7 +2004,11 @@ export class Town {
     this.groundMeshes = [];
     this.animatedClouds = [];
     this.lanterns = [];
+    this.streetLampLights = [];
+    this.shopLights = [];
+    this.shopWindowMaterials = [];
     this.vendingMachines = [];
+    this._nightBlend = 0;
     this.waterMeshes = [];
     this.interactableSpawns = [];
     this.colliders = new ColliderWorld();
@@ -1718,11 +2046,80 @@ export class Town {
     this._addBoxCollider(group.position.x, group.position.z, halfW, halfD, group.rotation.y);
   }
 
+  /** Box collider aligned to a placed group; optional userData.collider tightens / offsets the hit area. */
+  _addPlacedGroupCollider(group, fallbackHalfW = 1, fallbackHalfD = 1) {
+    const custom = group.userData?.collider;
+    let halfW = fallbackHalfW;
+    let halfD = fallbackHalfD;
+    let cx = group.position.x;
+    let cz = group.position.z;
+
+    if (custom) {
+      halfW = custom.halfW ?? halfW;
+      halfD = custom.halfD ?? halfD;
+      const ox = custom.offsetX ?? 0;
+      const oz = custom.offsetZ ?? 0;
+      if (ox !== 0 || oz !== 0) {
+        const offset = new THREE.Vector3(ox, 0, oz);
+        offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), group.rotation.y);
+        cx += offset.x;
+        cz += offset.z;
+      }
+    } else {
+      const measured = measureBoxHalfExtents(group, fallbackHalfW, fallbackHalfD);
+      halfW = measured.halfW;
+      halfD = measured.halfD;
+    }
+
+    this._addBoxCollider(cx, cz, halfW, halfD, group.rotation.y);
+  }
+
   _recordSpawn(propId, position, rotationY = 0) {
     this.interactableSpawns.push({
       propId,
       position: position.clone(),
       rotationY,
+    });
+  }
+
+  _registerShopLights(root) {
+    root.traverse((obj) => {
+      if (obj.userData?.shopLights?.length) {
+        this.shopLights.push(...obj.userData.shopLights);
+      }
+      if (obj.userData?.shopWindowMaterials?.length) {
+        this.shopWindowMaterials.push(...obj.userData.shopWindowMaterials);
+      }
+    });
+  }
+
+  _createStreetLamps() {
+    const lampSpots = [];
+    for (let i = 0; i < 22; i++) {
+      lampSpots.push({
+        t: 0.04 + i * 0.043,
+        side: i % 2 === 0 ? -1 : 1,
+      });
+    }
+
+    lampSpots.forEach(({ t, side }) => {
+      const lamp = createStreetLampPost();
+      const solidR = 0.45;
+      const placement = tryPlaceWithClearance(
+        lamp, this.path, t, side, SIDWALK_PROP_OFFSET + 0.35, this._placedPositions, solidR, 'street',
+      );
+      if (!placement) return;
+
+      this.scene.add(lamp);
+      this._addCircleCollider(lamp.position.x, lamp.position.z, 0.35);
+      registerSolid(this._placedPositions, lamp.position, 0.5);
+
+      if (lamp.userData.streetLampLight) {
+        this.streetLampLights.push(lamp.userData.streetLampLight);
+      }
+      if (lamp.userData.lanternMesh) {
+        this.lanterns.push(lamp.userData.lanternMesh);
+      }
     });
   }
 
@@ -1750,6 +2147,7 @@ export class Town {
     this._createEnvironmentDetails();
     this._createClouds();
     this._createLighting();
+    this._createStreetLamps();
     onProgress?.('Ready');
   }
 
@@ -1771,13 +2169,17 @@ export class Town {
     });
 
     this.vendingMachines.forEach((vm, i) => {
-      const pulse = 0.82 + Math.sin(elapsed * 1.6 + i * 1.3) * 0.18;
+      const pulse = 0.88 + Math.sin(elapsed * 1.6 + i * 1.3) * 0.12;
+      const night = this._nightBlend ?? 0;
       if (vm.userData.vendingLight) {
-        vm.userData.vendingLight.intensity = 0.55 * pulse;
+        vm.userData.vendingLight.intensity = (0.12 + night * 1.15) * pulse;
+      }
+      if (vm.userData.vendingSpillLight) {
+        vm.userData.vendingSpillLight.intensity = (0.08 + night * 0.55) * pulse;
       }
       const glow = vm.userData.vendingGlow;
       if (glow?.material?.emissiveIntensity != null) {
-        glow.material.emissiveIntensity = 0.35 + pulse * 0.2;
+        glow.material.emissiveIntensity = 0.25 + night * 0.45 + pulse * 0.12;
       }
     });
 
@@ -2093,15 +2495,15 @@ export class Town {
 
     shops.forEach((def) => {
       const shop = def.make();
-      const solidR = measureSolidRadius(shop, 3.0);
+      const solidR = shop.userData?.placementRadius ?? measureSolidRadius(shop, 3.0);
       const placement = tryPlaceWithClearance(
         shop, this.path, def.t, def.side, def.offset, this._placedPositions, solidR,
       );
       if (!placement) return;
 
       this.scene.add(shop);
-      const { halfW, halfD } = measureBoxHalfExtents(shop, solidR, solidR * 0.85);
-      this._addBoxCollider(shop.position.x, shop.position.z, halfW, halfD, shop.rotation.y);
+      this._registerShopLights(shop);
+      this._addPlacedGroupCollider(shop, solidR, solidR * 0.85);
       this._recordSpawn(def.spawn, shop.position, shop.rotation.y);
       registerSolid(this._placedPositions, shop.position, solidR);
     });
@@ -2141,6 +2543,7 @@ export class Town {
 
     const props = [
       { t: 0.06, side: -1, type: 'vending', color: PALETTE.vending },
+      { t: 0.16, side: 1, type: 'vending', color: 0x4080a0 },
       { t: 0.20, side: 1, type: 'mailbox' },
       { t: 0.30, side: -1, type: 'dirSign' },
       { t: 0.40, side: 1, type: 'mirror' },
@@ -2149,7 +2552,7 @@ export class Town {
       { t: 0.74, side: -1, type: 'utility' },
       { t: 0.80, side: -1, type: 'utility' },
       { t: 0.86, side: 1, type: 'busStop' },
-      { t: 0.94, side: -1, type: 'vending', color: 0x4080a0 },
+      { t: 0.94, side: -1, type: 'vending', color: 0x508878 },
     ];
 
     const utilityAnchors = [];

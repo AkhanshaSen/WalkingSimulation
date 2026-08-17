@@ -47,7 +47,7 @@ export class DialogueManager {
     this.conversation = null;
     this.phase = 'greeting';
     this.pendingChoices = false;
-    this.journal = [];
+    this._chatSnippet = '';
 
     this.nextBtn.addEventListener('click', () => this.advance());
     this.approachChatBtn?.addEventListener('click', () => this._onChatClicked());
@@ -238,6 +238,7 @@ export class DialogueManager {
 
   _beginCompanion(npc) {
     this._rewardHandler?.({ type: 'companion', npc });
+    this.game?.dayJournal?.logCompanionWalk(npc.profile);
     this._showToast(`🚶 ${npc.profile.name}: "${npc.profile.walkAccept}"`);
   }
 
@@ -250,6 +251,10 @@ export class DialogueManager {
 
   _onIgnoreClicked() {
     if (this.npc) {
+      this.game?.dayJournal?.logNpcChat({
+        profile: this.npc.profile,
+        ignored: true,
+      });
       this.npc.ignoreFor(15);
       this.npc.stopApproaching();
     }
@@ -267,6 +272,7 @@ export class DialogueManager {
     }
     this.phase = 'greeting';
     this.pendingChoices = false;
+    this._chatSnippet = '';
 
     this.box.classList.remove('hidden');
     this.box.classList.add('bubble-mode');
@@ -371,8 +377,7 @@ export class DialogueManager {
 
   _applyReward(reward) {
     if (reward.type === 'journal') {
-      this.journal.push({ title: reward.title, body: reward.body, npc: this.npc.profile.name });
-      this._updateJournalUI();
+      this.game?.dayJournal?.addLegacyEntry(reward.title, reward.body, this.npc?.profile?.name);
       this._showToast(`📓 Saved to journal: ${reward.title}`);
     } else if (reward.type === 'speedBoost') {
       this._rewardHandler?.({ type: 'speedBoost', amount: reward.amount, duration: reward.duration });
@@ -396,17 +401,7 @@ export class DialogueManager {
   }
 
   _updateJournalUI() {
-    if (!this.journalList) return;
-    this.journalList.innerHTML = '';
-    if (this.journal.length === 0) {
-      this.journalList.innerHTML = '<li class="journal-empty">Talk to townspeople to collect notes.</li>';
-      return;
-    }
-    this.journal.forEach((entry) => {
-      const li = document.createElement('li');
-      li.innerHTML = `<strong>${entry.title}</strong><span>${entry.npc}</span><p>${entry.body}</p>`;
-      this.journalList.appendChild(li);
-    });
+    this.game?.dayJournal?.render(this.journalList);
   }
 
   advance() {
@@ -423,6 +418,7 @@ export class DialogueManager {
 
   _renderLine(line) {
     const p = this.npc.profile;
+    this._chatSnippet = line.text;
     this.nameEl.textContent = `${p.nameJa} · ${p.name}`;
     this.personalityEl.textContent = `${p.emoji} ${p.personality}`;
     this.textEl.textContent = line.text;
@@ -436,6 +432,9 @@ export class DialogueManager {
   }
 
   close() {
+    const closingNpc = this.npc;
+    const snippet = this._chatSnippet;
+
     this.active = false;
     this.box.classList.add('hidden');
     this.box.classList.remove('bubble-mode');
@@ -445,12 +444,17 @@ export class DialogueManager {
     this.continueHint?.classList.add('hidden');
     this.dialogueWalkBtn?.classList.add('hidden');
     this.dialogueStopWalkBtn?.classList.add('hidden');
-    if (this.npc) {
-      this.npc.hideSpeechBubble();
-      this.npc.endConversation();
-      if (!this.npc.isCompanion) this.npc = null;
+    if (closingNpc) {
+      closingNpc.hideSpeechBubble();
+      closingNpc.endConversation();
+      this.game?.dayJournal?.logNpcChat({
+        profile: closingNpc.profile,
+        snippet,
+      });
+      if (!closingNpc.isCompanion) this.npc = null;
       this.onConversationEnd?.();
     }
+    this._chatSnippet = '';
   }
 
   tryAdvanceFromKey() {
@@ -460,8 +464,7 @@ export class DialogueManager {
   }
 
   addJournalEntry(title, body, source) {
-    this.journal.push({ title, body, npc: source });
-    this._updateJournalUI();
+    this.game?.dayJournal?.addLegacyEntry(title, body, source);
     this._showToast(`📓 Saved to journal: ${title}`);
   }
 

@@ -133,6 +133,10 @@ function setupUI(game) {
   const outfitUI = new OutfitUI({
     modal: document.getElementById('outfit-modal'),
     closeBtn: document.getElementById('outfit-close'),
+    modelSlot: document.getElementById('outfit-model-slot'),
+    accentSlot: document.getElementById('outfit-accent-slot'),
+    hatSlot: document.getElementById('outfit-hat-slot'),
+    shoesSlot: document.getElementById('outfit-shoes-slot'),
     modelLabel: document.getElementById('outfit-model-label'),
     accentLabel: document.getElementById('outfit-accent-label'),
     hatLabel: document.getElementById('outfit-hat-label'),
@@ -153,10 +157,12 @@ function setupUI(game) {
   menuBtn.addEventListener('click', () => menuPanel.classList.remove('hidden'));
   closeMenu.addEventListener('click', () => menuPanel.classList.add('hidden'));
 
-  musicBtn.addEventListener('click', () => {
-    game.isMusicPlaying = !game.isMusicPlaying;
-    musicBtn.textContent = game.isMusicPlaying ? '♫' : '♪';
-    musicBtn.style.background = game.isMusicPlaying ? '#d0ecec' : '';
+  musicBtn.addEventListener('click', async () => {
+    const playing = await game.toggleMusic();
+    musicBtn.textContent = playing ? '♫' : '♪';
+    musicBtn.style.background = playing ? '#d0ecec' : '';
+    musicBtn.dataset.active = playing ? 'true' : 'false';
+    musicBtn.setAttribute('aria-label', playing ? 'Turn music off' : 'Turn music on');
   });
 
   customBtn.addEventListener('click', () => {
@@ -165,7 +171,11 @@ function setupUI(game) {
 
   document.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') {
-      if (outfitUI.isOpen()) {
+      const timePanel = document.getElementById('time-panel');
+      if (timePanel && !timePanel.classList.contains('hidden')) {
+        timePanel.classList.add('hidden');
+        document.getElementById('time-display')?.setAttribute('aria-expanded', 'false');
+      } else if (outfitUI.isOpen()) {
         outfitUI.hide();
       } else if (game.shopUI?.isOpen()) {
         game.shopUI.close();

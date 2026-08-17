@@ -315,6 +315,94 @@ body {
   font-variant-numeric: tabular-nums;
   flex: 1;
   box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+#time-display:hover {
+  background: rgba(30, 42, 54, 0.92);
+  border-color: #a8d0f0;
+}
+
+#time-panel {
+  margin-top: 0.45rem;
+  padding: 0.55rem 0.5rem 0.5rem;
+  background: rgba(14, 20, 28, 0.88);
+  border: 1.5px solid #5a8898;
+  border-radius: 8px;
+}
+
+#time-panel.hidden {
+  display: none;
+}
+
+.time-panel-label {
+  display: block;
+  font-size: 0.65rem;
+  color: #98b8c8;
+  margin-bottom: 0.35rem;
+  letter-spacing: 0.04em;
+}
+
+#time-slider {
+  width: 100%;
+  accent-color: #88c8e8;
+  margin-bottom: 0.45rem;
+}
+
+#time-presets,
+.menu-time-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.time-preset-btn {
+  border: 1.5px solid #5a8898;
+  background: rgba(255, 255, 255, 0.08);
+  color: #d8eef8;
+  border-radius: 5px;
+  padding: 0.22rem 0.45rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.time-preset-btn:hover {
+  background: rgba(136, 200, 232, 0.22);
+  border-color: #88c8e8;
+}
+
+.time-pause-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+  font-size: 0.68rem;
+  color: #a8c8d8;
+  cursor: pointer;
+}
+
+.menu-time-section {
+  margin: 1rem 0 1.1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(58, 138, 138, 0.25);
+}
+
+.menu-time-section h3 {
+  font-size: 0.92rem;
+  color: #2a4a4a;
+  margin-bottom: 0.35rem;
+}
+
+.menu-time-hint {
+  font-size: 0.75rem;
+  color: #667;
+  margin-bottom: 0.55rem;
+  line-height: 1.45;
 }
 
 #period-display {
@@ -1169,9 +1257,9 @@ body {
   padding: 1.75rem 2rem;
   border-radius: 12px;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15);
-  max-width: 420px;
-  width: 90%;
-  max-height: 70vh;
+  max-width: 520px;
+  width: 92%;
+  max-height: 72vh;
   overflow-y: auto;
 }
 
@@ -1182,12 +1270,65 @@ body {
 #journal-panel h2 {
   font-size: 1.2rem;
   color: #2a4a4a;
+  margin-bottom: 0.35rem;
+}
+
+.journal-subtitle {
+  font-size: 0.78rem;
+  color: #7a9090;
   margin-bottom: 1rem;
+  font-style: italic;
 }
 
 #journal-list {
-  list-style: none;
   margin-bottom: 1.25rem;
+}
+
+.journal-day {
+  margin-bottom: 1.35rem;
+  padding-bottom: 1.1rem;
+  border-bottom: 1px solid rgba(58, 138, 138, 0.15);
+}
+
+.journal-day:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.journal-day-head {
+  margin-bottom: 0.65rem;
+}
+
+.journal-day-head h3 {
+  font-size: 0.95rem;
+  color: #2a4a4a;
+  margin: 0 0 0.15rem;
+}
+
+.journal-day-head time {
+  font-size: 0.72rem;
+  color: #889898;
+}
+
+.journal-day-body p {
+  font-size: 0.88rem;
+  color: #3a4548;
+  line-height: 1.65;
+  margin: 0 0 0.65rem;
+  text-indent: 0.15rem;
+}
+
+.journal-day-body p:last-child {
+  margin-bottom: 0;
+}
+
+.journal-empty {
+  color: #888;
+  font-size: 0.85rem;
+  font-style: italic;
+  line-height: 1.55;
+  margin: 0;
 }
 
 #journal-list li {
@@ -1215,15 +1356,6 @@ body {
   color: #444;
   line-height: 1.5;
   margin-top: 0.35rem;
-}
-
-.journal-empty {
-  color: #888;
-  font-size: 0.85rem;
-  font-style: italic;
-  border-left: none !important;
-  background: none !important;
-  padding: 0 !important;
 }
 
 @media (max-width: 600px) {
@@ -1300,7 +1432,7 @@ body {
   width: 100%;
 }
 
-/* ── Outfit customizer (reference arrows) ─────────────────────────── */
+/* ── Outfit customizer ─────────────────────────────────────────────── */
 #outfit-modal {
   pointer-events: none;
   position: fixed;
@@ -1314,10 +1446,11 @@ body {
 
 .outfit-close {
   pointer-events: auto;
-  position: absolute;
-  top: 1.2rem;
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed;
+  top: 22%;
+  right: 5.25rem;
+  left: auto;
+  transform: none;
   width: 44px;
   height: 44px;
   border: 2.5px solid #1a1a1a;
@@ -1331,29 +1464,42 @@ body {
   z-index: 22;
 }
 
+.outfit-grid {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+}
+
+.outfit-row {
+  pointer-events: none;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(10rem, 28vw, 14rem);
+  width: min(94vw, 46rem);
+}
+
+.outfit-row:first-child {
+  top: 21%;
+}
+
+.outfit-row:last-child {
+  top: 68%;
+}
+
 .outfit-slot {
   pointer-events: auto;
-  position: absolute;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.45rem;
 }
-
-.outfit-slot-left {
-  left: 1rem;
-}
-
-.outfit-slot-right {
-  right: 1rem;
-}
-
-.outfit-model { top: 28%; }
-.outfit-accent { top: 28%; }
-.outfit-hat { top: 52%; }
-.outfit-shoes { top: 52%; }
 
 .outfit-arrow {
+  flex: 0 0 auto;
   width: 44px;
   height: 44px;
   border: 2.5px solid #1a1a1a;
@@ -1363,6 +1509,7 @@ body {
   cursor: pointer;
   box-shadow: 0 3px 0 #1a1a1a;
   line-height: 1;
+  padding: 0;
 }
 
 .outfit-arrow:active {
@@ -1371,29 +1518,64 @@ body {
 }
 
 .outfit-slot-label {
+  flex: 0 0 auto;
   font-size: 0.72rem;
   font-weight: 700;
   color: #1a1a1a;
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.92);
   border: 2px solid #1a1a1a;
   border-radius: 6px;
-  padding: 0.2rem 0.5rem;
-  min-width: 4.5rem;
+  padding: 0.45rem 0.65rem;
+  min-width: 5.25rem;
   text-align: center;
+  white-space: nowrap;
 }
 
 .outfit-hint {
   pointer-events: none;
-  position: absolute;
-  bottom: 1.25rem;
+  position: fixed;
+  bottom: 5.5rem;
   left: 50%;
   transform: translateX(-50%);
+  z-index: 21;
   font-size: 0.78rem;
   color: #1a1a1a;
   background: rgba(255, 255, 255, 0.85);
   border: 2px solid #1a1a1a;
   border-radius: 8px;
   padding: 0.35rem 0.75rem;
+}
+
+@media (max-width: 720px) {
+  .outfit-row {
+    gap: clamp(7.5rem, 22vw, 10rem);
+    width: min(96vw, 36rem);
+  }
+
+  .outfit-row:first-child {
+    top: 19%;
+  }
+
+  .outfit-row:last-child {
+    top: 70%;
+  }
+
+  .outfit-slot-label {
+    min-width: 4.25rem;
+    font-size: 0.65rem;
+    padding: 0.35rem 0.45rem;
+  }
+
+  .outfit-arrow {
+    width: 38px;
+    height: 38px;
+    font-size: 0.85rem;
+  }
+
+  .outfit-close {
+    right: 4.25rem;
+    top: 18%;
+  }
 }
 
 .dialogue-choice {

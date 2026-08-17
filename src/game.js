@@ -5,7 +5,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { Town } from './town.js';
-import { Player, NPC, InputManager, setCharacterModelLoader } from './character.js';
+import { Player, NPC, InputManager, setCharacterModelLoader, markDynamicSubtree } from './character.js';
 import { NPC_PROFILES } from './npcData.js';
 import { AMBIENT_NPCS } from './ambientNpcs.js';
 import { DialogueManager } from './dialogue.js';
@@ -15,6 +15,7 @@ import { Minimap } from './minimap.js';
 import { ModelLoader } from './loaders/ModelLoader.js';
 import { MoodSystem } from './MoodSystem.js';
 import { DayNightCycle } from './DayNightCycle.js';
+import { DayJournal } from './DayJournal.js';
 import { setExpression } from './character.js';
 import { Animal } from './entities/Animal.js';
 import { setAnimalModelLoader } from './entities/animalMeshes.js';
@@ -28,6 +29,7 @@ import {
 import { SHOP_CATALOG } from './data/shopData.js';
 import { ANIMAL_DEFINITIONS } from './data/animalData.js';
 import { resolveNpcSpawnPositions, applyNpcGroupSeparation } from './npcSeparation.js';
+import { MusicManager } from './audio/MusicManager.js';
 
 function closestPointOnPath(path, point, samples = 100) {
   let closestT = 0;
@@ -90,7 +92,9 @@ export class Game {
     this.input = new InputManager(canvas);
     this.cameraTarget = new THREE.Vector3();
     this._cameraSmoothed = new THREE.Vector3();
+    this._outfitLookY = 1.95;
     this.outfitOpen = false;
+    this.music = new MusicManager();
 
     // Post-processing: FXAA anti-aliasing only — no bloom (bloom washes out labels)
     this.composer = new EffectComposer(this.renderer);
@@ -134,8 +138,7 @@ export class Game {
       game.player = new Player(game.scene, game.path);
       game.player.colliderWorld = game.town.colliders;
       game.player.walkableCurves = game.town.getWalkableCurves();
-      // Mark all character meshes as dynamic so the static freeze pass skips them
-      game.player.mesh.traverse((c) => { c.userData.dynamic = true; });
+      markDynamicSubtree(game.player.mesh);
 
       const startTangent = game.path.getTangentAt(0.05);
       game.input.cameraAngle = Math.atan2(-startTangent.x, -startTangent.z);
@@ -147,13 +150,13 @@ export class Game {
         (profile) => new NPC(game.scene, game.town.getPathForId(profile.pathId), profile),
       );
       resolveNpcSpawnPositions(game.npcs);
-      game.npcs.forEach((npc) => npc.mesh.traverse((c) => { c.userData.dynamic = true; }));
+      game.npcs.forEach((npc) => markDynamicSubtree(npc.mesh));
 
       onProgress?.('Spawning animals…');
       game.animals = ANIMAL_DEFINITIONS.map(
         (def) => new Animal(game.scene, game.town.getPathForId(def.pathId), def),
       );
-      game.animals.forEach((a) => a.mesh.traverse((c) => { c.userData.dynamic = true; }));
+      game.animals.forEach((a) => markDynamicSubtree(a.mesh));
 
       game.worldProps = [];
       for (const spawn of game.town.getInteractableSpawns()) {
@@ -181,7 +184,11 @@ export class Game {
       // ── GPU performance pass ──────────────────────────────────────────────
       // Shadow culling + static matrix freeze for non-dynamic objects.
       game.scene.traverse((obj) => {
-        if (obj.userData.dynamic) return;
+        let node = obj;
+        while (node) {
+          if (node.userData?.dynamic) return;
+          node = node.parent;
+        }
         obj.updateMatrix();
         obj.matrixAutoUpdate = false;
         if (obj.isMesh) {
@@ -201,6 +208,14 @@ export class Game {
     }
   }
 
+  get isMusicPlaying() {
+    return this.music?.isPlaying ?? false;
+  }
+
+  async toggleMusic() {
+    return this.music?.toggle() ?? false;
+  }
+
   initInteraction(dialogue, petUI, shopUI) {
     this.dialogue = dialogue;
     this.petUI = petUI;
@@ -212,7 +227,30 @@ export class Game {
     this.dayNight = new DayNightCycle(this, this.town);
     this.dayNight._applyLighting();
     this.dayNight._updateHUD();
+    this.dayNight.bindControls({
+      panel: document.getElementById('time-panel'),
+      slider: document.getElementById('time-slider'),
+      pauseCheckbox: document.getElementById('time-pause'),
+      presetButtons: document.querySelectorAll('[data-time-preset]'),
+      toggleBtn: document.getElementById('time-display'),
+    });
+
     this.locationTag = document.getElementById('location-tag');
+    this.dayJournal = new DayJournal(() => ({
+      dayKey: this.dayNight?.dayIndex ?? 1,
+      period: this.dayNight?.getPeriod?.() ?? 'morning',
+      timeLabel: this.dayNight?.formatTime?.() ?? '',
+      zone: this.locationTag?.textContent ?? 'Town',
+    }));
+    const savedDays = this.dayJournal.getDaysNewestFirst();
+    if (savedDays.length > 0) {
+      this.dayNight.dayIndex = Math.max(this.dayNight.dayIndex, savedDays[0].key);
+    }
+    this.dayJournal.onChange = () => dialogue._updateJournalUI();
+    dialogue._updateJournalUI();
+    this._lastZoneLabel = null;
+    this._journalWalkStarted = false;
+
     this.petTag = document.getElementById('pet-companion-tag');
     this.petLabel = document.getElementById('pet-companion-label');
     this.petPartBtn = document.getElementById('pet-companion-part');
@@ -319,6 +357,8 @@ export class Game {
   }
 
   openShop(shopId) {
+    const shop = this.shopUI?.catalog?.[shopId];
+    if (shop) this.dayJournal?.logShopVisit(shop);
     if (this.shopUI && shopId) this.shopUI.open(shopId);
   }
 
@@ -430,7 +470,7 @@ export class Game {
       this.clearCompanion();
       this.mood?.drain(4);
     } else if (reward.type === 'journal') {
-      this.dialogue?.addJournalEntry?.(reward.title, reward.body, '購入 · Purchase');
+      this.dayJournal?.addLegacyEntry(reward.title, reward.body, 'Purchase');
       this.mood?.boost(8, 'Memory made');
     }
   }
@@ -440,6 +480,10 @@ export class Game {
     const t = this.path.getClosestPointT(this.player.position);
     const zone = LOCATION_ZONES.find((z) => t <= z.tMax) ?? LOCATION_ZONES[LOCATION_ZONES.length - 1];
     this.locationTag.textContent = zone.label;
+    if (zone.label !== this._lastZoneLabel) {
+      this._lastZoneLabel = zone.label;
+      this.dayJournal?.logZoneVisit(zone.label);
+    }
   }
 
   _onResize() {
@@ -463,18 +507,32 @@ export class Game {
     if (!this.player) return;
 
     const playerPos = this.player.position;
-    const angle = this.input.cameraAngle;
-    const pitch = this.input.cameraPitch;
-    const dist = this.input.cameraDistance;
+    let angle = this.input.cameraAngle;
+    let pitch = this.input.cameraPitch;
+    let dist = this.input.cameraDistance;
+    let smooth = 0.22;
 
-    const shoulderY = 1.95;
-    const target = playerPos.clone().add(new THREE.Vector3(0, shoulderY, 0));
-    this.cameraTarget.lerp(target, 0.22);
+    if (this.outfitOpen) {
+      const frontAngle = this.player.facing;
+      angle = THREE.MathUtils.lerp(angle, frontAngle, 0.1);
+      pitch = THREE.MathUtils.lerp(pitch, 0.12, 0.1);
+      dist = THREE.MathUtils.lerp(dist, 6.1, 0.1);
+      this._outfitLookY = THREE.MathUtils.lerp(this._outfitLookY, 1.02, 0.1);
+      smooth = 0.14;
+      this.input.cameraAngle = angle;
+      this.input.cameraPitch = pitch;
+      this.input.cameraDistance = dist;
+    } else {
+      this._outfitLookY = THREE.MathUtils.lerp(this._outfitLookY, 1.95, 0.12);
+    }
+
+    const target = playerPos.clone().add(new THREE.Vector3(0, this._outfitLookY, 0));
+    this.cameraTarget.lerp(target, smooth);
 
     const horiz = dist * Math.cos(pitch);
     const offset = new THREE.Vector3(
       Math.sin(angle) * horiz,
-      Math.sin(pitch) * dist + dist * 0.08,
+      Math.sin(pitch) * dist + dist * 0.06,
       Math.cos(angle) * horiz,
     );
 
@@ -482,7 +540,7 @@ export class Game {
     if (this._cameraSmoothed.lengthSq() < 0.001) {
       this._cameraSmoothed.copy(desired);
     } else {
-      this._cameraSmoothed.lerp(desired, 0.22);
+      this._cameraSmoothed.lerp(desired, smooth);
     }
     this.camera.position.copy(this._cameraSmoothed);
     this.camera.lookAt(this.cameraTarget);
@@ -523,6 +581,12 @@ export class Game {
     }
 
     this.player.update(this.input, dt, this.town.getGroundMeshes());
+
+    if (!this._journalWalkStarted && this.player.velocity.length() > 0.15) {
+      this.dayJournal?.ensureWalkStarted();
+      this._journalWalkStarted = true;
+    }
+
     this.npcs.forEach((npc) => npc.update(dt, this.player.position, this.player.facing));
     applyNpcGroupSeparation(this.npcs, dt);
 
@@ -532,7 +596,12 @@ export class Game {
       ring.material.opacity = 0.5 + Math.sin(this.clock.elapsedTime * 3) * 0.3;
       ring.rotation.z += dt * 0.8;
     }
-    this.animals?.forEach((a) => a.update(dt, this.player.position, this.player.facing));
+    this.animals?.forEach((a) => a.update(
+      dt,
+      this.player.position,
+      this.player.facing,
+      this.player.velocity.length(),
+    ));
     this._updateLocationTag();
     if (this.mood) {
       this.mood.update(dt);

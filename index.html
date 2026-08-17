@@ -72,8 +72,23 @@
         <div id="minimap-info">
           <div id="location-tag">静かな町 · Town Entrance</div>
           <div id="time-row">
-            <span id="time-display">8:15 AM</span>
+            <button id="time-display" type="button" aria-expanded="false" aria-controls="time-panel" title="Set time of day">8:15 AM</button>
             <span id="period-display" data-period="morning">Morning</span>
+          </div>
+          <div id="time-panel" class="hidden" aria-label="Time of day controls">
+            <label class="time-panel-label" for="time-slider">Time of day</label>
+            <input id="time-slider" type="range" min="0" max="1439" step="15" value="495" />
+            <div id="time-presets">
+              <button type="button" class="time-preset-btn" data-time-preset="dawn">Dawn</button>
+              <button type="button" class="time-preset-btn" data-time-preset="morning">Morning</button>
+              <button type="button" class="time-preset-btn" data-time-preset="noon">Noon</button>
+              <button type="button" class="time-preset-btn" data-time-preset="evening">Evening</button>
+              <button type="button" class="time-preset-btn" data-time-preset="night">Night</button>
+            </div>
+            <label class="time-pause-label">
+              <input id="time-pause" type="checkbox" />
+              Pause clock
+            </label>
           </div>
           <div id="yen-display">💴 ¥1000</div>
           <div id="token-display">🪙 5</div>
@@ -164,25 +179,31 @@
 
       <div id="outfit-modal" class="hidden">
         <button id="outfit-close" class="outfit-close" type="button" aria-label="Close">✕</button>
-        <div class="outfit-slot outfit-slot-left outfit-model">
-          <button class="outfit-arrow outfit-prev" id="outfit-model-prev" type="button">◀</button>
-          <span class="outfit-slot-label" id="outfit-model-label">Girl A</span>
-          <button class="outfit-arrow outfit-next" id="outfit-model-next" type="button">▶</button>
-        </div>
-        <div class="outfit-slot outfit-slot-right outfit-accent">
-          <button class="outfit-arrow outfit-prev" id="outfit-accent-prev" type="button">◀</button>
-          <span class="outfit-slot-label" id="outfit-accent-label">Default</span>
-          <button class="outfit-arrow outfit-next" id="outfit-accent-next" type="button">▶</button>
-        </div>
-        <div class="outfit-slot outfit-slot-left outfit-hat">
-          <button class="outfit-arrow outfit-prev" id="outfit-hat-prev" type="button">◀</button>
-          <span class="outfit-slot-label" id="outfit-hat-label">None</span>
-          <button class="outfit-arrow outfit-next" id="outfit-hat-next" type="button">▶</button>
-        </div>
-        <div class="outfit-slot outfit-slot-right outfit-shoes">
-          <button class="outfit-arrow outfit-prev" id="outfit-shoes-prev" type="button">◀</button>
-          <span class="outfit-slot-label" id="outfit-shoes-label">Sneakers</span>
-          <button class="outfit-arrow outfit-next" id="outfit-shoes-next" type="button">▶</button>
+        <div class="outfit-grid">
+          <div class="outfit-row">
+            <div class="outfit-slot outfit-hat" id="outfit-hat-slot">
+              <button class="outfit-arrow outfit-prev" id="outfit-hat-prev" type="button">◀</button>
+              <span class="outfit-slot-label" id="outfit-hat-label">None</span>
+              <button class="outfit-arrow outfit-next" id="outfit-hat-next" type="button">▶</button>
+            </div>
+            <div class="outfit-slot outfit-accent" id="outfit-accent-slot">
+              <button class="outfit-arrow outfit-prev" id="outfit-accent-prev" type="button">◀</button>
+              <span class="outfit-slot-label" id="outfit-accent-label">Default</span>
+              <button class="outfit-arrow outfit-next" id="outfit-accent-next" type="button">▶</button>
+            </div>
+          </div>
+          <div class="outfit-row">
+            <div class="outfit-slot outfit-model" id="outfit-model-slot">
+              <button class="outfit-arrow outfit-prev" id="outfit-model-prev" type="button">◀</button>
+              <span class="outfit-slot-label" id="outfit-model-label">Girl A</span>
+              <button class="outfit-arrow outfit-next" id="outfit-model-next" type="button">▶</button>
+            </div>
+            <div class="outfit-slot outfit-shoes" id="outfit-shoes-slot">
+              <button class="outfit-arrow outfit-prev" id="outfit-shoes-prev" type="button">◀</button>
+              <span class="outfit-slot-label" id="outfit-shoes-label">Sneakers</span>
+              <button class="outfit-arrow outfit-next" id="outfit-shoes-next" type="button">▶</button>
+            </div>
+          </div>
         </div>
         <p class="outfit-hint">Use arrows to change your look</p>
       </div>
@@ -203,7 +224,8 @@
 
       <div id="journal-panel" class="hidden">
         <h2>📓 Journal</h2>
-        <ul id="journal-list"></ul>
+        <p class="journal-subtitle">Your walk, written as the day unfolds.</p>
+        <div id="journal-list"></div>
         <button id="close-journal" class="panel-btn">Close</button>
       </div>
 
@@ -229,6 +251,17 @@
           <li><kbd>Esc</kbd> — Close dialogue</li>
           <li>Mouse drag — Rotate camera</li>
         </ul>
+        <div class="menu-time-section">
+          <h3>Time of day</h3>
+          <p class="menu-time-hint">Tap the clock on the map panel, or use the controls below.</p>
+          <div id="menu-time-presets" class="menu-time-presets">
+            <button type="button" class="time-preset-btn" data-time-preset="dawn">Dawn</button>
+            <button type="button" class="time-preset-btn" data-time-preset="morning">Morning</button>
+            <button type="button" class="time-preset-btn" data-time-preset="noon">Noon</button>
+            <button type="button" class="time-preset-btn" data-time-preset="evening">Evening</button>
+            <button type="button" class="time-preset-btn" data-time-preset="night">Night</button>
+          </div>
+        </div>
         <button id="close-menu" class="panel-btn">Close</button>
       </div>
     </div>

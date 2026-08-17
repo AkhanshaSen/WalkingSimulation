@@ -9,13 +9,13 @@ const PERIOD_LABELS = {
 
 /** Key hours for sky / light colour blending (24 h). */
 const SKY_KEYS = [
-  { hour: 0,  sky: 0x1a2840, fog: 0x1a2840, hemiSky: 0x334466, hemiGround: 0x1a2830, sun: 0x6688bb, sunI: 0.12, ambient: 0x223344, ambientI: 0.35, exposure: 0.72 },
+  { hour: 0,  sky: 0x1a2840, fog: 0x1a2840, hemiSky: 0x334466, hemiGround: 0x1a2830, sun: 0x6688bb, sunI: 0.12, ambient: 0x334455, ambientI: 0.42, exposure: 0.84 },
   { hour: 5,  sky: 0x4a6888, fog: 0x5a7898, hemiSky: 0x8899bb, hemiGround: 0x5a7060, sun: 0xffb080, sunI: 0.28, ambient: 0xc8b0a0, ambientI: 0.38, exposure: 0.88 },
   { hour: 8,  sky: 0x91d3c8, fog: 0x91d3c8, hemiSky: 0x97c5dd, hemiGround: 0x91d3c8, sun: 0xfff4e8, sunI: 0.65, ambient: 0xe8ddd9, ambientI: 0.45, exposure: 1.08 },
   { hour: 12, sky: 0x98d8d0, fog: 0x98d8d0, hemiSky: 0xa0d8f0, hemiGround: 0x8ec8a8, sun: 0xfff8f0, sunI: 0.72, ambient: 0xf0ece8, ambientI: 0.48, exposure: 1.12 },
   { hour: 17, sky: 0xe8b888, fog: 0xe0b090, hemiSky: 0xf0c090, hemiGround: 0xc89878, sun: 0xff8844, sunI: 0.48, ambient: 0xf0d0b0, ambientI: 0.42, exposure: 0.98 },
-  { hour: 20, sky: 0x3a4868, fog: 0x3a4868, hemiSky: 0x556688, hemiGround: 0x2a3848, sun: 0x8899cc, sunI: 0.18, ambient: 0x445566, ambientI: 0.38, exposure: 0.78 },
-  { hour: 24, sky: 0x1a2840, fog: 0x1a2840, hemiSky: 0x334466, hemiGround: 0x1a2830, sun: 0x6688bb, sunI: 0.12, ambient: 0x223344, ambientI: 0.35, exposure: 0.72 },
+  { hour: 20, sky: 0x3a4868, fog: 0x3a4868, hemiSky: 0x556688, hemiGround: 0x2a3848, sun: 0x8899cc, sunI: 0.18, ambient: 0x445566, ambientI: 0.4, exposure: 0.82 },
+  { hour: 24, sky: 0x1a2840, fog: 0x1a2840, hemiSky: 0x334466, hemiGround: 0x1a2830, sun: 0x6688bb, sunI: 0.12, ambient: 0x334455, ambientI: 0.42, exposure: 0.84 },
 ];
 
 function lerpColor(a, b, t) {
@@ -53,12 +53,21 @@ function sampleSkyKeys(hour) {
   };
 }
 
+function computeNightBlend(hour) {
+  if (hour >= 20 || hour < 5) return 1;
+  if (hour >= 17 && hour < 20) return (hour - 17) / 3;
+  if (hour >= 5 && hour < 7) return 1 - (hour - 5) / 2;
+  return 0;
+}
+
 export class DayNightCycle {
   constructor(game, town) {
     this.game = game;
     this.town = town;
     this.minutesPerSecond = 1.5;
     this.timeMinutes = 8 * 60 + 15;
+    this.dayIndex = 1;
+    this.clockPaused = false;
     this.timeEl = document.getElementById('time-display');
     this.periodEl = document.getElementById('period-display');
   }
@@ -91,10 +100,84 @@ export class DayNightCycle {
     return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
   }
 
-  update(dt) {
-    this.timeMinutes = (this.timeMinutes + dt * this.minutesPerSecond) % (24 * 60);
+  setTimeMinutes(totalMinutes) {
+    this.timeMinutes = ((Math.round(totalMinutes) % (24 * 60)) + 24 * 60) % (24 * 60);
     this._applyLighting();
     this._updateHUD();
+    this._syncControls?.();
+  }
+
+  setTime(hour, minute = 0) {
+    this.setTimeMinutes(hour * 60 + minute);
+  }
+
+  setPreset(preset) {
+    const presets = {
+      dawn: 6 * 60,
+      morning: 9 * 60 + 15,
+      noon: 12 * 60,
+      afternoon: 15 * 60,
+      evening: 18 * 60 + 30,
+      night: 21 * 60,
+      midnight: 0,
+    };
+    if (presets[preset] != null) this.setTimeMinutes(presets[preset]);
+  }
+
+  toggleClockPaused() {
+    this.clockPaused = !this.clockPaused;
+    this._syncControls?.();
+    return this.clockPaused;
+  }
+
+  bindControls({ panel, slider, pauseCheckbox, presetButtons, toggleBtn }) {
+    this.timePanel = panel;
+    this.timeSlider = slider;
+    this.timePauseCheckbox = pauseCheckbox;
+    this.clockPaused = false;
+
+    this._syncControls = () => {
+      if (slider) slider.value = String(Math.round(this.timeMinutes));
+      if (pauseCheckbox) pauseCheckbox.checked = this.clockPaused;
+    };
+
+    toggleBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = panel?.classList.toggle('hidden') === false;
+      toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      this._syncControls();
+    });
+
+    panel?.addEventListener('click', (e) => e.stopPropagation());
+
+    slider?.addEventListener('input', () => {
+      this.setTimeMinutes(Number(slider.value));
+    });
+
+    pauseCheckbox?.addEventListener('change', () => {
+      this.clockPaused = pauseCheckbox.checked;
+    });
+
+    presetButtons?.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const preset = btn.dataset.timePreset;
+        if (preset) this.setPreset(preset);
+        this._syncControls();
+      });
+    });
+
+    this._syncControls();
+  }
+
+  update(dt) {
+    if (!this.clockPaused) {
+      const prev = this.timeMinutes;
+      this.timeMinutes = (this.timeMinutes + dt * this.minutesPerSecond) % (24 * 60);
+      if (this.timeMinutes < prev) this.dayIndex += 1;
+    }
+    this._applyLighting();
+    this._updateHUD();
+    if (!this.clockPaused) this._syncControls?.();
   }
 
   _updateHUD() {
@@ -108,11 +191,14 @@ export class DayNightCycle {
 
   _applyLighting() {
     const { scene, renderer } = this.game;
-    const lights = this.town?.lights;
+    const town = this.town;
+    const lights = town?.lights;
     if (!scene || !lights) return;
 
     const hour = this.hourFloat;
     const sample = sampleSkyKeys(hour);
+    const nightBlend = computeNightBlend(hour);
+    if (town) town._nightBlend = nightBlend;
 
     scene.background.setHex(sample.sky);
     if (scene.fog) scene.fog.color.setHex(sample.fog);
@@ -142,12 +228,42 @@ export class DayNightCycle {
       lights.fill.intensity = lerpNum(0.22, 0.5, sample.sunI / 0.72);
     }
 
-    const isNight = hour < 5 || hour >= 20;
     lights.street?.forEach((pl) => {
-      pl.intensity = isNight ? 0.55 : 0.22;
+      pl.intensity = lerpNum(0.18, 0.42, nightBlend);
     });
+
+    town?.streetLampLights?.forEach((pl) => {
+      pl.intensity = lerpNum(0, 1.18, nightBlend);
+    });
+
+    town?.shopLights?.forEach((pl, i) => {
+      const role = i % 3;
+      const peak = role === 0 ? 0.95 : role === 1 ? 0.72 : 0.55;
+      pl.intensity = lerpNum(0, peak, nightBlend);
+    });
+
+    town?.shopWindowMaterials?.forEach((mat) => {
+      if (!mat) return;
+      if (mat.userData.baseEmissiveIntensity == null) {
+        mat.userData.baseEmissiveIntensity = mat.emissiveIntensity ?? 0.5;
+      }
+      mat.emissiveIntensity = lerpNum(
+        mat.userData.baseEmissiveIntensity * 0.25,
+        mat.userData.baseEmissiveIntensity * 1.35,
+        nightBlend,
+      );
+    });
+
+    town?.lanterns?.forEach((mesh) => {
+      if (!mesh?.material) return;
+      if (mesh.userData.baseEmissiveIntensity == null) {
+        mesh.userData.baseEmissiveIntensity = mesh.material.emissiveIntensity ?? 0.35;
+      }
+      mesh.material.emissiveIntensity = lerpNum(0.08, 0.9, nightBlend);
+    });
+
     if (lights.shrine) {
-      lights.shrine.intensity = isNight ? 0.45 : 0.22;
+      lights.shrine.intensity = lerpNum(0.22, 0.55, nightBlend);
     }
 
     if (renderer) {

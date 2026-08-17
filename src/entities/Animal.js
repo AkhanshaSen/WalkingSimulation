@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { FRIEND_THRESHOLD } from '../data/animalData.js';
 import { createAnimalMesh, createNameLabel } from './animalMeshes.js';
-import { followPlayer } from './FollowerBehavior.js';
 
 let heartTexture = null;
 function getHeartTexture() {
@@ -40,7 +39,8 @@ export class Animal {
     this.idlePhase = Math.random() * Math.PI * 2;
     this.walkPhase = 0;
     this.scaredTimer = 0;
-    this.followSpeed = 3.0;
+    this.followSpeed = 3.2;
+    this.followSide = (definition.id?.length ?? 0) % 2 === 0 ? 1 : -1;
     this.range = 5;
 
     // Wander state — random target within WANDER_RADIUS of homePos
@@ -140,6 +140,7 @@ export class Animal {
   startFollowing() {
     this.state = 'following';
     this.isPetCompanion = true;
+    this._followTarget = null;
     if (this.nameLabel) this.nameLabel.visible = false;
   }
 
@@ -176,7 +177,7 @@ export class Animal {
     };
   }
 
-  update(dt, playerPos = null, playerFacing = 0) {
+  update(dt, playerPos = null, playerFacing = 0, playerSpeed = 0) {
     // ── heart particles ────────────────────────────────────────────────────
     for (let i = this.heartParticles.length - 1; i >= 0; i--) {
       const h = this.heartParticles[i];
@@ -201,45 +202,47 @@ export class Animal {
       return;
     }
 
-    // ── following player ───────────────────────────────────────────────────
+    // ── following player (walk beside, not behind) ─────────────────────────
     if (this.state === 'following' && playerPos) {
-      // Compute the ideal "behind player" position
-      const fwdX = Math.sin(playerFacing);
-      const fwdZ = Math.cos(playerFacing);
-      const desiredX = playerPos.x - fwdX * 2.2;
-      const desiredZ = playerPos.z - fwdZ * 2.2;
+      const perpX = Math.cos(playerFacing) * this.followSide;
+      const perpZ = -Math.sin(playerFacing) * this.followSide;
+      const lateral = 1.28;
+      const desiredX = playerPos.x + perpX * lateral;
+      const desiredZ = playerPos.z + perpZ * lateral;
 
-      // Lazy-initialise a smoothed target so it doesn't teleport on sharp turns
       if (!this._followTarget) {
-        this._followTarget = new THREE.Vector3(desiredX, 0, desiredZ);
+        this._followTarget = new THREE.Vector3(desiredX, GROUND_Y, desiredZ);
       } else {
-        this._followTarget.x += (desiredX - this._followTarget.x) * Math.min(1, dt * 4.0);
-        this._followTarget.z += (desiredZ - this._followTarget.z) * Math.min(1, dt * 4.0);
+        this._followTarget.x += (desiredX - this._followTarget.x) * Math.min(1, dt * 5.5);
+        this._followTarget.z += (desiredZ - this._followTarget.z) * Math.min(1, dt * 5.5);
       }
 
       const dx = this._followTarget.x - this.mesh.position.x;
       const dz = this._followTarget.z - this.mesh.position.z;
       const dist = Math.hypot(dx, dz);
+      const slotDist = 0.38;
+      const moveSpeed = Math.max(
+        this.followSpeed,
+        playerSpeed > 0.2 ? playerSpeed * 1.08 : this.followSpeed,
+      );
 
-      if (dist > 0.8) {
-        const step = Math.min(this.followSpeed * dt, dist - 0.8);
+      if (dist > slotDist) {
+        const step = Math.min(moveSpeed * dt, dist - slotDist);
         this.mesh.position.x += (dx / dist) * step;
         this.mesh.position.z += (dz / dist) * step;
-        // Face the direction of travel, not toward the player
-        const targetRot = Math.atan2(dx, dz);
+        const targetRot = dist > 1.0 ? Math.atan2(dx, dz) : playerFacing;
         const diff = ((targetRot - this.mesh.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-        this.mesh.rotation.y += diff * Math.min(1, dt * 8);
+        this.mesh.rotation.y += diff * Math.min(1, dt * 10);
 
-        this.walkPhase += dt * this.followSpeed * 4;
-        this.mesh.position.y = GROUND_Y + Math.abs(Math.sin(this.walkPhase)) * 0.05;
+        this.walkPhase += dt * moveSpeed * 5.5;
+        this.mesh.position.y = GROUND_Y + Math.abs(Math.sin(this.walkPhase)) * 0.06;
       } else {
-        // Idle behind player — face same direction as player
         const diff = ((playerFacing - this.mesh.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-        this.mesh.rotation.y += diff * Math.min(1, dt * 4);
-        this.mesh.position.y = GROUND_Y;
+        this.mesh.rotation.y += diff * Math.min(1, dt * 8);
+        this.mesh.position.y = GROUND_Y + (playerSpeed > 0.15 ? Math.abs(Math.sin(this.walkPhase += dt * moveSpeed * 5.5)) * 0.04 : 0);
       }
 
-      this._animateTail(dt, dist > 0.8 ? 6.0 : 2.5);
+      this._animateTail(dt, dist > slotDist || playerSpeed > 0.15 ? 7.0 : 3.0);
       return;
     }
 

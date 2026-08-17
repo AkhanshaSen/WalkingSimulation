@@ -83,7 +83,7 @@ export class InputManager {
       this.isDragging = false;
     });
     window.addEventListener('pointermove', (e) => {
-      if (!this.isDragging) return;
+      if (!this.isDragging || this.outfitOpen) return;
       const dx = e.clientX - this.lastPointer.x;
       const dy = e.clientY - this.lastPointer.y;
       this.cameraAngle -= dx * 0.005;
@@ -92,6 +92,7 @@ export class InputManager {
     });
 
     canvas.addEventListener('wheel', (e) => {
+      if (this.outfitOpen) return;
       this.cameraDistance = THREE.MathUtils.clamp(this.cameraDistance + e.deltaY * 0.01, 3.5, 10);
     }, { passive: true });
 
@@ -123,7 +124,7 @@ export class InputManager {
           joystick.current = { x: t.clientX, y: t.clientY };
         }
       }
-      if (this.isDragging && e.touches.length >= 1) {
+      if (this.isDragging && !this.outfitOpen && e.touches.length >= 1) {
         const t = e.touches[e.touches.length - 1];
         const dx = t.clientX - this.lastPointer.x;
         const dy = t.clientY - this.lastPointer.y;
@@ -602,6 +603,13 @@ function _applySitBlend(character, t) {
 export const MAX_DIST_FROM_PATH = 12;
 export const MAP_BOUNDS = { minX: -75, maxX: 75, minZ: -145, maxZ: 28 };
 
+export function markDynamicSubtree(root) {
+  root.traverse((node) => {
+    node.userData.dynamic = true;
+    node.matrixAutoUpdate = true;
+  });
+}
+
 export class Player {
   constructor(scene, path) {
     this.scene = scene;
@@ -613,9 +621,9 @@ export class Player {
 
     this.velocity = new THREE.Vector3();
     this.facing = 0;
-    this.walkSpeed = 3.2;
-    this.runSpeed = 6.5;
-    this.baseRunSpeed = 6.5;
+    this.walkSpeed = 2.4;
+    this.runSpeed = 5.0;
+    this.baseRunSpeed = 5.0;
     this.speedBoostTimer = 0;
     this.pathT = 0.05;
     this.raycaster = new THREE.Raycaster();
@@ -647,7 +655,7 @@ export class Player {
     this.mesh.position.copy(pos);
     this.mesh.rotation.y = rotY;
     this.mesh.userData.isJumping = wasJumping;
-    this.mesh.traverse((c) => { c.userData.dynamic = true; });
+    markDynamicSubtree(this.mesh);
     this.scene.add(this.mesh);
 
     // Re-apply headgear on the fresh mesh.

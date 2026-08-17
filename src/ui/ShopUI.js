@@ -82,6 +82,9 @@ export class ShopUI {
     }
     this._game.spendYen(item.price);
     this._game.dialogue?.showToast(`${item.emoji} ${item.nameEn} — ¥${item.price} spent!`);
+    if (this._currentShop) {
+      this._game.dayJournal?.logPurchase(this._currentShop, item);
+    }
     if (item.reward) {
       this._game._handleReward(item.reward);
     }
