@@ -2,11 +2,9 @@ import * as THREE from 'three';
 import { createToonMaterial } from './materials.js';
 
 // ── Calibration ────────────────────────────────────────────────────────────────
-// KayKit characters normalised to 2.35 m.  T-pose measurements:
-//   head bone world Y ≈ 0.972   head mesh top world Y ≈ 1.724   model scale ≈ 0.7826
-//   bone-local Y from bone origin to top of head = (1.724 - 0.972) / 0.7826 ≈ 0.961
-const H  = 0.961;   // bone-local Y at crown of head
-const IS = 1.278;   // inv model scale  →  world units to bone-local units
+// KayKit characters normalised to 1.72 m (~5′8″).
+const H  = 0.961;
+const IS = 1.745;
 
 /** Convert a desired world-space size to bone-local size. */
 const s = (w) => w * IS;

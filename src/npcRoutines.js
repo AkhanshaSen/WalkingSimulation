@@ -1,4 +1,4 @@
-import { animateCharacter } from './character.js';
+import { animateCharacter, getPathPositionWithOffset } from './character.js';
 
 export function setupNpcRoutine(npc) {
   const profile = npc.profile;
@@ -34,10 +34,13 @@ export function setupNpcRoutine(npc) {
 }
 
 export function updateNpcRoutine(npc, dt) {
-  if (npc.isTalking || npc.isCompanion || npc.state === 'following' || npc.state === 'approaching') {
-    return;
-  }
-  if (npc.playerNearby && !npc.profile.isAmbient) {
+  if (
+    npc.isTalking
+    || npc.interactionEngaged
+    || npc.isCompanion
+    || npc.state === 'following'
+    || npc.state === 'approaching'
+  ) {
     return;
   }
 
@@ -78,13 +81,16 @@ function updatePointToPoint(npc, dt) {
   // Standing pause at the current waypoint
   if (npc.patrolWait > 0) {
     npc.patrolWait -= dt;
-    npc.mesh.position.y = npc.homePos.y + Math.sin((npc.idlePhase += dt * 1.2)) * 0.01;
+    npc.idlePhase += dt * 1.2;
+    npc.mesh.position.y = 0.02 + Math.sin(npc.idlePhase) * 0.01;
     animateCharacter(npc.mesh, 0, dt);
     return;
   }
 
   const targetT = npc.patrolTs[npc.patrolIndex];
-  const target = npc.path.getPointAt(targetT);
+  const target = getPathPositionWithOffset(
+    npc.path, targetT, npc.pathSide, npc.pathOffset,
+  );
   target.y = npc.mesh.position.y;
   const reached = npc._moveToward(target, dt, npc.patrolSpeed, 0.75);
   if (reached) {
@@ -92,7 +98,9 @@ function updatePointToPoint(npc, dt) {
     npc.patrolWait = dwellSeconds(npc);
     // Face along path toward the next stop while standing
     const nextT = npc.patrolTs[npc.patrolIndex];
-    const next = npc.path.getPointAt(nextT);
+    const next = getPathPositionWithOffset(
+      npc.path, nextT, npc.pathSide, npc.pathOffset,
+    );
     npc.facePoint(next);
     animateCharacter(npc.mesh, 0, dt);
   }
@@ -110,6 +118,6 @@ function updateSit(npc, dt) {
 function updateIdle(npc, dt) {
   npc.mesh.userData.isSitting = false;
   npc.idlePhase += dt * 1.5;
-  npc.mesh.position.y = npc.homePos.y + Math.sin(npc.idlePhase) * 0.015;
+  npc.mesh.position.y = 0.02 + Math.sin(npc.idlePhase) * 0.015;
   animateCharacter(npc.mesh, 0, dt);
 }

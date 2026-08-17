@@ -143,6 +143,68 @@ export function createGrassTexture() {
   return grassTexture;
 }
 
+let soilTexture = null;
+let mulchTexture = null;
+
+/** Dark tilled soil for raised garden beds. */
+export function createSoilTexture() {
+  if (soilTexture) return soilTexture;
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#5a4030';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 180; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const r = 1 + Math.random() * 3;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = Math.random() > 0.5 ? 'rgba(40,28,20,0.35)' : 'rgba(90,65,48,0.28)';
+    ctx.fill();
+  }
+  for (let i = 0; i < 400; i++) {
+    ctx.fillStyle = `rgba(${70 + Math.random() * 30},${50 + Math.random() * 20},${35 + Math.random() * 15},0.18)`;
+    ctx.fillRect(Math.random() * size, Math.random() * size, 1, 1 + Math.random());
+  }
+  soilTexture = new THREE.CanvasTexture(canvas);
+  soilTexture.wrapS = soilTexture.wrapT = THREE.RepeatWrapping;
+  soilTexture.repeat.set(3, 3);
+  soilTexture.colorSpace = THREE.SRGBColorSpace;
+  return soilTexture;
+}
+
+/** Wood-chip mulch for shrub beds. */
+export function createMulchTexture() {
+  if (mulchTexture) return mulchTexture;
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#4a3828';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 220; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const w = 2 + Math.random() * 5;
+    const h = 1 + Math.random() * 2;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.random() * Math.PI);
+    ctx.fillStyle = Math.random() > 0.5 ? '#6a5040' : '#3a2a20';
+    ctx.fillRect(-w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+  mulchTexture = new THREE.CanvasTexture(canvas);
+  mulchTexture.wrapS = mulchTexture.wrapT = THREE.RepeatWrapping;
+  mulchTexture.repeat.set(3, 3);
+  mulchTexture.colorSpace = THREE.SRGBColorSpace;
+  return mulchTexture;
+}
+
 const vendingDisplayCache = new Map();
 
 export function createVendingDisplayTexture(accentColor = 0x5ab0a8) {

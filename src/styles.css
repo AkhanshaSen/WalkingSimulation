@@ -296,6 +296,57 @@ body {
   box-shadow: 0 2px 6px rgba(0,0,0,0.25);
 }
 
+#time-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+#time-display {
+  background: rgba(20, 28, 36, 0.82);
+  border: 1.5px solid #88b8d8;
+  padding: 0.28rem 0.6rem;
+  border-radius: 5px;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  color: #e8f4ff;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex: 1;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
+#period-display {
+  background: rgba(20, 28, 36, 0.82);
+  border: 1.5px solid #88b8d8;
+  padding: 0.28rem 0.45rem;
+  border-radius: 5px;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  color: #c8e8f8;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
+#period-display[data-period="morning"] { border-color: #f0c878; color: #ffe8b0; }
+#period-display[data-period="day"] { border-color: #88d8f0; color: #d8f4ff; }
+#period-display[data-period="evening"] { border-color: #e89868; color: #ffd8b8; }
+#period-display[data-period="night"] { border-color: #6888b8; color: #b8c8e8; }
+
+#token-display {
+  background: rgba(36, 28, 48, 0.82);
+  border: 1.5px solid #a080d0;
+  padding: 0.28rem 0.6rem;
+  border-radius: 5px;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  color: #e8d8ff;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
 /* ── Mood display ──────────────────────────────────────────────── */
 #mood-display {
   background: rgba(20, 28, 36, 0.82);

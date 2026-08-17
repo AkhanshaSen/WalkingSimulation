@@ -14,8 +14,9 @@ export const NPC_PROFILES = [
     backpackColor: 0x8060c0,
     hairColor: 0x2a2030,
     startT: 0.07,
+    pathSide: -1,
     defaultExpression: 'shy',
-    routine: 'sit',
+    routine: 'idle',
     social: {
       befriend: {
         expression: 'shy',

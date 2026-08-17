@@ -14,18 +14,20 @@ import { InteractableRegistry } from './interaction/InteractableRegistry.js';
 import { Minimap } from './minimap.js';
 import { ModelLoader } from './loaders/ModelLoader.js';
 import { MoodSystem } from './MoodSystem.js';
+import { DayNightCycle } from './DayNightCycle.js';
 import { setExpression } from './character.js';
 import { Animal } from './entities/Animal.js';
 import { setAnimalModelLoader } from './entities/animalMeshes.js';
 import {
-  createBenchProp,
   createTreeProp,
   createShrineProp,
+  createToriiProp,
   createShopProp,
   createVendingProp,
 } from './entities/WorldProp.js';
 import { SHOP_CATALOG } from './data/shopData.js';
 import { ANIMAL_DEFINITIONS } from './data/animalData.js';
+import { resolveNpcSpawnPositions, applyNpcGroupSeparation } from './npcSeparation.js';
 
 function closestPointOnPath(path, point, samples = 100) {
   let closestT = 0;
@@ -144,6 +146,7 @@ export class Game {
       ].map(
         (profile) => new NPC(game.scene, game.town.getPathForId(profile.pathId), profile),
       );
+      resolveNpcSpawnPositions(game.npcs);
       game.npcs.forEach((npc) => npc.mesh.traverse((c) => { c.userData.dynamic = true; }));
 
       onProgress?.('Spawning animals…');
@@ -155,12 +158,12 @@ export class Game {
       game.worldProps = [];
       for (const spawn of game.town.getInteractableSpawns()) {
         const { propId, position, rotationY } = spawn;
-        if (propId === 'bench') {
-          game.worldProps.push(createBenchProp(game.scene, position, rotationY));
-        } else if (propId === 'cherry_tree' || propId === 'shrine_tree') {
+        if (propId === 'cherry_tree' || propId === 'shrine_tree') {
           game.worldProps.push(createTreeProp(game.scene, position, propId));
         } else if (propId === 'shrine') {
           game.worldProps.push(createShrineProp(game.scene, position, rotationY));
+        } else if (propId === 'torii') {
+          game.worldProps.push(createToriiProp(game.scene, position, rotationY));
         } else if (propId === 'vending') {
           game.worldProps.push(createVendingProp(game.scene, position, rotationY));
         } else if (propId.startsWith('shop_')) {
@@ -205,6 +208,10 @@ export class Game {
     this.companion = null;
     this.petCompanion = null;
     this.yen = 1000;
+    this.offeringTokens = 5;
+    this.dayNight = new DayNightCycle(this, this.town);
+    this.dayNight._applyLighting();
+    this.dayNight._updateHUD();
     this.locationTag = document.getElementById('location-tag');
     this.petTag = document.getElementById('pet-companion-tag');
     this.petLabel = document.getElementById('pet-companion-label');
@@ -243,7 +250,9 @@ export class Game {
     this.petPartBtn?.addEventListener('click', () => this.clearPetCompanion());
 
     this.yenEl = document.getElementById('yen-display');
+    this.tokenEl = document.getElementById('token-display');
     this._updateYenHUD();
+    this._updateTokenHUD();
 
     const minimapCanvas = document.getElementById('minimap');
     const minimapWrap = document.getElementById('minimap-wrap');
@@ -281,6 +290,17 @@ export class Game {
     if (this.yenEl) this.yenEl.textContent = `💴 ¥${this.yen}`;
   }
 
+  spendOfferingToken(amount = 1) {
+    if (this.offeringTokens < amount) return false;
+    this.offeringTokens -= amount;
+    this._updateTokenHUD();
+    return true;
+  }
+
+  _updateTokenHUD() {
+    if (this.tokenEl) this.tokenEl.textContent = `🪙 ${this.offeringTokens}`;
+  }
+
   _updateMoodHUD() {
     if (!this.mood) return;
     const m = this.mood.getMood();
@@ -300,10 +320,6 @@ export class Game {
 
   openShop(shopId) {
     if (this.shopUI && shopId) this.shopUI.open(shopId);
-  }
-
-  playerRest(duration, position, options = {}) {
-    this.player.rest(duration, position, options);
   }
 
   _handlePetAction(animal, action) {
@@ -508,6 +524,7 @@ export class Game {
 
     this.player.update(this.input, dt, this.town.getGroundMeshes());
     this.npcs.forEach((npc) => npc.update(dt, this.player.position, this.player.facing));
+    applyNpcGroupSeparation(this.npcs, dt);
 
     // Pulse companion ring
     if (this.companion?.mesh?.userData?.companionRing) {
@@ -527,12 +544,12 @@ export class Game {
       );
     }
     this.minimap?.update();
+    this.dayNight?.update(dt);
     this.town.update(this.clock.elapsedTime);
 
-    // Follow player with sun shadow camera for sharper local shadows
+    // Keep shadow frustum on the player; sun position comes from day/night cycle
     if (this.town?.sun && this.player) {
       const pp = this.player.position;
-      this.town.sun.position.set(pp.x + 18, 28, pp.z + 12);
       this.town.sun.target.position.set(pp.x, 0, pp.z);
       this.town.sun.target.updateMatrixWorld();
     }

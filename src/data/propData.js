@@ -12,19 +12,6 @@ export function drawFortune() {
 }
 
 export const PROP_DEFINITIONS = {
-  bench: {
-    id: 'bench',
-    label: 'Bench',
-    range: 3.5,
-    actions: {
-      sit: {
-        message: 'You sit for a moment. The town feels unhurried.',
-        sitDuration: 4,
-        sitHeight: 0.40,
-      },
-    },
-  },
-
   cherry_tree: {
     id: 'cherry_tree',
     label: 'Cherry tree',
@@ -56,6 +43,14 @@ export const PROP_DEFINITIONS = {
     label: 'Shrine',
     range: 7,
     hitRadius: 2.5,
+  },
+
+  torii: {
+    id: 'torii',
+    label: 'Torii gate',
+    range: 5,
+    hitRadius: 1.6,
+    tokenCost: 1,
   },
 
   vending: {

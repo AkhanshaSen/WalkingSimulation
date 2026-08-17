@@ -4,6 +4,34 @@ import { setupNpcRoutine, updateNpcRoutine } from './npcRoutines.js';
 import { followPlayer, moveToward } from './entities/FollowerBehavior.js';
 import { attachAccessory } from './accessories.js';
 
+const NPC_SIDEWALK_OFFSET = 2.75;
+const NPC_JOG_OFFSET = 1.55;
+const NPC_NOTICE_RANGE = 12;
+
+function hashProfileId(id = '') {
+  return [...id].reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+}
+
+export function resolveNpcPathSide(profile, index = 0) {
+  if (profile.pathSide != null) return profile.pathSide;
+  return hashProfileId(profile.id) % 2 === 0 ? -1 : 1;
+}
+
+export function resolveNpcPathOffset(profile) {
+  if (profile.pathOffset != null) return profile.pathOffset;
+  const base = profile.routine === 'jog' ? NPC_JOG_OFFSET : NPC_SIDEWALK_OFFSET;
+  const jitter = (hashProfileId(profile.id) % 5) * 0.1;
+  return base + jitter;
+}
+
+export function getPathPositionWithOffset(path, t, side, offset) {
+  const pos = path.getPointAt(t);
+  const tangent = path.getTangentAt(t).normalize();
+  const perp = new THREE.Vector3(-tangent.z, 0, tangent.x).multiplyScalar(side);
+  pos.add(perp.multiplyScalar(offset));
+  return pos;
+}
+
 let _characterLoader = null;
 
 export function setCharacterModelLoader(loader) {
@@ -207,7 +235,7 @@ export function createCharacter(options = {}) {
   if (rigged) {
     if (options.nameTag) {
       const tag = createNameTag(options.nameTag, options.nameTagJa);
-      tag.position.y = 2.45;
+      tag.position.y = 1.79;
       rigged.add(tag);
     }
     rigged.add(createBlobShadow());
@@ -307,6 +335,7 @@ export function createCharacter(options = {}) {
   }
 
   group.add(createBlobShadow());
+  group.scale.setScalar(1.72 / 1.65);
   return group;
 }
 
@@ -491,7 +520,7 @@ function createNameTag(name, nameJa) {
   const texture = new THREE.CanvasTexture(canvas);
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
   const sprite = new THREE.Sprite(material);
-  sprite.position.y = 2.45;
+  sprite.position.y = 1.79;
   sprite.scale.set(1.2, 0.32, 1);
 
   const hitMaterial = new THREE.SpriteMaterial({
@@ -500,7 +529,7 @@ function createNameTag(name, nameJa) {
     depthWrite: false,
   });
   const hitArea = new THREE.Sprite(hitMaterial);
-  hitArea.position.y = 2.45;
+  hitArea.position.y = 1.79;
   hitArea.scale.set(1.8, 0.65, 1);
   hitArea.userData.isNameTagHit = true;
 
@@ -590,9 +619,6 @@ export class Player {
     this.speedBoostTimer = 0;
     this.pathT = 0.05;
     this.raycaster = new THREE.Raycaster();
-    this.restTimer = 0;
-    this.restPos = null;
-    this.restSitY = 0.01;
     this.verticalVelocity = 0;
     this.isGrounded = true;
     this.colliderWorld = null;
@@ -607,7 +633,6 @@ export class Player {
   setOutfit({ modelKey, tint, tintStrength, scale = 1 }) {
     const pos = this.mesh.position.clone();
     const rotY = this.mesh.rotation.y;
-    const wasSitting = this.mesh.userData.isSitting;
     const wasJumping = this.mesh.userData.isJumping;
     // Preserve current headgear so it survives a skin swap.
     const prevAccessoryId = this.mesh.userData.accessoryId ?? 'none';
@@ -621,7 +646,6 @@ export class Player {
     if (scale !== 1) this.mesh.scale.setScalar(scale);
     this.mesh.position.copy(pos);
     this.mesh.rotation.y = rotY;
-    this.mesh.userData.isSitting = wasSitting;
     this.mesh.userData.isJumping = wasJumping;
     this.mesh.traverse((c) => { c.userData.dynamic = true; });
     this.scene.add(this.mesh);
@@ -647,19 +671,8 @@ export class Player {
       }
     }
 
-    if (input.dialogueOpen || this.restTimer > 0 || input.outfitOpen) {
+    if (input.dialogueOpen || input.outfitOpen) {
       this.velocity.set(0, 0, 0);
-      if (this.restTimer > 0) {
-        this.restTimer -= dt;
-        this.mesh.userData.isSitting = true;
-        if (this.restPos) {
-          this.mesh.position.lerp(this.restPos, 0.08);
-          this.mesh.position.y = this.restSitY;
-        }
-        if (this.restTimer <= 0) {
-          this.mesh.userData.isSitting = false;
-        }
-      }
     } else {
       if (input.consumeKey('Space') && this.isGrounded) {
         this.verticalVelocity = 5.8;
@@ -714,14 +727,6 @@ export class Player {
     animateCharacter(this.mesh, moveSpeed, dt);
 
     this.pathT = this.path.getClosestPointT?.(this.mesh.position) ?? 0;
-  }
-
-  rest(duration, nearPos, options = {}) {
-    this.restTimer = duration;
-    this.restPos = nearPos?.clone();
-    this.restSitY = options.sitY ?? 0.01;
-    if (options.facing != null) this.mesh.rotation.y = options.facing;
-    this.velocity.set(0, 0, 0);
   }
 
   _clampToWalkableArea() {
@@ -856,7 +861,7 @@ function createSpeechBubble() {
   const sprite = new THREE.Sprite(
     new THREE.SpriteMaterial({ transparent: true, depthTest: true }),
   );
-  sprite.position.y = 2.75;
+  sprite.position.y = 2.0;
   sprite.visible = false;
   sprite.userData.mode = 'speech';
 
@@ -908,7 +913,7 @@ function createInteractPrompt() {
   const sprite = new THREE.Sprite(
     new THREE.SpriteMaterial({ map: texture, transparent: true }),
   );
-  sprite.position.y = 2.25;
+  sprite.position.y = 1.65;
   sprite.scale.set(0.28, 0.22, 1);
   sprite.visible = false;
   return sprite;
@@ -935,7 +940,7 @@ function createAlertBubble() {
   const sprite = new THREE.Sprite(
     new THREE.SpriteMaterial({ map: texture, transparent: true }),
   );
-  sprite.position.y = 2.25;
+  sprite.position.y = 1.65;
   sprite.scale.set(0.45, 0.45, 1);
   sprite.visible = false;
   return sprite;
@@ -961,7 +966,7 @@ function createWaveBubble() {
   const sprite = new THREE.Sprite(
     new THREE.SpriteMaterial({ map: texture, transparent: true }),
   );
-  sprite.position.y = 2.25;
+  sprite.position.y = 1.65;
   sprite.scale.set(0.5, 0.5, 1);
   sprite.visible = false;
   return sprite;
@@ -974,6 +979,7 @@ export class NPC {
     this.profile = profile;
     this.t = profile.startT;
     this.isTalking = false;
+    this.interactionEngaged = false;
     this.playerNearby = false;
     this.talkCount = 0;
     this.friendship = 0;
@@ -982,6 +988,8 @@ export class NPC {
     this.state = 'idle';
     this.isCompanion = false;
     this.homePos = new THREE.Vector3();
+    this.pathSide = resolveNpcPathSide(profile);
+    this.pathOffset = resolveNpcPathOffset(profile);
     this.walkSpeed = 2.8;
     this.followSpeed = 3.4;
 
@@ -1038,10 +1046,10 @@ export class NPC {
   }
 
   _placeOnPath() {
-    const pos = this.path.getPointAt(this.t);
-    const tangent = this.path.getTangentAt(this.t);
+    const pos = getPathPositionWithOffset(this.path, this.t, this.pathSide, this.pathOffset);
     this.mesh.position.copy(pos);
-    this.mesh.position.y += 0.02;
+    this.mesh.position.y = 0.02;
+    const tangent = this.path.getTangentAt(this.t);
     this.mesh.rotation.y = Math.atan2(tangent.x, tangent.z);
   }
 
@@ -1150,10 +1158,7 @@ export class NPC {
 
   setPlayerNearby(nearby, playerPos) {
     this.playerNearby = nearby && !this.isCompanion;
-    if (nearby && playerPos && !this.isTalking && !this.isCompanion) {
-      this.facePoint(playerPos);
-    }
-    if (!this.isTalking && !this.isCompanion && this.state !== 'approaching') {
+    if (!this.isTalking && !this.interactionEngaged && !this.isCompanion && this.state !== 'approaching') {
       this.alertBubble.visible = false;
       if (nearby && !this.isIgnored()) {
         this.showInteractPrompt();
@@ -1176,17 +1181,23 @@ export class NPC {
 
   endConversation() {
     this.isTalking = false;
+    this.interactionEngaged = false;
     this.hideSpeechBubble();
     if (!this.isCompanion) {
       setExpression(this.mesh, this.profile.defaultExpression);
     }
   }
 
-  facePoint(point) {
+  facePoint(point, smooth = false, dt = 0) {
     const dx = point.x - this.mesh.position.x;
     const dz = point.z - this.mesh.position.z;
     if (Math.hypot(dx, dz) > 0.01) {
-      this.mesh.rotation.y = Math.atan2(dx, dz);
+      const target = Math.atan2(dx, dz);
+      if (smooth && dt > 0) {
+        this.mesh.rotation.y = THREE.MathUtils.lerp(this.mesh.rotation.y, target, Math.min(1, dt * 10));
+      } else {
+        this.mesh.rotation.y = target;
+      }
     }
   }
 
@@ -1197,7 +1208,7 @@ export class NPC {
   update(dt, playerPos = null, playerFacing = 0) {
     if (this.isTalking) {
       animateCharacter(this.mesh, 0, dt);
-      if (playerPos) this.facePoint(playerPos);
+      if (playerPos) this.facePoint(playerPos, true, dt);
       return;
     }
 
@@ -1218,16 +1229,38 @@ export class NPC {
     }
 
     if (this.state === 'approaching' && playerPos) {
-      const reached = this._moveToward(playerPos, dt, this.walkSpeed, 2.2);
+      const slot = (hashProfileId(this.profile.id) % 8) / 8 * Math.PI * 2;
+      const target = new THREE.Vector3(
+        playerPos.x + Math.sin(slot) * 2.0,
+        this.mesh.position.y,
+        playerPos.z + Math.cos(slot) * 2.0,
+      );
+      const reached = this._moveToward(target, dt, this.walkSpeed, 0.55);
       this.waveBubble.visible = true;
       if (reached) setExpression(this.mesh, 'happy');
       return;
     }
 
-    if (this.playerNearby) {
+    if (this.interactionEngaged && playerPos) {
       animateCharacter(this.mesh, 0, dt);
-      if (playerPos) this.facePoint(playerPos);
+      this.facePoint(playerPos, true, dt);
       return;
+    }
+
+    if (
+      playerPos
+      && !this.isCompanion
+      && this.state !== 'following'
+      && this.state !== 'approaching'
+    ) {
+      const dist = this.distanceTo(playerPos);
+      if (dist < NPC_NOTICE_RANGE) {
+        this.facePoint(playerPos, true, dt);
+        this.idlePhase += dt * 1.5;
+        this.mesh.position.y = 0.02 + Math.sin(this.idlePhase) * 0.015;
+        animateCharacter(this.mesh, 0, dt);
+        return;
+      }
     }
 
     updateNpcRoutine(this, dt);

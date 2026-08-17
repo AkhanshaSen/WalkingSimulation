@@ -3,7 +3,6 @@
  * License: CC0 1.0 — https://creativecommons.org/publicdomain/zero/1.0/
  *
  * targetHeight / maxFootprint tuned to match procedural town scale (~1 unit ≈ 1 metre).
- * Kenney GLBs share Textures/colormap.png in public/models/cc0/Textures/
  */
 export const MODEL_CATALOG = {
   bench: {
@@ -26,14 +25,14 @@ export const MODEL_CATALOG = {
   },
   tree_normal: {
     file: 'tree_normal.glb',
-    targetHeight: 3.2,
-    maxFootprint: 2.2,
+    targetHeight: 5.5,
+    maxFootprint: 3.5,
     credit: 'Kenney City Kit Suburban (CC0)',
   },
   tree_cherry: {
     file: 'tree_cherry.glb',
-    targetHeight: 2.8,
-    maxFootprint: 1.8,
+    targetHeight: 4.8,
+    maxFootprint: 3.0,
     credit: 'Kenney City Kit Suburban (CC0)',
   },
   shrine: {
@@ -182,43 +181,43 @@ export const MODEL_CATALOG = {
   },
   character_female_a: {
     file: 'character_female_a.glb',
-    targetHeight: 2.35,
-    maxFootprint: 1.4,
+    targetHeight: 1.72,
+    maxFootprint: 0.9,
     rigged: true,
     credit: 'KayKit Character Pack Adventures (CC0)',
   },
   character_female_b: {
     file: 'character_female_b.glb',
-    targetHeight: 2.35,
-    maxFootprint: 1.4,
+    targetHeight: 1.72,
+    maxFootprint: 0.9,
     rigged: true,
     credit: 'KayKit Character Pack Adventures (CC0)',
   },
   character_female_c: {
     file: 'character_female_c.glb',
-    targetHeight: 2.35,
-    maxFootprint: 1.4,
+    targetHeight: 1.72,
+    maxFootprint: 0.9,
     rigged: true,
     credit: 'KayKit Character Pack Adventures (CC0)',
   },
   character_male_a: {
     file: 'character_male_a.glb',
-    targetHeight: 2.35,
-    maxFootprint: 1.4,
+    targetHeight: 1.72,
+    maxFootprint: 0.9,
     rigged: true,
     credit: 'KayKit Character Pack Adventures (CC0)',
   },
   character_male_b: {
     file: 'character_male_b.glb',
-    targetHeight: 2.35,
-    maxFootprint: 1.4,
+    targetHeight: 1.72,
+    maxFootprint: 0.9,
     rigged: true,
     credit: 'KayKit Character Pack Adventures (CC0)',
   },
   character_male_c: {
     file: 'character_male_c.glb',
-    targetHeight: 2.35,
-    maxFootprint: 1.4,
+    targetHeight: 1.72,
+    maxFootprint: 0.9,
     rigged: true,
     credit: 'KayKit Character Pack Adventures (CC0)',
   },

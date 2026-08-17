@@ -156,7 +156,7 @@ export const AMBIENT_NPCS = [
     hairColor: 0x909090,
     startT: 0.40,
     defaultExpression: 'thinking',
-    routine: 'sit',
+    routine: 'idle',
     social: {
       befriend: {
         expression: 'happy',
@@ -164,7 +164,7 @@ export const AMBIENT_NPCS = [
       },
     },
     firstMeet: {
-      greeting: { expression: 'thinking', text: 'Mm. Sit a moment, young one. I\'ve watched this street change for sixty years. The vending machines were the big revolution.' },
+      greeting: { expression: 'thinking', text: 'Mm. Slow down a moment, young one. I\'ve watched this street change for sixty years. The vending machines were the big revolution.' },
       choices: [
         { label: '"What was it like before?"', response: { expression: 'thinking', text: 'Quieter. More bicycles. Mrs. Tanaka — Haruko\'s mother — planted that cherry tree by the garden.' } },
         { label: '"Walk with me to the shrine?"', response: { expression: 'happy', text: 'Ha! You talk me into it. Lead the way — my knees need the practice.' }, reward: { type: 'friendship' }, end: true },
@@ -200,7 +200,8 @@ export const AMBIENT_NPCS = [
     shirtColor: 0xf0f0d8,
     backpackColor: 0xe08090,
     hairColor: 0x4a3020,
-    startT: 0.50,
+    startT: 0.48,
+    pathSide: -1,
     defaultExpression: 'happy',
     routine: 'work',
     social: {
@@ -248,7 +249,8 @@ export const AMBIENT_NPCS = [
     backpackColor: 0x806040,
     hairColor: 0x3a2a20,
     pathId: 'shopping',
-    startT: 0.12,
+    startT: 0.14,
+    pathSide: 1,
     defaultExpression: 'happy',
     routine: 'work',
     social: {
@@ -336,9 +338,10 @@ export const AMBIENT_NPCS = [
     backpackColor: 0x8060a0,
     hairColor: 0x2a1a30,
     pathId: 'grove',
-    startT: 0.5,
+    startT: 0.55,
+    pathSide: 1,
     defaultExpression: 'shy',
-    routine: 'sit',
+    routine: 'idle',
     social: {
       befriend: { expression: 'happy', text: 'You see the world the way I do. I\'ll paint something for you someday.' },
     },
@@ -346,7 +349,7 @@ export const AMBIENT_NPCS = [
       greeting: { expression: 'shy', text: 'Oh — I didn\'t hear you approach. I was watching the light through the cherry branches.' },
       choices: [
         { label: '"What are you painting?"', response: { expression: 'happy', text: 'The picnic blanket and mushrooms. This grove changes every hour — never the same green twice.' } },
-        { label: '"Sit together?"', response: { expression: 'shy', text: 'I\'d like that. The bench has the best view of the trees.' }, reward: { type: 'friendship' }, end: true },
+        { label: '"Can I watch you work?"', response: { expression: 'shy', text: 'I\'d like that. The light through the trees is best from here.' }, reward: { type: 'friendship' }, end: true },
       ],
     },
     revisit: {

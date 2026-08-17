@@ -40,15 +40,6 @@ export class WorldProp {
     return this.distanceTo(playerPos) <= this.range;
   }
 
-  getSitPosition(sitHeight = 0.40) {
-    const pos = this.mesh.position.clone();
-    const forward = 0.55;
-    pos.x -= Math.sin(this.mesh.rotation.y) * forward;
-    pos.z -= Math.cos(this.mesh.rotation.y) * forward;
-    pos.y = sitHeight;
-    return pos;
-  }
-
   interact(context) {
     const def = this.definition;
 
@@ -72,21 +63,29 @@ export class WorldProp {
       return;
     }
 
+    // Torii gate — pray with offering token
+    if (def.id === 'torii') {
+      const cost = def.tokenCost ?? 1;
+      if (!context.game?.spendOfferingToken(cost)) {
+        context.dialogue?._showToast('🪙 No offering tokens left. Rest and try again tomorrow.');
+        return;
+      }
+      const fortune = drawFortune();
+      context.dialogue?._showToast(`🪙⛩️ ${fortune}`);
+      context.dialogue?.addJournalEntry?.(
+        '参拝 · Prayer',
+        fortune,
+        '鳥居 · Torii Gate',
+      );
+      context.game?.mood?.boost(14, 'Peaceful prayer');
+      context.game?._updateMoodHUD?.();
+      return;
+    }
+
     // Default prop (bench, tree, etc.)
     const action = def.defaultAction ?? 'interact';
     const actionDef = def.actions?.[action];
     if (!actionDef) return;
-
-    if (actionDef.sitDuration) {
-      const sitHeight = actionDef.sitHeight ?? 0.40;
-      const sitPos = this.getSitPosition(sitHeight);
-      context.game?.playerRest?.(actionDef.sitDuration, sitPos, {
-        sitY: sitHeight,
-        facing: this.mesh.rotation.y,
-      });
-      context.game?.mood?.boost(6, 'Taking a rest');
-      context.game?._updateMoodHUD?.();
-    }
 
     context.dialogue?._showToast(actionDef.message);
 
@@ -100,11 +99,6 @@ export class WorldProp {
   }
 }
 
-export function createBenchProp(scene, position, rotationY = 0) {
-  const def = { ...PROP_DEFINITIONS.bench, defaultAction: 'sit', hitRadius: 1.4 };
-  return new WorldProp(scene, def, position, rotationY);
-}
-
 export function createTreeProp(scene, position, treeType = 'cherry_tree') {
   const def = {
     ...(PROP_DEFINITIONS[treeType] ?? PROP_DEFINITIONS.cherry_tree),
@@ -116,6 +110,11 @@ export function createTreeProp(scene, position, treeType = 'cherry_tree') {
 
 export function createShrineProp(scene, position, rotationY = 0) {
   const def = { ...PROP_DEFINITIONS.shrine };
+  return new WorldProp(scene, def, position, rotationY);
+}
+
+export function createToriiProp(scene, position, rotationY = 0) {
+  const def = { ...PROP_DEFINITIONS.torii };
   return new WorldProp(scene, def, position, rotationY);
 }
 

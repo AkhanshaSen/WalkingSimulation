@@ -100,8 +100,10 @@ export class DialogueManager {
         label = `<kbd>E</kbd> 🏪 ${def.label}`;
       } else if (def.id === 'shrine') {
         label = `<kbd>E</kbd> ⛩️ Pray at Shrine`;
-      } else if (def.id === 'bench') {
-        label = `<kbd>E</kbd> 🪑 Rest on Bench`;
+      } else if (def.id === 'torii') {
+        const tokens = this.game?.offeringTokens ?? 0;
+        const cost = def.tokenCost ?? 1;
+        label = `<kbd>E</kbd> 🪙 Pray (${cost} token${cost > 1 ? 's' : ''}) · ${tokens} left`;
       } else if (def.id === 'cherry_tree') {
         label = `<kbd>E</kbd> 🌸 Admire Cherry Tree`;
       } else if (def.id === 'shrine_tree') {
@@ -170,6 +172,7 @@ export class DialogueManager {
     this.approachModal.classList.remove('hidden');
 
     if (!isCompanion) {
+      npc.interactionEngaged = true;
       npc.onApproach(this.approachInitiated);
       npc.stopApproaching();
     }
@@ -183,6 +186,7 @@ export class DialogueManager {
     this.approachPartBtn?.classList.add('hidden');
     this.approachIgnoreBtn?.classList.remove('hidden');
     if (this.npc && !this.active) {
+      this.npc.interactionEngaged = false;
       this.npc.clearApproachBubbles();
       if (!this.npc.isCompanion) this.npc = null;
     }
