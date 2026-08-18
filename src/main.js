@@ -57,6 +57,7 @@ async function boot() {
     try {
       game.start();
       game.loadDeferredContent();
+      window.__game = game;
     } catch (error) {
       console.error('Failed to start UI:', error);
       showLoadError(`UI failed: ${error.message}. Check the browser console (F12).`);

@@ -679,7 +679,7 @@ export class Game {
       this.minimap?.update(dt);
     }
     this.dayNight?.update(dt);
-    this.town.update(this.clock.elapsedTime);
+    this.town.update(this.clock.elapsedTime, this.player?.position);
 
     // Keep shadow frustum on the player; sun position comes from day/night cycle
     if (this.town?.sun && this.player) {

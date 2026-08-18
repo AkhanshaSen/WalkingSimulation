@@ -20,6 +20,49 @@ function maybePointLight(color, intensity, distance, decay = 1.35) {
   return new THREE.PointLight(color, intensity, distance, decay);
 }
 
+function maybeStreetLampLight(color, intensity, distance, decay = 1.6) {
+  if (!PERF.useStreetLampLights && !PERF.usePointLights) return null;
+  return new THREE.PointLight(color, intensity, distance, decay);
+}
+
+let _warmGlowTex = null;
+
+/** Radial falloff — soft amber centre fading to transparent (no hard ring). */
+function getWarmGlowTexture() {
+  if (_warmGlowTex) return _warmGlowTex;
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255, 210, 150, 1)');
+  grad.addColorStop(0.28, 'rgba(255, 190, 120, 0.72)');
+  grad.addColorStop(0.55, 'rgba(255, 170, 100, 0.32)');
+  grad.addColorStop(0.78, 'rgba(255, 150, 80, 0.10)');
+  grad.addColorStop(1, 'rgba(255, 130, 60, 0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 128, 128);
+  _warmGlowTex = new THREE.CanvasTexture(canvas);
+  _warmGlowTex.colorSpace = THREE.SRGBColorSpace;
+  return _warmGlowTex;
+}
+
+function warmGlowColor(hex, warmth = 0.35) {
+  return new THREE.Color(hex).lerp(new THREE.Color(0xffa850), warmth);
+}
+
+function createWarmGlowMaterial(color = 0xffc878) {
+  return new THREE.MeshBasicMaterial({
+    map: getWarmGlowTexture(),
+    color: warmGlowColor(color),
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+}
+
 function withModel(key, targetHeight, fallback, options = {}) {
   const instance = _modelLoader?.createInstance(key, { targetHeight, ...options });
   return instance ?? fallback();
@@ -469,7 +512,7 @@ function createTorii() {
   [-0.55, 0.55].forEach((x) => {
     const chochin = createOutlinedMesh(
       new THREE.SphereGeometry(0.11, 8, 6),
-      createToonMaterial(0xfff0c8, { emissive: 0xff9020, emissiveIntensity: 0.35 }),
+      createToonMaterial(0xfff0c8, { emissive: 0xff9020, emissiveIntensity: 0.55 }),
     );
     chochin.position.set(x, 2.32, 0.1);
     group.add(chochin);
@@ -478,11 +521,14 @@ function createTorii() {
   });
 
   glowMeshes.forEach((mesh) => registerLandmarkGlowMesh(group, mesh, 0xff5818));
-  addLandmarkLight(group, 0, 2.55, 0.35, 0xffb060, 22);
-  addLandmarkLight(group, 0, 1.2, 0.85, 0xffc878, 16);
-  addLandmarkLight(group, -1.1, 0.6, 0.55, 0xffc070, 14);
-  addLandmarkLight(group, 1.1, 0.6, 0.55, 0xffc070, 14);
+  addLandmarkLight(group, 0, 2.55, 0.35, 0xffb060, 22, 2.3, 'torii');
+  addLandmarkLight(group, 0, 1.2, 0.85, 0xffc878, 16, 1.9, 'torii');
+  addLandmarkLight(group, -1.1, 0.6, 0.55, 0xffc070, 14, 1.7, 'torii');
+  addLandmarkLight(group, 1.1, 0.6, 0.55, 0xffc070, 14, 1.7, 'torii');
   addLandmarkGlowOrb(group, 0, 2.58, 0.18, 0xffc888, 0.16);
+  addLampGroundPool(group, -1.1, 0.11, 0.55, 1.8, 0xffe0a8);
+  addLampGroundPool(group, 1.1, 0.11, 0.55, 1.8, 0xffe0a8);
+  addLampGroundPool(group, 0, 0.11, 0.85, 2.4, 0xffe8b0);
 
   return group;
 }
@@ -527,7 +573,7 @@ function createLantern() {
     group.userData.lanternMesh = paper;
   }
 
-  const lampLight = maybePointLight(0xffd898, 0, 22, 1.35);
+  const lampLight = maybeStreetLampLight(0xffc070, 0, 22, 2.0);
   if (lampLight) {
     lampLight.position.set(0, 2.65, 0.15);
     group.add(lampLight);
@@ -535,12 +581,17 @@ function createLantern() {
   }
 
   const glowOrb = new THREE.Mesh(
-    new THREE.SphereGeometry(0.14, 8, 8),
-    new THREE.MeshBasicMaterial({ color: 0xffe8a8, transparent: true, opacity: 0 }),
+    new THREE.SphereGeometry(0.22, 12, 12),
+    createWarmGlowMaterial(0xffc878),
   );
   glowOrb.position.set(0, 2.65, 0.15);
   group.add(glowOrb);
   group.userData.lampGlowOrb = glowOrb;
+
+  const groundPool = addLampGroundPool(group, 0, 0.11, 0, 2.6, 0xffc878);
+  group.userData.lampGroundPool = groundPool;
+
+  recordLampSite(group, 0, 2.65, 0.15, 0xffd898, 2.6, 'street');
 
   return group;
 }
@@ -554,7 +605,49 @@ function prepareGlowMaterial(material, warm = 0xffd080) {
   }
 }
 
-function addLandmarkLight(group, x, y, z, color = 0xffc878, distance = 18) {
+const LAMP_SOFT_DEFAULTS = {
+  'shop-window': { distance: 12, decay: 1.8 },
+  'shop-sign': { distance: 9, decay: 1.6 },
+  'shop-porch': { distance: 7, decay: 2.0 },
+  street: { distance: 18, decay: 1.6 },
+  torii: { distance: 18, decay: 1.7 },
+  shrine: { distance: 16, decay: 1.7 },
+  market: { distance: 10, decay: 1.8 },
+  vending: { distance: 12, decay: 1.8 },
+  landmark: { distance: 16, decay: 1.7 },
+};
+
+function recordLampSite(group, x, y, z, color, peak, kind = null, distance = null, decay = null) {
+  const defs = kind ? LAMP_SOFT_DEFAULTS[kind] : null;
+  if (!group.userData.lampSites) group.userData.lampSites = [];
+  group.userData.lampSites.push({
+    x, y, z, color, peak, kind,
+    distance: distance ?? defs?.distance ?? 14,
+    decay: decay ?? defs?.decay ?? 1.8,
+  });
+}
+
+function addLampGroundPool(group, x, y = 0.11, z, radius = 2.2, color = 0xffc878) {
+  const pool = new THREE.Mesh(
+    new THREE.CircleGeometry(radius, 32),
+    createWarmGlowMaterial(color),
+  );
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.set(x, y, z);
+  pool.renderOrder = 2;
+  pool.material.polygonOffset = true;
+  pool.material.polygonOffsetFactor = -2;
+  pool.material.polygonOffsetUnits = -2;
+  group.add(pool);
+  if (!group.userData.lampGroundPools) group.userData.lampGroundPools = [];
+  group.userData.lampGroundPools.push(pool);
+  return pool;
+}
+
+function addLandmarkLight(group, x, y, z, color = 0xffc878, distance = 18, peak = null, kind = 'landmark') {
+  const lightPeak = peak ?? Math.min(2.6, distance * 0.11);
+  recordLampSite(group, x, y, z, color, lightPeak, kind, distance);
+
   const pl = maybePointLight(color, 0, distance, 1.35);
   if (!pl) return null;
   pl.position.set(x, y, z);
@@ -564,10 +657,22 @@ function addLandmarkLight(group, x, y, z, color = 0xffc878, distance = 18) {
   return pl;
 }
 
+function addShopGlowOrb(group, x, y, z, color, size = 0.1) {
+  const orb = new THREE.Mesh(
+    new THREE.SphereGeometry(size, 10, 10),
+    createWarmGlowMaterial(color),
+  );
+  orb.position.set(x, y, z);
+  group.add(orb);
+  if (!group.userData.shopGlowOrbs) group.userData.shopGlowOrbs = [];
+  group.userData.shopGlowOrbs.push(orb);
+  return orb;
+}
+
 function addLandmarkGlowOrb(group, x, y, z, color = 0xffe8a8, size = 0.12) {
   const orb = new THREE.Mesh(
-    new THREE.SphereGeometry(size, 8, 8),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 }),
+    new THREE.SphereGeometry(size, 10, 10),
+    createWarmGlowMaterial(color),
   );
   orb.position.set(x, y, z);
   group.add(orb);
@@ -606,13 +711,15 @@ function createMiniShrineLantern() {
     group.add(pl);
     group.userData.landmarkLight = pl;
     const orb = new THREE.Mesh(
-      new THREE.SphereGeometry(0.1, 8, 8),
-      new THREE.MeshBasicMaterial({ color: 0xffe0a0, transparent: true, opacity: 0 }),
+      new THREE.SphereGeometry(0.14, 10, 10),
+      createWarmGlowMaterial(0xffc878),
     );
     orb.position.copy(pl.position);
     group.add(orb);
     group.userData.landmarkGlowOrb = orb;
   }
+
+  recordLampSite(group, 0, 0.55, 0.08, 0xffc878, 1.85, 'shrine');
 
   return group;
 }
@@ -794,6 +901,15 @@ function decorateVendingMachine(group, color) {
   }
 
   const lightColor = new THREE.Color(color).lerp(new THREE.Color(0xfff0d0), 0.45);
+  const spillHex = 0xffe8c8;
+  recordLampSite(group, 0, 1.55, 0.65, lightColor.getHex(), 1.85, 'vending');
+  recordLampSite(group, 0, 0.35, 0.55, spillHex, 1.1, 'vending');
+
+  addLandmarkGlowOrb(group, 0, 1.55, 0.68, lightColor.getHex(), 0.11);
+  addLandmarkGlowOrb(group, 0, 0.35, 0.58, spillHex, 0.08);
+  const poolColor = lightColor.clone().lerp(new THREE.Color(0xffe8b0), 0.4).getHex();
+  addLampGroundPool(group, 0, 0.11, 0.55, 1.6, poolColor);
+
   const displayLight = maybePointLight(lightColor, 0, 14, 1.8);
   if (displayLight) {
     displayLight.position.set(0, 1.55, 0.65);
@@ -1545,12 +1661,15 @@ function createElevatedShrine() {
     group.add(lantern);
   });
 
-  addLandmarkLight(group, 0, platformY + 1.55, -0.15, 0xffd8a0, 20);
-  addLandmarkLight(group, 0, platformY + 0.85, 0.75, 0xffc878, 16);
-  addLandmarkLight(group, -1.05, platformY + 0.7, 0.45, 0xffc070, 14);
-  addLandmarkLight(group, 1.05, platformY + 0.7, 0.45, 0xffc070, 14);
-  addLandmarkLight(group, 0, platformY + 0.45, 1.05, 0xffe8b8, 18);
+  addLandmarkLight(group, 0, platformY + 1.55, -0.15, 0xffd8a0, 20, 2.4, 'shrine');
+  addLandmarkLight(group, 0, platformY + 0.85, 0.75, 0xffc878, 16, 2.0, 'shrine');
+  addLandmarkLight(group, -1.05, platformY + 0.7, 0.45, 0xffc070, 14, 1.75, 'shrine');
+  addLandmarkLight(group, 1.05, platformY + 0.7, 0.45, 0xffc070, 14, 1.75, 'shrine');
+  addLandmarkLight(group, 0, platformY + 0.45, 1.05, 0xffe8b8, 18, 2.1, 'shrine');
   addLandmarkGlowOrb(group, 0, platformY + 1.5, -0.35, 0xffe8c0, 0.18);
+  addLampGroundPool(group, -1.05, platformY + 0.05, 0.45, 1.6, 0xffe0a8);
+  addLampGroundPool(group, 1.05, platformY + 0.05, 0.45, 1.6, 0xffe0a8);
+  addLampGroundPool(group, 0, platformY + 0.05, 0.85, 2.6, 0xffe8b0);
 
   return group;
 }
@@ -1827,25 +1946,38 @@ function createShopWindowTexture(goodsLabel = 'OPEN', goodsEmoji = '🛍️', bg
 
 function attachShopNightLights(group, { signColor, faceZ, h, w, windowOverlay, signBoard }) {
   const lights = [];
+  const signWarm = new THREE.Color(signColor);
+  const warmHex = signWarm.getHex();
+  const windowWarm = signWarm.clone().lerp(new THREE.Color(0xfff0d0), 0.38);
+  const signGlowHex = 0xfff4dc;
+  const porchHex = 0xffe8c0;
+
+  recordLampSite(group, 0, h * 0.38, faceZ + 0.85, windowWarm.getHex(), 2.15, 'shop-window');
+  recordLampSite(group, 0, h * 0.88, faceZ + 0.95, signGlowHex, 1.75, 'shop-sign');
+  recordLampSite(group, 0, 2.4, faceZ + 0.55, porchHex, 1.55, 'shop-porch');
+
+  addShopGlowOrb(group, 0, h * 0.38, faceZ + 0.88, windowWarm.getHex(), 0.12);
+  addShopGlowOrb(group, 0, h * 0.88, faceZ + 0.98, signGlowHex, 0.1);
+  addShopGlowOrb(group, 0, 2.4, faceZ + 0.58, porchHex, 0.09);
+  const porchPoolColor = signWarm.clone().lerp(new THREE.Color(porchHex), 0.55).getHex();
+  addLampGroundPool(group, 0, 0.11, faceZ + 0.72, 2.0, porchPoolColor);
 
   if (PERF.usePointLights) {
-    const warm = new THREE.Color(signColor);
-
-    const windowLight = maybePointLight(warm, 0, 12, 1.8);
+    const windowLight = maybePointLight(windowWarm, 0, 12, 1.8);
     if (windowLight) {
       windowLight.position.set(0, h * 0.38, faceZ + 0.85);
       group.add(windowLight);
       lights.push(windowLight);
     }
 
-    const signLight = maybePointLight(0xfff4dc, 0, 9, 1.6);
+    const signLight = maybePointLight(signGlowHex, 0, 9, 1.6);
     if (signLight) {
       signLight.position.set(0, h * 0.88, faceZ + 0.95);
       group.add(signLight);
       lights.push(signLight);
     }
 
-    const porchLight = maybePointLight(0xffe8c0, 0, 7, 2);
+    const porchLight = maybePointLight(porchHex, 0, 7, 2);
     if (porchLight) {
       porchLight.position.set(0, 2.4, faceZ + 0.55);
       group.add(porchLight);
@@ -1855,8 +1987,16 @@ function attachShopNightLights(group, { signColor, faceZ, h, w, windowOverlay, s
 
   group.userData.shopLights = lights;
   group.userData.shopWindowMaterials = [];
-  if (windowOverlay?.material) group.userData.shopWindowMaterials.push(windowOverlay.material);
-  if (signBoard?.material) group.userData.shopWindowMaterials.push(signBoard.material);
+  if (windowOverlay?.material) {
+    windowOverlay.material.emissive = windowWarm.clone();
+    windowOverlay.material.emissiveIntensity = 0.5;
+    group.userData.shopWindowMaterials.push(windowOverlay.material);
+  }
+  if (signBoard?.material) {
+    signBoard.material.emissive = signWarm.clone().lerp(new THREE.Color(0xffffff), 0.22);
+    signBoard.material.emissiveIntensity = 0.38;
+    group.userData.shopWindowMaterials.push(signBoard.material);
+  }
   return lights;
 }
 
@@ -2274,6 +2414,14 @@ function createMarketStalls() {
       marketLights.push(stallLight);
     });
   }
+  stalls.forEach(({ x, awning }) => {
+    const stallWarm = new THREE.Color(awning).lerp(new THREE.Color(0xfff0d0), 0.5);
+    const col = stallWarm.getHex();
+    recordLampSite(group, x, 1.65, 0.85, col, 1.65, 'market');
+    addShopGlowOrb(group, x, 1.65, 0.88, col, 0.1);
+    const poolCol = stallWarm.clone().lerp(new THREE.Color(0xffe8b0), 0.35).getHex();
+    addLampGroundPool(group, x, 0.11, 0.85, 1.45, poolCol);
+  });
   group.userData.shopLights = marketLights;
   // Tight collider on stall counters only — leave the street-facing apron walkable.
   group.userData.collider = { halfW: 4.05, halfD: 0.78, offsetZ: -0.92 };
@@ -2344,6 +2492,9 @@ export class Town {
     this.lanterns = [];
     this.streetLampLights = [];
     this.lampGlowOrbs = [];
+    this.lampGroundPools = [];
+    this.lampSites = [];
+    this.nearLightPool = [];
     this.shopLights = [];
     this.shopWindowMaterials = [];
     this.vendingMachines = [];
@@ -2422,6 +2573,81 @@ export class Town {
     });
   }
 
+  _collectLampSites(root) {
+    root.updateMatrixWorld(true);
+    root.traverse((obj) => {
+      const sites = obj.userData?.lampSites;
+      if (sites?.length) {
+        for (const site of sites) {
+          const pos = new THREE.Vector3(site.x, site.y, site.z);
+          obj.localToWorld(pos);
+          this.lampSites.push({
+            position: pos,
+            color: site.color,
+            peak: site.peak ?? 2.0,
+            kind: site.kind ?? null,
+            distance: site.distance ?? 14,
+            decay: site.decay ?? 1.8,
+          });
+        }
+      }
+      const pools = obj.userData?.lampGroundPools;
+      if (pools?.length) {
+        this.lampGroundPools.push(...pools);
+      } else if (obj.userData?.lampGroundPool) {
+        this.lampGroundPools.push(obj.userData.lampGroundPool);
+      }
+    });
+  }
+
+  _createNearLightPool() {
+    if (!PERF.useNearPointLights) return;
+    const count = PERF.maxNearPointLights ?? 28;
+    for (let i = 0; i < count; i++) {
+      const pl = new THREE.PointLight(0xffc070, 0, 18, 2.0);
+      this.scene.add(pl);
+      this.nearLightPool.push(pl);
+    }
+  }
+
+  _updateNearLights(playerPos, nightBlend, dt) {
+    const lerpRate = 1 - Math.pow(0.001, dt);
+
+    if (!this.nearLightPool.length) return;
+    if (nightBlend < 0.04 || !playerPos) {
+      this.nearLightPool.forEach((pl) => {
+        pl.intensity = THREE.MathUtils.lerp(pl.intensity, 0, lerpRate);
+      });
+      return;
+    }
+
+    const maxRange = PERF.nearLightRange ?? 52;
+    const ranked = this.lampSites
+      .map((site) => ({
+        ...site,
+        dist: Math.hypot(site.position.x - playerPos.x, site.position.z - playerPos.z),
+      }))
+      .filter((site) => site.dist <= maxRange)
+      .sort((a, b) => a.dist - b.dist)
+      .slice(0, this.nearLightPool.length);
+
+    this.nearLightPool.forEach((pl, i) => {
+      const site = ranked[i];
+      if (!site) {
+        pl.intensity = THREE.MathUtils.lerp(pl.intensity, 0, lerpRate);
+        return;
+      }
+      pl.position.lerp(site.position, Math.min(1, lerpRate * 1.4));
+      pl.color.lerp(new THREE.Color(site.color), Math.min(1, lerpRate * 0.9));
+      pl.distance = site.distance;
+      pl.decay = site.decay;
+      const falloff = 1 - site.dist / maxRange;
+      const softFalloff = falloff * falloff;
+      const target = site.peak * nightBlend * (0.55 + 0.45 * softFalloff);
+      pl.intensity = THREE.MathUtils.lerp(pl.intensity, target, lerpRate);
+    });
+  }
+
   _registerShopLights(root) {
     root.traverse((obj) => {
       if (obj.userData?.shopLights?.length) {
@@ -2429,6 +2655,9 @@ export class Town {
       }
       if (obj.userData?.shopWindowMaterials?.length) {
         this.shopWindowMaterials.push(...obj.userData.shopWindowMaterials);
+      }
+      if (obj.userData?.shopGlowOrbs?.length) {
+        this.lampGlowOrbs.push(...obj.userData.shopGlowOrbs);
       }
     });
   }
@@ -2483,6 +2712,7 @@ export class Town {
       if (lamp.userData.lampGlowOrb) {
         this.lampGlowOrbs.push(lamp.userData.lampGlowOrb);
       }
+      this._collectLampSites(lamp);
       if (lamp.userData.lanternMeshes?.length) {
         this.lanterns.push(...lamp.userData.lanternMeshes);
       } else if (lamp.userData.lanternMesh) {
@@ -2524,12 +2754,19 @@ export class Town {
     this._createEnvironmentDetails();
     this._createClouds();
     this._createLighting();
+    this._createNearLightPool();
     onProgress?.('Ready');
+    if (import.meta.env.DEV) {
+      console.info(`[Town] ${this.lampSites.length} lamp sites, ${this.lampGroundPools.length} ground pools`);
+    }
   }
 
-  update(elapsed) {
+  update(elapsed, playerPos = null) {
     const dt = Math.min(elapsed - (this._lastElapsed ?? elapsed), 0.05);
     this._lastElapsed = elapsed;
+
+    const night = this._nightBlend ?? 0;
+    this._updateNearLights(playerPos, night, dt);
 
     this.animatedClouds.forEach((cloud) => {
       cloud.position.x += Math.sin(elapsed * cloud.userData.driftSpeed + cloud.userData.driftPhase) * 0.003;
@@ -2544,12 +2781,17 @@ export class Town {
       lantern.material.color.copy(lantern.userData.baseColor).multiplyScalar(pulse);
     });
 
-    const night = this._nightBlend ?? 0;
     this.lampGlowOrbs.forEach((orb, i) => {
       if (!orb?.material) return;
-      const pulse = 0.82 + Math.sin(elapsed * 2.4 + i) * 0.18;
-      orb.material.opacity = night * 0.72 * pulse;
-      orb.scale.setScalar(0.85 + night * 0.35 * pulse);
+      const pulse = 0.86 + Math.sin(elapsed * 2.4 + i) * 0.14;
+      orb.material.opacity = night * 0.52 * pulse;
+      orb.scale.setScalar(0.95 + night * 0.45 * pulse);
+    });
+
+    this.lampGroundPools.forEach((pool, i) => {
+      if (!pool?.material) return;
+      const pulse = 0.9 + Math.sin(elapsed * 2.1 + i * 0.7) * 0.1;
+      pool.material.opacity = night * 0.5 * pulse;
     });
 
     this.vendingMachines.forEach((vm, i) => {
@@ -2858,6 +3100,7 @@ export class Town {
       this.scene.add(item);
       this._registerLandmarkLighting(item);
       this._registerShopLights(item);
+      this._collectLampSites(item);
       const { halfW, halfD } = measureBoxHalfExtents(item, def.halfW ?? solidR, def.halfD ?? solidR);
       if (def.radius != null) {
         this._addCircleCollider(item.position.x, item.position.z, def.radius);
@@ -2935,6 +3178,7 @@ export class Town {
 
       this.scene.add(shop);
       this._registerShopLights(shop);
+      this._collectLampSites(shop);
       this._addPlacedGroupCollider(shop, solidR, solidR * 0.85);
       this._recordSpawn(def.spawn, shop.position, shop.rotation.y);
       registerSolid(this._placedPositions, shop.position, solidR);
@@ -3030,6 +3274,7 @@ export class Town {
 
       if (type === 'vending') {
         this.vendingMachines.push(prop);
+        this._collectLampSites(prop);
         this._recordSpawn('vending', prop.position, prop.rotation.y);
       }
 

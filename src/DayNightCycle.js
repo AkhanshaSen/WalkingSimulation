@@ -15,8 +15,8 @@ const SKY_KEYS = [
   { hour: 8,  sky: 0x91d3c8, fog: 0x91d3c8, hemiSky: 0x97c5dd, hemiGround: 0x91d3c8, sun: 0xfff4e8, sunI: 0.65, ambient: 0xe8ddd9, ambientI: 0.45, exposure: 1.08 },
   { hour: 12, sky: 0x98d8d0, fog: 0x98d8d0, hemiSky: 0xa0d8f0, hemiGround: 0x8ec8a8, sun: 0xfff8f0, sunI: 0.72, ambient: 0xf0ece8, ambientI: 0.48, exposure: 1.12 },
   { hour: 17, sky: 0xe8b888, fog: 0xe0b090, hemiSky: 0xf0c090, hemiGround: 0xc89878, sun: 0xff8844, sunI: 0.48, ambient: 0xf0d0b0, ambientI: 0.42, exposure: 0.98 },
-  { hour: 20, sky: 0x3a4868, fog: 0x3a4868, hemiSky: 0x556688, hemiGround: 0x2a3848, sun: 0x8899cc, sunI: 0.18, ambient: 0x445566, ambientI: 0.4, exposure: 0.82 },
-  { hour: 24, sky: 0x1a2840, fog: 0x1a2840, hemiSky: 0x334466, hemiGround: 0x1a2830, sun: 0x6688bb, sunI: 0.12, ambient: 0x334455, ambientI: 0.42, exposure: 0.84 },
+  { hour: 20, sky: 0x3a4868, fog: 0x3a4868, hemiSky: 0x556688, hemiGround: 0x3a4858, sun: 0x8899cc, sunI: 0.18, ambient: 0x556677, ambientI: 0.52, exposure: 0.92 },
+  { hour: 24, sky: 0x1a2840, fog: 0x1a2840, hemiSky: 0x334466, hemiGround: 0x2a3848, sun: 0x6688bb, sunI: 0.12, ambient: 0x445566, ambientI: 0.48, exposure: 0.88 },
 ];
 
 function lerpColor(a, b, t) {
@@ -262,29 +262,42 @@ export class DayNightCycle {
     if (town) town._nightBlend = nightBlend;
 
     scene.background.setHex(sample.sky);
-    if (scene.fog) scene.fog.color.setHex(sample.fog);
+    if (scene.fog) {
+      const fogColor = new THREE.Color(sample.fog);
+      fogColor.lerp(new THREE.Color(0x3a4868), nightBlend * 0.18);
+      scene.fog.color.copy(fogColor);
+      if (scene.fog.isFog) {
+        scene.fog.near = lerpNum(34, 26, nightBlend);
+        scene.fog.far = lerpNum(90, 78, nightBlend);
+      }
+    }
 
     if (lights.hemi) {
       lights.hemi.color.setHex(sample.hemiSky);
-      lights.hemi.groundColor.setHex(sample.hemiGround);
-      lights.hemi.intensity = lerpNum(0.9, 1.35, sample.sunI / 0.72);
+      const ground = new THREE.Color(sample.hemiGround);
+      ground.lerp(new THREE.Color(0xffe8d0), nightBlend * 0.28);
+      lights.hemi.groundColor.copy(ground);
+      lights.hemi.intensity = lerpNum(0.9, 1.35, sample.sunI / 0.72) + nightBlend * 0.38;
     }
     if (lights.ambient) {
-      lights.ambient.color.setHex(sample.ambient);
-      lights.ambient.intensity = sample.ambientI;
+      const amb = new THREE.Color(sample.ambient);
+      amb.lerp(new THREE.Color(0xffe8d8), nightBlend * 0.32);
+      lights.ambient.color.copy(amb);
+      lights.ambient.intensity = sample.ambientI + nightBlend * 0.14;
     }
     if (lights.fill) {
       lights.fill.intensity = lerpNum(0.22, 0.5, sample.sunI / 0.72);
     }
 
     const usePointLights = this.game?.perf?.usePointLights ?? false;
+    const useStreetLamps = usePointLights || (this.game?.perf?.useStreetLampLights ?? false);
     const streetIntensity = usePointLights ? lerpNum(0.18, 0.42, nightBlend) : 0;
     lights.street?.forEach((pl) => {
       pl.intensity = streetIntensity;
     });
 
     town?.streetLampLights?.forEach((pl) => {
-      pl.intensity = usePointLights ? lerpNum(0, 2.4, nightBlend) : 0;
+      pl.intensity = useStreetLamps ? lerpNum(0, 1.35, nightBlend) : 0;
     });
 
     town?.shopLights?.forEach((pl) => {
@@ -293,25 +306,33 @@ export class DayNightCycle {
 
     town?.shopWindowMaterials?.forEach((mat) => {
       if (!mat) return;
+      if (mat.userData.baseEmissive == null && mat.emissive) {
+        mat.userData.baseEmissive = mat.emissive.clone();
+      }
       if (mat.userData.baseEmissiveIntensity == null) {
         mat.userData.baseEmissiveIntensity = mat.emissiveIntensity ?? 0.5;
       }
+      if (mat.userData.baseEmissive) mat.emissive.copy(mat.userData.baseEmissive);
       mat.emissiveIntensity = lerpNum(
-        mat.userData.baseEmissiveIntensity * 0.25,
-        mat.userData.baseEmissiveIntensity * 1.55,
+        mat.userData.baseEmissiveIntensity * 0.28,
+        mat.userData.baseEmissiveIntensity * 1.5,
         nightBlend,
       );
     });
 
     town?.lanterns?.forEach((mesh) => {
       if (!mesh?.material) return;
-      if (!mesh.material.emissive || mesh.material.emissive.getHex() === 0x000000) {
-        mesh.material.emissive = new THREE.Color(0xffc868);
+      if (mesh.userData.baseEmissive == null) {
+        if (!mesh.material.emissive || mesh.material.emissive.getHex() === 0x000000) {
+          mesh.material.emissive = new THREE.Color(0xffc868);
+        }
+        mesh.userData.baseEmissive = mesh.material.emissive.clone();
       }
       if (mesh.userData.baseEmissiveIntensity == null) {
         mesh.userData.baseEmissiveIntensity = mesh.material.emissiveIntensity || 0.35;
       }
-      mesh.material.emissiveIntensity = lerpNum(0.15, 1.65, nightBlend);
+      mesh.material.emissive.copy(mesh.userData.baseEmissive);
+      mesh.material.emissiveIntensity = lerpNum(0.1, 1.15, nightBlend);
     });
 
     if (lights.shrine) {
@@ -319,7 +340,7 @@ export class DayNightCycle {
     }
 
     if (renderer) {
-      renderer.toneMappingExposure = sample.exposure;
+      renderer.toneMappingExposure = sample.exposure + nightBlend * 0.08;
     }
 
     this._updateSkyGradient(sample);

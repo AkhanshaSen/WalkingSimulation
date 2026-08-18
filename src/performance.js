@@ -31,12 +31,18 @@ export function getPerformanceProfile() {
     /** Cap device pixel ratio — full Retina + post-FX is the main live-site killer. */
     dprMax: lowEnd ? 1.15 : 1.5,
     shadowMapSize: lowEnd ? 512 : 1024,
-    softShadows: false,
+    softShadows: !lowEnd,
     /** EffectComposer + OutputPass + FXAA ≈ 3 full-screen passes per frame. */
     usePostProcessing: false,
     minimapUpdateInterval: lowEnd ? 0.12 : 0.066,
-    /** Point lights are expensive — use emissive windows/lanterns instead. */
+    /** ~22 street-lamp point lights — cheap and gives soft spill on the whole street. */
+    useStreetLampLights: true,
+    /** Point lights are expensive — shops/shrine use near-light pool instead. */
     usePointLights: false,
+    /** Small pool of point lights follow nearest lamps — looks like before, stays fast. */
+    useNearPointLights: true,
+    maxNearPointLights: lowEnd ? 12 : 28,
+    nearLightRange: lowEnd ? 36 : 52,
     pathLocalSearchSteps: 14,
     pathLocalSearchSpan: 0.09,
     /** GLB props: outlines double draw calls — skip on static Kenney assets. */
