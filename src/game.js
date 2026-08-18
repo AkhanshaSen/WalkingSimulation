@@ -33,6 +33,7 @@ import { ANIMAL_DEFINITIONS } from './data/animalData.js';
 import { resolveNpcSpawnPositions, applyNpcGroupSeparation } from './npcSeparation.js';
 import { MusicManager } from './audio/MusicManager.js';
 import { PERF, BOOT_MODEL_KEYS } from './performance.js';
+import { nextFrame } from './materials.js';
 
 function closestPointOnPath(path, point, samples = 100) {
   let closestT = 0;
@@ -692,6 +693,10 @@ export class Game {
   }
 
   warmUpGPU() {
+    return this._warmUpGPUAsync();
+  }
+
+  async _warmUpGPUAsync() {
     if (!this.ready) return;
     if (this.town?.sun && this.player) {
       const pp = this.player.position;
@@ -699,43 +704,56 @@ export class Game {
       this.town.sun.target.updateMatrixWorld();
     }
     this._updateCamera();
-    this.renderer.compile(this.scene, this.camera);
+    if (!this.perf.skipShaderCompile) {
+      this.renderer.compile(this.scene, this.camera);
+    }
     const frames = this.perf.warmupFrames ?? 2;
     for (let i = 0; i < frames; i++) {
       this.render();
+      await nextFrame();
     }
-    this.minimap?.update(0);
   }
 
   async loadDeferredContent() {
     if (!this.modelLoader || this._deferredLoading) return;
     this._deferredLoading = true;
     try {
+      const delay = this.perf.deferredLoadDelayMs ?? 2000;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+
       await this.modelLoader.loadRemaining();
+      await nextFrame();
+
+      if (this.town && PERF.deferGardens && !this.town._gardensBuilt) {
+        this.town._createGardens();
+        this.town._gardensBuilt = true;
+        await nextFrame();
+      }
+
       if (this._ambientPending) {
-        const ambient = AMBIENT_NPCS.map((profile) => ({ ...profile, isAmbient: true })).map(
-          (profile) => new NPC(this.scene, this.town.getPathForId(profile.pathId), profile),
-        );
-        this.npcs.push(...ambient);
-        resolveNpcSpawnPositions(this.npcs);
-        ambient.forEach((npc) => {
+        const profiles = AMBIENT_NPCS.map((profile) => ({ ...profile, isAmbient: true }));
+        for (const profile of profiles) {
+          const npc = new NPC(this.scene, this.town.getPathForId(profile.pathId), profile);
+          this.npcs.push(npc);
           markDynamicSubtree(npc.mesh);
           npc.mesh.traverse((c) => { if (c.isMesh) c.castShadow = true; });
-        });
-        this.interactables.registerAll(ambient);
+          this.interactables.register(npc);
+          if (this.npcs.length % 2 === 0) await nextFrame();
+        }
+        resolveNpcSpawnPositions(this.npcs);
         this.minimap?.setNpcs(this.npcs);
         this._ambientPending = false;
       }
 
       if (this.animals.length === 0) {
-        this.animals = ANIMAL_DEFINITIONS.map(
-          (def) => new Animal(this.scene, this.town.getPathForId(def.pathId), def),
-        );
-        this.animals.forEach((a) => {
-          markDynamicSubtree(a.mesh);
-          a.mesh.traverse((c) => { if (c.isMesh) c.castShadow = true; });
-        });
-        this.interactables.registerAll(this.animals);
+        for (const def of ANIMAL_DEFINITIONS) {
+          const animal = new Animal(this.scene, this.town.getPathForId(def.pathId), def);
+          this.animals.push(animal);
+          markDynamicSubtree(animal.mesh);
+          animal.mesh.traverse((c) => { if (c.isMesh) c.castShadow = true; });
+          this.interactables.register(animal);
+          if (this.animals.length % 3 === 0) await nextFrame();
+        }
         this.minimap?.setAnimals(this.animals);
       }
     } catch (error) {

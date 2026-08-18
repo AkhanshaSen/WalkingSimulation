@@ -47,10 +47,15 @@ export function getPerformanceProfile() {
     npcSeparationPasses: lowEnd ? 1 : 2,
     /** Off-screen renders before hiding the loading screen (shader compile). */
     warmupFrames: lowEnd ? 2 : 3,
+    /** compile() walks the whole scene synchronously — skip on low-end. */
+    skipShaderCompile: lowEnd,
     /** Procedural grass blade rects — 0 = mottling only. */
     grassBladeCount: lowEnd ? 0 : 350,
     /** Spawn ambient NPCs + animals after first frames. */
     deferAmbientContent: true,
+    /** Gardens are hundreds of meshes — build after gameplay starts. */
+    deferGardens: true,
+    deferredLoadDelayMs: lowEnd ? 3000 : 2000,
     interactionUpdateInterval: 0.1,
   };
 }

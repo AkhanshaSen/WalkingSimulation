@@ -15,6 +15,11 @@ function setTownModelLoader(loader) {
   _modelLoader = loader;
 }
 
+function maybePointLight(color, intensity, distance, decay = 1.35) {
+  if (!PERF.usePointLights) return null;
+  return new THREE.PointLight(color, intensity, distance, decay);
+}
+
 function withModel(key, targetHeight, fallback, options = {}) {
   const instance = _modelLoader?.createInstance(key, { targetHeight, ...options });
   return instance ?? fallback();
@@ -522,16 +527,18 @@ function createLantern() {
     group.userData.lanternMesh = paper;
   }
 
-  const lampLight = new THREE.PointLight(0xffd898, 0, 22, 1.35);
-  lampLight.position.set(0, 2.65, 0.15);
-  group.add(lampLight);
-  group.userData.streetLampLight = lampLight;
+  const lampLight = maybePointLight(0xffd898, 0, 22, 1.35);
+  if (lampLight) {
+    lampLight.position.set(0, 2.65, 0.15);
+    group.add(lampLight);
+    group.userData.streetLampLight = lampLight;
+  }
 
   const glowOrb = new THREE.Mesh(
     new THREE.SphereGeometry(0.14, 8, 8),
     new THREE.MeshBasicMaterial({ color: 0xffe8a8, transparent: true, opacity: 0 }),
   );
-  glowOrb.position.copy(lampLight.position);
+  glowOrb.position.set(0, 2.65, 0.15);
   group.add(glowOrb);
   group.userData.lampGlowOrb = glowOrb;
 
@@ -548,7 +555,8 @@ function prepareGlowMaterial(material, warm = 0xffd080) {
 }
 
 function addLandmarkLight(group, x, y, z, color = 0xffc878, distance = 18) {
-  const pl = new THREE.PointLight(color, 0, distance, 1.35);
+  const pl = maybePointLight(color, 0, distance, 1.35);
+  if (!pl) return null;
   pl.position.set(x, y, z);
   group.add(pl);
   if (!group.userData.landmarkLights) group.userData.landmarkLights = [];
@@ -590,20 +598,21 @@ function createMiniShrineLantern() {
   );
   shade.position.y = 0.52;
   group.add(shade);
-
-  const pl = new THREE.PointLight(0xffc878, 0, 16, 1.45);
-  pl.position.set(0, 0.55, 0.08);
-  group.add(pl);
-  group.userData.landmarkLight = pl;
   group.userData.landmarkGlowMesh = shade;
 
-  const orb = new THREE.Mesh(
-    new THREE.SphereGeometry(0.1, 8, 8),
-    new THREE.MeshBasicMaterial({ color: 0xffe0a0, transparent: true, opacity: 0 }),
-  );
-  orb.position.copy(pl.position);
-  group.add(orb);
-  group.userData.landmarkGlowOrb = orb;
+  const pl = maybePointLight(0xffc878, 0, 16, 1.45);
+  if (pl) {
+    pl.position.set(0, 0.55, 0.08);
+    group.add(pl);
+    group.userData.landmarkLight = pl;
+    const orb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.1, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffe0a0, transparent: true, opacity: 0 }),
+    );
+    orb.position.copy(pl.position);
+    group.add(orb);
+    group.userData.landmarkGlowOrb = orb;
+  }
 
   return group;
 }
@@ -785,15 +794,19 @@ function decorateVendingMachine(group, color) {
   }
 
   const lightColor = new THREE.Color(color).lerp(new THREE.Color(0xfff0d0), 0.45);
-  const displayLight = new THREE.PointLight(lightColor, 0, 14, 1.8);
-  displayLight.position.set(0, 1.55, 0.65);
-  group.add(displayLight);
-  group.userData.vendingLight = displayLight;
+  const displayLight = maybePointLight(lightColor, 0, 14, 1.8);
+  if (displayLight) {
+    displayLight.position.set(0, 1.55, 0.65);
+    group.add(displayLight);
+    group.userData.vendingLight = displayLight;
+  }
 
-  const spillLight = new THREE.PointLight(0xffe8c8, 0, 8, 2);
-  spillLight.position.set(0, 0.35, 0.55);
-  group.add(spillLight);
-  group.userData.vendingSpillLight = spillLight;
+  const spillLight = maybePointLight(0xffe8c8, 0, 8, 2);
+  if (spillLight) {
+    spillLight.position.set(0, 0.35, 0.55);
+    group.add(spillLight);
+    group.userData.vendingSpillLight = spillLight;
+  }
   group.userData.vendingColor = color;
 }
 
@@ -1565,34 +1578,19 @@ function addGardenModel(group, key, x, z, targetHeight, rotY = 0, scale = 1) {
 
 function addGardenFlower(group, x, z, color, scale = 1) {
   const stemH = 0.26 * scale;
-  const stem = createOutlinedMesh(
-    new THREE.CylinderGeometry(0.012 * scale, 0.018 * scale, stemH, 5),
+  const stem = createFastMesh(
+    new THREE.CylinderGeometry(0.012 * scale, 0.018 * scale, stemH, 4),
     createToonMaterial(0x3a6a3a),
   );
   stem.position.set(x, stemH * 0.5 + 0.1, z);
   group.add(stem);
 
-  const head = createOutlinedMesh(
-    new THREE.SphereGeometry(0.055 * scale, 7, 5),
+  const head = createFastMesh(
+    new THREE.SphereGeometry(0.055 * scale, 6, 4),
     createToonMaterial(color),
   );
   head.position.set(x, 0.1 + stemH + 0.04 * scale, z);
   group.add(head);
-
-  for (let i = 0; i < 5; i++) {
-    const angle = (i / 5) * Math.PI * 2;
-    const petal = createOutlinedMesh(
-      new THREE.SphereGeometry(0.028 * scale, 6, 4),
-      createToonMaterial(color),
-    );
-    petal.position.set(
-      x + Math.cos(angle) * 0.05 * scale,
-      0.1 + stemH + 0.038 * scale,
-      z + Math.sin(angle) * 0.05 * scale,
-    );
-    petal.scale.set(1.2, 0.45, 1.2);
-    group.add(petal);
-  }
 }
 
 function addGardenBedBase(group, width, depth, surface = 'soil') {
@@ -1641,7 +1639,7 @@ function createGarden(variant = 'flower', seed = 1) {
     const d = 1.9;
     addGardenBedBase(group, w, d, 'soil');
 
-    const count = 10 + Math.floor(rand() * 4);
+    const count = 5 + Math.floor(rand() * 2);
     for (let i = 0; i < count; i++) {
       const x = (rand() - 0.5) * (w - 0.5);
       const z = (rand() - 0.5) * (d - 0.4);
@@ -1692,7 +1690,7 @@ function createGarden(variant = 'flower', seed = 1) {
     const d = 2.1;
     addGardenBedBase(group, w, d, 'soil');
 
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 4; i++) {
       const x = -w * 0.35 + rand() * w * 0.7;
       const z = -d * 0.35 + rand() * d * 0.65;
       addGardenFlower(group, x, z, flowerColors[Math.floor(rand() * flowerColors.length)], 0.8 + rand() * 0.25);
@@ -1782,9 +1780,14 @@ function createPlayerHome() {
     homeWindows.push(win);
   });
 
-  const doorLight = new THREE.PointLight(0xffe0b0, 0, 14, 1.5);
-  doorLight.position.set(0, 1.05, faceZ + 0.55);
-  group.add(doorLight);
+  let doorLight = null;
+  if (PERF.usePointLights) {
+    doorLight = maybePointLight(0xffe0b0, 0, 14, 1.5);
+    if (doorLight) {
+      doorLight.position.set(0, 1.05, faceZ + 0.55);
+      group.add(doorLight);
+    }
+  }
 
   attachShopNightLights(group, {
     signColor: 0xc8a878,
@@ -1796,7 +1799,7 @@ function createPlayerHome() {
   });
 
   if (!group.userData.landmarkLights) group.userData.landmarkLights = [];
-  group.userData.landmarkLights.push(doorLight);
+  if (doorLight) group.userData.landmarkLights.push(doorLight);
   group.userData.placementRadius = 3.2;
   return group;
 }
@@ -1823,23 +1826,32 @@ function createShopWindowTexture(goodsLabel = 'OPEN', goodsEmoji = '🛍️', bg
 }
 
 function attachShopNightLights(group, { signColor, faceZ, h, w, windowOverlay, signBoard }) {
-  const warm = new THREE.Color(signColor);
   const lights = [];
 
-  const windowLight = new THREE.PointLight(warm, 0, 12, 1.8);
-  windowLight.position.set(0, h * 0.38, faceZ + 0.85);
-  group.add(windowLight);
-  lights.push(windowLight);
+  if (PERF.usePointLights) {
+    const warm = new THREE.Color(signColor);
 
-  const signLight = new THREE.PointLight(0xfff4dc, 0, 9, 1.6);
-  signLight.position.set(0, h * 0.88, faceZ + 0.95);
-  group.add(signLight);
-  lights.push(signLight);
+    const windowLight = maybePointLight(warm, 0, 12, 1.8);
+    if (windowLight) {
+      windowLight.position.set(0, h * 0.38, faceZ + 0.85);
+      group.add(windowLight);
+      lights.push(windowLight);
+    }
 
-  const porchLight = new THREE.PointLight(0xffe8c0, 0, 7, 2);
-  porchLight.position.set(0, 2.4, faceZ + 0.55);
-  group.add(porchLight);
-  lights.push(porchLight);
+    const signLight = maybePointLight(0xfff4dc, 0, 9, 1.6);
+    if (signLight) {
+      signLight.position.set(0, h * 0.88, faceZ + 0.95);
+      group.add(signLight);
+      lights.push(signLight);
+    }
+
+    const porchLight = maybePointLight(0xffe8c0, 0, 7, 2);
+    if (porchLight) {
+      porchLight.position.set(0, 2.4, faceZ + 0.55);
+      group.add(porchLight);
+      lights.push(porchLight);
+    }
+  }
 
   group.userData.shopLights = lights;
   group.userData.shopWindowMaterials = [];
@@ -2248,12 +2260,20 @@ function createMarketStalls() {
   group.add(bunting);
 
   const marketLights = [];
-  stalls.forEach(({ x, awning }) => {
-    const stallLight = new THREE.PointLight(new THREE.Color(awning).lerp(new THREE.Color(0xfff0d0), 0.5), 0, 11, 1.6);
-    stallLight.position.set(x, 1.65, 0.85);
-    group.add(stallLight);
-    marketLights.push(stallLight);
-  });
+  if (PERF.usePointLights) {
+    stalls.forEach(({ x, awning }) => {
+      const stallLight = maybePointLight(
+        new THREE.Color(awning).lerp(new THREE.Color(0xfff0d0), 0.5),
+        0,
+        11,
+        1.6,
+      );
+      if (!stallLight) return;
+      stallLight.position.set(x, 1.65, 0.85);
+      group.add(stallLight);
+      marketLights.push(stallLight);
+    });
+  }
   group.userData.shopLights = marketLights;
   // Tight collider on stall counters only — leave the street-facing apron walkable.
   group.userData.collider = { halfW: 4.05, halfD: 0.78, offsetZ: -0.92 };
@@ -2485,9 +2505,13 @@ export class Town {
 
     onProgress?.('Placing buildings…');
     this._createLandmarks();
-    this._createShopsAndPlaces();
-    this._createGardens();
     await nextFrame();
+    this._createShopsAndPlaces();
+    await nextFrame();
+    if (!PERF.deferGardens) {
+      this._createGardens();
+      await nextFrame();
+    }
 
     onProgress?.('Adding details…');
     this._createProps();
@@ -3156,28 +3180,37 @@ export class Town {
     const ambient = new THREE.AmbientLight(0xe8ddd9, 0.45);
     this.scene.add(ambient);
 
-    // Capped decorative point lights (max 6)
     const streetLights = [];
-    [[-3, 2.5, -10], [-5, 2.5, -22], [4, 2.5, -34]].forEach(([x, y, z]) => {
-      const pl = new THREE.PointLight(0xffc878, 0.28, 12);
-      pl.position.set(x, y, z);
-      this.scene.add(pl);
-      streetLights.push(pl);
-    });
+    let shrineLight = null;
+    if (PERF.usePointLights) {
+      [[-3, 2.5, -10], [-5, 2.5, -22], [4, 2.5, -34]].forEach(([x, y, z]) => {
+        const pl = maybePointLight(0xffc878, 0.28, 12);
+        if (!pl) return;
+        pl.position.set(x, y, z);
+        this.scene.add(pl);
+        streetLights.push(pl);
+      });
 
-    const harborLight = new THREE.PointLight(0x90d0e0, 0.3, 14);
-    harborLight.position.set(10, 3, -95);
-    this.scene.add(harborLight);
-    streetLights.push(harborLight);
+      const harborLight = maybePointLight(0x90d0e0, 0.3, 14);
+      if (harborLight) {
+        harborLight.position.set(10, 3, -95);
+        this.scene.add(harborLight);
+        streetLights.push(harborLight);
+      }
 
-    const marketLight = new THREE.PointLight(0xffc878, 0.25, 14);
-    marketLight.position.set(6, 3, -48);
-    this.scene.add(marketLight);
-    streetLights.push(marketLight);
+      const marketLight = maybePointLight(0xffc878, 0.25, 14);
+      if (marketLight) {
+        marketLight.position.set(6, 3, -48);
+        this.scene.add(marketLight);
+        streetLights.push(marketLight);
+      }
 
-    const shrineLight = new THREE.PointLight(0xc0a0e0, 0.22, 14);
-    shrineLight.position.set(-8, 3, -68);
-    this.scene.add(shrineLight);
+      shrineLight = maybePointLight(0xc0a0e0, 0.22, 14);
+      if (shrineLight) {
+        shrineLight.position.set(-8, 3, -68);
+        this.scene.add(shrineLight);
+      }
+    }
 
     this.lights = { hemi, sun, fill, ambient, street: streetLights, shrine: shrineLight };
   }

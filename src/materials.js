@@ -87,12 +87,13 @@ export function addOutline(mesh, thickness = 1.068, color = 0x0a0a10) {
 
 export function createOutlinedMesh(geometry, material, outlineScale = 1.068) {
   const mesh = new THREE.Mesh(geometry, material);
-  addOutline(mesh, outlineScale);
+  if (!PERF.skipStaticOutlines) addOutline(mesh, outlineScale);
   return mesh;
 }
 
 /** Slightly thinner outline for very large meshes */
 export function createSoftOutlinedMesh(geometry, material, outlineScale = 1.042) {
+  if (PERF.skipStaticOutlines) return new THREE.Mesh(geometry, material);
   return createOutlinedMesh(geometry, material, outlineScale);
 }
 

@@ -48,7 +48,7 @@ async function boot() {
     game = await Game.create(canvas, (label) => setProgress(label, 20 + Math.random() * 55));
     setProgress('Warming up…', 92);
     setupUI(game);
-    game.warmUpGPU();
+    await game.warmUpGPU();
     setProgress('Ready!', 100);
     window.__gameBooted = true;
 
