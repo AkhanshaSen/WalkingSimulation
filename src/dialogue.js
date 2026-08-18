@@ -35,12 +35,15 @@ export class DialogueManager {
     this.journalList = elements.journalList;
     this.journalBtn = elements.journalBtn;
     this.closeJournalBtn = elements.closeJournalBtn;
-    this.interactHint = elements.interactHint;
+    this.interactHintPanel = elements.interactHintPanel;
     this.continueHint = elements.continueHint;
 
     this.active = false;
+    this.hintItems = [];
+    this.hintSelectedIndex = 0;
     this.hintItem = null;
     this.onHintClick = null;
+    this.onHintSelect = null;
     this.approachOpen = false;
     this.approachInitiated = false;
     this.npc = null;
@@ -59,9 +62,87 @@ export class DialogueManager {
     this.dialogueStopWalkBtn?.addEventListener('click', () => this._onDialogueStopWalkClicked());
     this.journalBtn?.addEventListener('click', () => this.journalPanel?.classList.remove('hidden'));
     this.closeJournalBtn?.addEventListener('click', () => this.journalPanel?.classList.add('hidden'));
-    this.interactHint?.addEventListener('click', () => {
-      this.onHintClick?.();
+  }
+
+  _getInteractLabelText(item) {
+    if (item.type === 'npc') {
+      const name = item.profile?.nameJa || item.profile?.name || 'Someone';
+      return `Talk to ${name}`;
+    }
+    if (item.type === 'animal') {
+      const d = item.definition;
+      return `${d.emoji} Meet ${d.nameJa || d.name}`;
+    }
+    const def = item.definition;
+    if (def.shopId) return `🏪 ${def.label}`;
+    if (def.id === 'shrine') return '⛩️ Pray at Shrine';
+    if (def.id === 'torii') {
+      const tokens = this.game?.offeringTokens ?? 0;
+      const cost = def.tokenCost ?? 1;
+      return `🪙 Pray (${cost} token${cost > 1 ? 's' : ''}) · ${tokens} left`;
+    }
+    if (def.id === 'home') {
+      return `🏠 Rest · start Day ${(this.game?.dayNight?.dayIndex ?? 1) + 1}`;
+    }
+    if (def.id === 'cherry_tree') return '🌸 Admire Cherry Tree';
+    if (def.id === 'shrine_tree') return '🌿 Listen to the Wind';
+    return def.label ?? 'Interact';
+  }
+
+  showInteractHints(items, selectedIndex = 0) {
+    if (!this.interactHintPanel || !items?.length || this.isBlocking()) {
+      this.hideInteractHint();
+      return;
+    }
+
+    const clampedIndex = Math.max(0, Math.min(selectedIndex, items.length - 1));
+    this.hintItems = items;
+    this.hintSelectedIndex = clampedIndex;
+    this.hintItem = items[clampedIndex];
+
+    const panel = this.interactHintPanel;
+    panel.innerHTML = '';
+    panel.classList.toggle('interact-hint-grid', items.length >= 4);
+
+    const optionsWrap = document.createElement('div');
+    optionsWrap.className = 'interact-hint-options';
+
+    items.forEach((item, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `interact-hint-option${i === clampedIndex ? ' selected' : ''}`;
+      const key = i === clampedIndex ? 'E' : String(i + 1);
+      btn.innerHTML = `<kbd>${key}</kbd> ${this._getInteractLabelText(item)}`;
+      btn.addEventListener('click', () => {
+        this.hintSelectedIndex = i;
+        this.hintItem = item;
+        this.onHintSelect?.(i);
+      });
+      optionsWrap.appendChild(btn);
     });
+    panel.appendChild(optionsWrap);
+
+    if (items.length > 1) {
+      const tip = document.createElement('p');
+      tip.className = 'interact-hint-tip';
+      tip.textContent = 'Tab to cycle · number keys to pick';
+      panel.appendChild(tip);
+    }
+
+    panel.classList.remove('hidden');
+  }
+
+  /** @deprecated use showInteractHints */
+  showInteractHint(item) {
+    this.showInteractHints(item ? [item] : [], 0);
+  }
+
+  hideInteractHint() {
+    this.hintItems = [];
+    this.hintSelectedIndex = 0;
+    this.hintItem = null;
+    this.interactHintPanel?.classList.add('hidden');
+    if (this.interactHintPanel) this.interactHintPanel.innerHTML = '';
   }
 
   setRewardHandler(handler) {
@@ -78,48 +159,6 @@ export class DialogueManager {
 
   isBlocking() {
     return this.active || this.approachOpen;
-  }
-
-  showInteractHint(item) {
-    if (!this.interactHint || !item || this.isBlocking()) {
-      this.hideInteractHint();
-      return;
-    }
-    this.hintItem = item;
-
-    let label = '<kbd>E</kbd> Interact';
-    if (item.type === 'npc') {
-      const name = item.profile?.nameJa || item.profile?.name || 'Someone';
-      label = `<kbd>E</kbd> Interact? with ${name}`;
-    } else if (item.type === 'animal') {
-      const d = item.definition;
-      label = `<kbd>E</kbd> ${d.emoji} Meet ${d.nameJa || d.name}`;
-    } else if (item.type === 'prop') {
-      const def = item.definition;
-      if (def.shopId) {
-        label = `<kbd>E</kbd> 🏪 ${def.label}`;
-      } else if (def.id === 'shrine') {
-        label = `<kbd>E</kbd> ⛩️ Pray at Shrine`;
-      } else if (def.id === 'torii') {
-        const tokens = this.game?.offeringTokens ?? 0;
-        const cost = def.tokenCost ?? 1;
-        label = `<kbd>E</kbd> 🪙 Pray (${cost} token${cost > 1 ? 's' : ''}) · ${tokens} left`;
-      } else if (def.id === 'home') {
-        label = `<kbd>E</kbd> 🏠 Rest · start Day ${(this.game?.dayNight?.dayIndex ?? 1) + 1}`;
-      } else if (def.id === 'cherry_tree') {
-        label = `<kbd>E</kbd> 🌸 Admire Cherry Tree`;
-      } else if (def.id === 'shrine_tree') {
-        label = `<kbd>E</kbd> 🌿 Listen to the Wind`;
-      }
-    }
-
-    this.interactHint.innerHTML = label;
-    this.interactHint.classList.remove('hidden');
-  }
-
-  hideInteractHint() {
-    this.hintItem = null;
-    this.interactHint?.classList.add('hidden');
   }
 
   setCompanionTag(npc) {
@@ -153,7 +192,7 @@ export class DialogueManager {
     if (this.isBlocking() || !npc) return;
 
     this.hintItem = null;
-    this.interactHint?.classList.add('hidden');
+    this.hideInteractHint();
     this.approachOpen = true;
     this.approachInitiated = options.initiated ?? false;
     this.npc = npc;

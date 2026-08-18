@@ -11,10 +11,12 @@ export class InteractionSystem {
     this.picker = new RaycastPicker();
     this.approachRange = 9;
     this.spotRange = 20;
+    this._hintTargets = [];
+    this._hintIndex = 0;
 
-    // Wire hint-button click back to this system
-    dialogue.onHintClick = () => {
-      if (dialogue.hintItem) this._interactWithItem(dialogue.hintItem);
+    dialogue.onHintSelect = (index) => {
+      this._hintIndex = index;
+      this._interactWithItem(this._hintTargets[index]);
     };
   }
 
@@ -60,26 +62,40 @@ export class InteractionSystem {
     return true;
   }
 
-  update(input, camera, canvas) {
-    if (this.isBlocking()) {
+  _refreshHintTargets() {
+    const nearby = this.registry.findAllInteractable(this.player.position, this.approachRange)
+      .slice(0, 6);
+    const ids = nearby.map(({ item }) => item);
+    const prevId = this._hintTargets[this._hintIndex];
+    this._hintTargets = ids;
+
+    if (!ids.length) {
+      this._hintIndex = 0;
       this.dialogue.hideInteractHint();
       return;
     }
 
+    const kept = prevId ? ids.indexOf(prevId) : -1;
+    this._hintIndex = kept >= 0 ? kept : 0;
+    this.dialogue.showInteractHints(this._hintTargets, this._hintIndex);
+  }
+
+  update(input, camera, canvas) {
+    if (this.isBlocking()) {
+      this.dialogue.hideInteractHint();
+      this._hintTargets = [];
+      return;
+    }
+
     const npcs = this.registry.getNpcs();
-    const companion = this.game.companion;
 
     for (const npc of npcs) {
       if (npc.isCompanion) continue;
-
       const dist = npc.distanceTo(this.player.position);
       const inTalkRange = dist < this.approachRange;
-
       npc.setPlayerNearby(inTalkRange, this.player.position);
-
     }
 
-    // Closest NPC drives approach modal visibility
     const closestNpc = this.registry.findNearest(this.player.position, this.approachRange, {
       types: ['npc'],
     });
@@ -89,12 +105,18 @@ export class InteractionSystem {
       this.dialogue.hideApproach();
     }
 
-    // Closest interactable (any type) drives the hint pill
-    const hintTarget = this.registry.findNearest(this.player.position, this.approachRange, {});
-    if (hintTarget) {
-      this.dialogue.showInteractHint(hintTarget);
-    } else {
-      this.dialogue.hideInteractHint();
+    this._refreshHintTargets();
+
+    if (input.consumeKey('Tab') && this._hintTargets.length > 1) {
+      this._hintIndex = (this._hintIndex + 1) % this._hintTargets.length;
+      this.dialogue.showInteractHints(this._hintTargets, this._hintIndex);
+    }
+
+    for (let i = 1; i <= 9; i++) {
+      if (input.consumeKey(`Digit${i}`) && i <= this._hintTargets.length) {
+        this._hintIndex = i - 1;
+        this._interactWithItem(this._hintTargets[this._hintIndex]);
+      }
     }
 
     const tap = input.consumeTap();
@@ -106,17 +128,17 @@ export class InteractionSystem {
     }
 
     if (input.consumeKey('KeyE')) {
-      let tapped = null;
-      if (companion) {
-        tapped = companion;
-      } else {
-        tapped = this.registry.findNearest(this.player.position, this.approachRange + 2, {
+      const companion = this.game.companion;
+      let target = companion ?? this._hintTargets[this._hintIndex] ?? null;
+
+      if (!target) {
+        target = this.registry.findNearest(this.player.position, this.approachRange + 2, {
           includeIgnored: true,
         });
       }
 
-      if (tapped) {
-        this._interactWithItem(tapped);
+      if (target) {
+        this._interactWithItem(target);
       } else {
         this.dialogue._showToast('Nothing nearby to interact with.');
       }

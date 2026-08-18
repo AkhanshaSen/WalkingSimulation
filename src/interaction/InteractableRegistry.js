@@ -65,6 +65,11 @@ export class InteractableRegistry {
   }
 
   findAllInRange(playerPos, maxRange, options = {}) {
+    return this.findAllInteractable(playerPos, maxRange, options);
+  }
+
+  /** All interactables within each item's own range, sorted nearest first. */
+  findAllInteractable(playerPos, maxRange = 9, options = {}) {
     const { includeIgnored = false } = options;
     const results = [];
 
@@ -75,10 +80,18 @@ export class InteractableRegistry {
       if (item.type === 'animal' && item.isPetCompanion) continue;
 
       const dist = item.distanceTo(playerPos);
-      if (dist >= maxRange) continue;
+      const effectiveRange = item.type === 'npc' ? maxRange : (item.range ?? maxRange);
+      if (dist > effectiveRange) continue;
+      if (item.canInteract && !item.canInteract(playerPos)) continue;
+
       results.push({ item, dist });
     }
 
-    return results.sort((a, b) => a.dist - b.dist);
+    return results.sort((a, b) => {
+      if (Math.abs(a.dist - b.dist) > 0.35) return a.dist - b.dist;
+      const pa = TYPE_PRIORITY[a.item.type] ?? 9;
+      const pb = TYPE_PRIORITY[b.item.type] ?? 9;
+      return pa - pb;
+    });
   }
 }

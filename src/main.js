@@ -96,7 +96,7 @@ function setupUI(game) {
     journalList: document.getElementById('journal-list'),
     journalBtn: document.getElementById('journal-btn'),
     closeJournalBtn: document.getElementById('close-journal'),
-    interactHint: document.getElementById('interact-hint'),
+    interactHintPanel: document.getElementById('interact-hint-panel'),
     continueHint: document.getElementById('speech-continue'),
     dialogueWalkBtn: document.getElementById('dialogue-walk'),
     dialogueStopWalkBtn: document.getElementById('dialogue-stop-walk'),

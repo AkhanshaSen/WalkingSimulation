@@ -58,7 +58,7 @@ export class InputManager {
     window.addEventListener('keydown', (e) => {
       if (!this.keys[e.code]) this.justPressed.add(e.code);
       this.keys[e.code] = true;
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'].includes(e.code)) {
         e.preventDefault();
       }
     });
@@ -545,7 +545,7 @@ export function animateCharacter(character, speed, dt) {
   const ud = character.userData;
 
   if (ud.isRiggedCharacter) {
-    _characterLoader?.updateCharacterAnimation(character, speed, dt);
+    _characterLoader?.updateCharacterAnimation(character, speed < 0.08 ? 0 : speed, dt);
     return;
   }
 
@@ -679,7 +679,10 @@ export class Player {
       }
     }
 
-    if (input.dialogueOpen || input.outfitOpen) {
+    const frozen = input.dialogueOpen || input.outfitOpen;
+    const hasMoveInput = !frozen && (input.move.x * input.move.x + input.move.z * input.move.z > 0.001);
+
+    if (frozen) {
       this.velocity.set(0, 0, 0);
     } else {
       if (input.consumeKey('Space') && this.isGrounded) {
@@ -688,30 +691,27 @@ export class Player {
         this.mesh.userData.isJumping = true;
       }
 
-      const speed = input.isRunning ? this.runSpeed : this.walkSpeed;
-      const camForward = new THREE.Vector3(Math.sin(input.cameraAngle), 0, Math.cos(input.cameraAngle));
-      const camRight = new THREE.Vector3(Math.cos(input.cameraAngle), 0, -Math.sin(input.cameraAngle));
+      if (hasMoveInput) {
+        const speed = input.isRunning ? this.runSpeed : this.walkSpeed;
+        const camForward = new THREE.Vector3(Math.sin(input.cameraAngle), 0, Math.cos(input.cameraAngle));
+        const camRight = new THREE.Vector3(Math.cos(input.cameraAngle), 0, -Math.sin(input.cameraAngle));
 
-      const moveDir = new THREE.Vector3()
-        .addScaledVector(camRight, input.move.x)
-        .addScaledVector(camForward, input.move.z);
+        const moveDir = new THREE.Vector3()
+          .addScaledVector(camRight, input.move.x)
+          .addScaledVector(camForward, input.move.z)
+          .normalize();
 
-      if (moveDir.lengthSq() > 0.001) {
-        moveDir.normalize();
         this.velocity.copy(moveDir.multiplyScalar(speed));
         this.facing = Math.atan2(moveDir.x, moveDir.z);
       } else {
-        this.velocity.multiplyScalar(0.85);
+        this.velocity.set(0, 0, 0);
       }
     }
 
-    this.mesh.position.x += this.velocity.x * dt;
-    this.mesh.position.z += this.velocity.z * dt;
+    const prevX = this.mesh.position.x;
+    const prevZ = this.mesh.position.z;
 
-    if (this.colliderWorld) {
-      this.colliderWorld.resolve(this.mesh.position, 0.45);
-    }
-
+    this._applyHorizontalMovement(dt);
     this._clampToWalkableArea();
 
     const groundY = this._sampleGround(this.mesh.position, groundMeshes);
@@ -731,10 +731,33 @@ export class Player {
 
     this.mesh.rotation.y = THREE.MathUtils.lerp(this.mesh.rotation.y, this.facing, 0.15);
 
-    const moveSpeed = this.velocity.length();
-    animateCharacter(this.mesh, moveSpeed, dt);
+    const safeDt = Math.max(dt, 1e-5);
+    const actualSpeed = Math.hypot(
+      this.mesh.position.x - prevX,
+      this.mesh.position.z - prevZ,
+    ) / safeDt;
+    animateCharacter(this.mesh, actualSpeed < 0.08 ? 0 : actualSpeed, dt);
 
     this.pathT = this.path.getClosestPointT?.(this.mesh.position) ?? 0;
+  }
+
+  /** Move on XZ with axis-separated collision so walls don't cause diagonal drift. */
+  _applyHorizontalMovement(dt) {
+    if (this.velocity.lengthSq() < 1e-8) return;
+
+    const pos = this.mesh.position;
+    const velX = this.velocity.x * dt;
+    const velZ = this.velocity.z * dt;
+
+    if (this.colliderWorld) {
+      pos.x += velX;
+      this.colliderWorld.resolve(pos, 0.45);
+      pos.z += velZ;
+      this.colliderWorld.resolve(pos, 0.45);
+    } else {
+      pos.x += velX;
+      pos.z += velZ;
+    }
   }
 
   _clampToWalkableArea() {
@@ -762,9 +785,14 @@ export class Player {
     if (bestNearest) {
       this.pathT = bestT;
       if (bestDist > MAX_DIST_FROM_PATH) {
+        const beforeX = pos.x;
+        const beforeZ = pos.z;
         const scale = MAX_DIST_FROM_PATH / bestDist;
         pos.x = bestNearest.x + (pos.x - bestNearest.x) * scale;
         pos.z = bestNearest.z + (pos.z - bestNearest.z) * scale;
+        if (Math.hypot(pos.x - beforeX, pos.z - beforeZ) > 0.02) {
+          this.velocity.set(0, 0, 0);
+        }
       }
     }
 

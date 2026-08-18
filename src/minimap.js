@@ -1,113 +1,19 @@
-// ── symbol renderers ──────────────────────────────────────────────────────────
-function dot(ctx, mx, my, r, fill, stroke = null, sw = 1.5) {
-  ctx.fillStyle = fill;
-  ctx.beginPath();
-  ctx.arc(mx, my, r, 0, Math.PI * 2);
-  ctx.fill();
-  if (stroke) {
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = sw;
-    ctx.stroke();
-  }
-}
-
-/** Small upright human silhouette (head + body) */
-function personIcon(ctx, mx, my, bodyColor, headColor) {
-  ctx.fillStyle = bodyColor;
-  ctx.fillRect(mx - 2.5, my - 1, 5, 5);
-  ctx.fillStyle = headColor ?? bodyColor;
-  ctx.beginPath();
-  ctx.arc(mx, my - 2.8, 2.8, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-/** Tiny paw — circle + 3 toe-dots */
-function pawIcon(ctx, mx, my, color) {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(mx, my + 1, 2.8, 0, Math.PI * 2);
-  ctx.fill();
-  [[-3, -2.5], [0, -4.5], [3, -2.5]].forEach(([dx, dy]) => {
-    ctx.beginPath();
-    ctx.arc(mx + dx, my + dy, 1.5, 0, Math.PI * 2);
-    ctx.fill();
-  });
-}
-
-/** Small diamond (rotated square) */
-function diamondIcon(ctx, mx, my, color, size = 4) {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(mx, my - size);
-  ctx.lineTo(mx + size, my);
-  ctx.lineTo(mx, my + size);
-  ctx.lineTo(mx - size, my);
-  ctx.closePath();
-  ctx.fill();
-}
-
-/** 4-point star */
-function starIcon(ctx, mx, my, color, r = 4.5) {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2 - Math.PI / 2;
-    const radius = i % 2 === 0 ? r : r * 0.45;
-    const x = mx + Math.cos(angle) * radius;
-    const y = my + Math.sin(angle) * radius;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.closePath();
-  ctx.fill();
-}
-
-/** Tiny house outline */
-function shopIcon(ctx, mx, my, color) {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(mx - 4.5, my - 0.5);
-  ctx.lineTo(mx, my - 5.5);
-  ctx.lineTo(mx + 4.5, my - 0.5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillRect(mx - 3.5, my - 0.5, 7, 5.5);
-}
-
-/** Tiny house with roof — player home */
-function homeIcon(ctx, mx, my, color) {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(mx, my - 5.5);
-  ctx.lineTo(mx + 5.5, my - 1);
-  ctx.lineTo(mx - 5.5, my - 1);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillRect(mx - 4, my - 1, 8, 5.5);
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.fillRect(mx - 1.2, my + 1.2, 2.4, 2.8);
-}
-
-/** Torii gate — two posts and lintels */
-function toriiIcon(ctx, mx, my, color) {
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
-  [-3.5, 3.5].forEach((dx) => {
-    ctx.beginPath();
-    ctx.moveTo(mx + dx, my + 2);
-    ctx.lineTo(mx + dx, my - 4);
-    ctx.stroke();
-  });
-  ctx.beginPath();
-  ctx.moveTo(mx - 5, my - 2.2);
-  ctx.lineTo(mx + 5, my - 2.2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(mx - 5.5, my - 4.5);
-  ctx.lineTo(mx + 5.5, my - 4.5);
-  ctx.stroke();
-}
+// ── Minimap palette ───────────────────────────────────────────────────────────
+const MAP = {
+  ground: '#ddd0b8',
+  grass: '#7eb86a',
+  road: '#f8f2e4',
+  roadEdge: '#a88862',
+  roadCenter: '#c9b898',
+  water: '#7eb8d8',
+  waterEdge: '#ffffff',
+  building: '#b07858',
+  buildingEdge: '#7a5038',
+  badge: 'rgba(18, 20, 24, 0.92)',
+  badgeRing: 'rgba(255, 255, 255, 0.42)',
+  player: '#5ec8f0',
+  playerCore: '#ffffff',
+};
 
 export const INTERACTION_COLORS = {
   npc: '#f09030',
@@ -120,8 +26,27 @@ export const INTERACTION_COLORS = {
   bench: '#a07050',
   tree: '#c090b0',
   companion: '#60e8d8',
-  player: '#4a90e8',
+  player: MAP.player,
 };
+
+const GRASS_PATCHES = [
+  [-6, -12, 10, 8], [14, -28, 9, 7], [-10, -52, 11, 9], [8, -68, 12, 10],
+  [-4, -88, 10, 8], [18, -72, 8, 7], [6, -42, 9, 8],
+];
+
+// Player-centered zoom levels (world units from center to map edge). Last entry = full town.
+const ZOOM_LEVELS = [
+  { id: 'close', radius: 14, label: 'Close' },
+  { id: 'near', radius: 24, label: 'Near' },
+  { id: 'area', radius: 38, label: 'Area' },
+  { id: 'town', label: 'Town' },
+];
+const DEFAULT_ZOOM_INDEX = 1;
+
+function lerpAngle(from, to, t) {
+  const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from));
+  return from + delta * t;
+}
 
 function getInteractableColor(item) {
   if (item.type === 'npc') return INTERACTION_COLORS.npc;
@@ -138,9 +63,7 @@ function getInteractableColor(item) {
 }
 
 function getInteractablePosition(item) {
-  if (item.type === 'npc' || item.type === 'animal') {
-    return item.mesh.position;
-  }
+  if (item.type === 'npc' || item.type === 'animal') return item.mesh.position;
   return item.mesh?.position;
 }
 
@@ -169,17 +92,10 @@ function computeMapBounds(path, npcs, animals, worldProps, padding = 10, extraCu
   for (const curve of extraCurves) {
     if (curve !== path) sampleCurve(curve);
   }
-
-  for (const npc of npcs) {
-    add(npc.mesh.position.x, npc.mesh.position.z);
-  }
-  for (const animal of animals) {
-    add(animal.mesh.position.x, animal.mesh.position.z);
-  }
+  for (const npc of npcs) add(npc.mesh.position.x, npc.mesh.position.z);
+  for (const animal of animals) add(animal.mesh.position.x, animal.mesh.position.z);
   for (const prop of worldProps) {
-    if (prop.mesh?.position) {
-      add(prop.mesh.position.x, prop.mesh.position.z);
-    }
+    if (prop.mesh?.position) add(prop.mesh.position.x, prop.mesh.position.z);
   }
 
   if (!Number.isFinite(minX)) {
@@ -192,6 +108,139 @@ function computeMapBounds(path, npcs, animals, worldProps, padding = 10, extraCu
     minZ: minZ - padding,
     maxZ: maxZ + padding,
   };
+}
+
+function drawPoiBadge(ctx, mx, my, iconFn) {
+  ctx.fillStyle = MAP.badge;
+  ctx.beginPath();
+  ctx.arc(mx, my, 6.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = MAP.badgeRing;
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+  ctx.save();
+  ctx.translate(mx, my);
+  iconFn(ctx);
+  ctx.restore();
+}
+
+function whiteShopIcon(ctx) {
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.moveTo(-3.5, 1);
+  ctx.lineTo(0, -4);
+  ctx.lineTo(3.5, 1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillRect(-2.8, 1, 5.6, 3.5);
+}
+
+function whiteHomeIcon(ctx) {
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.moveTo(0, -4.5);
+  ctx.lineTo(4.5, 0);
+  ctx.lineTo(-4.5, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillRect(-3, 0, 6, 4);
+}
+
+function whiteShrineIcon(ctx) {
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2 - Math.PI / 2;
+    const r = i % 2 === 0 ? 4 : 1.8;
+    const x = Math.cos(angle) * r;
+    const y = Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+function whiteToriiIcon(ctx) {
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = 'round';
+  [-2.5, 2.5].forEach((dx) => {
+    ctx.beginPath();
+    ctx.moveTo(dx, 2.5);
+    ctx.lineTo(dx, -3.5);
+    ctx.stroke();
+  });
+  ctx.beginPath();
+  ctx.moveTo(-3.8, -1.5);
+  ctx.lineTo(3.8, -1.5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-4.2, -3.2);
+  ctx.lineTo(4.2, -3.2);
+  ctx.stroke();
+}
+
+function whiteNpcIcon(ctx) {
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(0, -2, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(-2, 0.5, 4, 3.5);
+}
+
+function whitePawIcon(ctx) {
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(0, 1.5, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  [[-2.2, -1.5], [0, -2.8], [2.2, -1.5]].forEach(([x, y]) => {
+    ctx.beginPath();
+    ctx.arc(x, y, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function whiteDotIcon(ctx) {
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(0, 0, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawBuilding(ctx, mx, my, w, h) {
+  ctx.fillStyle = MAP.building;
+  ctx.fillRect(mx - w / 2, my - h / 2, w, h);
+  ctx.strokeStyle = MAP.buildingEdge;
+  ctx.lineWidth = 0.8;
+  ctx.strokeRect(mx - w / 2 + 0.3, my - h / 2 + 0.3, w - 0.6, h - 0.6);
+}
+
+function drawPlayerMarker(ctx, mx, my, facing, overview = false) {
+  ctx.fillStyle = 'rgba(94, 200, 240, 0.25)';
+  ctx.beginPath();
+  ctx.arc(mx, my, 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  const arrowAngle = overview
+    ? Math.atan2(Math.sin(facing), -Math.cos(facing))
+    : (facing ?? 0);
+
+  ctx.save();
+  ctx.translate(mx, my);
+  ctx.rotate(arrowAngle);
+  ctx.fillStyle = MAP.player;
+  ctx.strokeStyle = MAP.playerCore;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -10);
+  ctx.lineTo(6, 8);
+  ctx.lineTo(0, 4);
+  ctx.lineTo(-6, 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
 }
 
 export class Minimap {
@@ -208,13 +257,17 @@ export class Minimap {
     this.petCompanion = null;
     this.nearbyInteractables = [];
     this.bounds = { minX: -20, maxX: 20, minZ: -100, maxZ: 20 };
-    this.padding = 10;
+    this.padding = 8;
+    this.zoomIndex = DEFAULT_ZOOM_INDEX;
+    this._mapRotation = 0;
+    this._mapRotationReady = false;
     this._pulse = 0;
     this.unavailable = false;
     this.dpr = 1;
     this.size = canvas?.width || 180;
 
     this.fallbackEl = wrapEl?.querySelector('#minimap-fallback') ?? null;
+    this.titleEl = wrapEl?.closest('#minimap-panel')?.querySelector('#minimap-title') ?? null;
     this.ctx = canvas?.getContext('2d') ?? null;
 
     if (!this.ctx) {
@@ -225,11 +278,51 @@ export class Minimap {
       return;
     }
 
-    const logicalSize = wrapEl?.clientWidth || canvas.width || 180;
-    this.resize(logicalSize);
+    this.resize(wrapEl?.clientWidth || canvas.width || 180);
+    this._bindZoomControl();
+    this._updateZoomLabel();
   }
 
-  setPlayer(player)       { this.player = player; }
+  _bindZoomControl() {
+    if (!this.wrapEl) return;
+    this.wrapEl.style.cursor = 'pointer';
+    this.wrapEl.title = 'Click to change map zoom';
+    this.wrapEl.addEventListener('click', () => this.cycleZoom());
+  }
+
+  cycleZoom() {
+    this.zoomIndex = (this.zoomIndex + 1) % ZOOM_LEVELS.length;
+    this._updateZoomLabel();
+  }
+
+  _updateZoomLabel() {
+    if (this.titleEl) {
+      this.titleEl.textContent = ZOOM_LEVELS[this.zoomIndex].label;
+    }
+  }
+
+  _isOverview() {
+    return ZOOM_LEVELS[this.zoomIndex].radius == null;
+  }
+
+  _localScale() {
+    const radius = ZOOM_LEVELS[this.zoomIndex].radius;
+    const usable = this.size - this.padding * 2;
+    return usable / (radius * 2);
+  }
+
+  _inLocalView(x, z, margin = 1.15) {
+    if (this._isOverview() || !this.player) return true;
+    const radius = ZOOM_LEVELS[this.zoomIndex].radius * margin;
+    const dx = x - this.player.position.x;
+    const dz = z - this.player.position.z;
+    return dx * dx + dz * dz <= radius * radius;
+  }
+
+  setPlayer(player) {
+    this.player = player;
+    this._mapRotationReady = false;
+  }
   setNpcs(npcs)           { this.npcs = npcs; this._recomputeBounds(); }
   setAnimals(animals)     { this.animals = animals; this._recomputeBounds(); }
   setWorldProps(props)    { this.worldProps = props; this._recomputeBounds(); }
@@ -254,11 +347,43 @@ export class Minimap {
     this.canvas.height = Math.round(size * this.dpr);
     this.canvas.style.width = `${size}px`;
     this.canvas.style.height = `${size}px`;
-
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   }
 
+  _playerFacing() {
+    return this.player?.mesh?.rotation?.y ?? this.player?.facing ?? 0;
+  }
+
+  _tickMapRotation(dt = 1 / 60) {
+    if (!this.player?.mesh || this._isOverview()) return;
+
+    const target = this._playerFacing();
+    if (!this._mapRotationReady) {
+      this._mapRotation = target;
+      this._mapRotationReady = true;
+      return;
+    }
+
+    const t = 1 - Math.exp(-10 * dt);
+    this._mapRotation = lerpAngle(this._mapRotation, target, t);
+  }
+
   _worldToMap(x, z) {
+    if (!this._isOverview() && this.player) {
+      const cx = this.size / 2;
+      const cy = this.size / 2;
+      const scale = this._localScale();
+      const dx = x - this.player.position.x;
+      const dz = z - this.player.position.z;
+      const f = this._mapRotation;
+      const localRight = dx * (-Math.cos(f)) + dz * Math.sin(f);
+      const localForward = dx * Math.sin(f) + dz * Math.cos(f);
+      return {
+        mx: cx + localRight * scale,
+        my: cy - localForward * scale,
+      };
+    }
+
     const { minX, maxX, minZ, maxZ } = this.bounds;
     const spanX = maxX - minX || 1;
     const spanZ = maxZ - minZ || 1;
@@ -269,200 +394,196 @@ export class Minimap {
     };
   }
 
-  update() {
-    if (this.unavailable || !this.ctx) return;
+  _drawRoad(ctx) {
+    const drawCurve = (curve, width, color, dash = []) => {
+      if (!curve?.getPointAt) return;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.setLineDash(dash);
+      ctx.beginPath();
+      for (let i = 0; i <= 60; i++) {
+        const p = curve.getPointAt(i / 60);
+        const { mx, my } = this._worldToMap(p.x, p.z);
+        if (i === 0) ctx.moveTo(mx, my);
+        else ctx.lineTo(mx, my);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    };
+
+    const edgeW = this._isOverview() ? 9 : 14;
+    const roadW = this._isOverview() ? 6 : 10;
+    drawCurve(this.path, edgeW, MAP.roadEdge);
+    drawCurve(this.path, roadW, MAP.road);
+    drawCurve(this.path, this._isOverview() ? 1 : 1.4, MAP.roadCenter, [2, 3]);
+    for (const curve of this.walkableCurves ?? []) {
+      if (curve === this.path) continue;
+      drawCurve(curve, this._isOverview() ? 3.5 : 5, 'rgba(168, 136, 98, 0.75)');
+    }
+  }
+
+  update(dt = 1 / 60) {
+    if (this.unavailable || !this.ctx || !this.path) return;
+
+    this._tickMapRotation(dt);
 
     const { ctx, size } = this;
+    const cx = size / 2;
+    const cy = size / 2;
     this._pulse = (this._pulse + 0.07) % (Math.PI * 2);
+
     ctx.clearRect(0, 0, size, size);
 
     ctx.save();
     ctx.beginPath();
-    ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+    ctx.arc(cx, cy, size / 2 - 1, 0, Math.PI * 2);
     ctx.clip();
 
-    const bgGrad = ctx.createRadialGradient(size / 2, size / 2, 8, size / 2, size / 2, size / 2);
-    bgGrad.addColorStop(0, '#2f5230');
-    bgGrad.addColorStop(1, '#1e3420');
-    ctx.fillStyle = bgGrad;
+    ctx.fillStyle = MAP.ground;
     ctx.fillRect(0, 0, size, size);
 
-    const harbor = this._worldToMap(22, -78);
-    ctx.fillStyle = 'rgba(58,104,144,0.75)';
-    ctx.beginPath();
-    ctx.arc(harbor.mx, harbor.my, 14, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = '#3a3830';
-    ctx.lineWidth = 8;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    for (let i = 0; i <= 60; i++) {
-      const p = this.path.getPointAt(i / 60);
-      const { mx, my } = this._worldToMap(p.x, p.z);
-      if (i === 0) ctx.moveTo(mx, my);
-      else ctx.lineTo(mx, my);
+    for (const [gx, gz, rx, rz] of GRASS_PATCHES) {
+      if (!this._inLocalView(gx, gz)) continue;
+      const { mx, my } = this._worldToMap(gx, gz);
+      const patchScale = this._isOverview()
+        ? (size - this.padding * 2) / (this.bounds.maxX - this.bounds.minX || 1)
+        : this._localScale();
+      ctx.fillStyle = MAP.grass;
+      ctx.beginPath();
+      const erx = this._isOverview() ? rx * patchScale * 0.18 : rx * patchScale * 0.35;
+      const erz = this._isOverview() ? rz * patchScale * 0.18 : rz * patchScale * 0.35;
+      ctx.ellipse(mx, my, erx, erz, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
-    ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(245,240,225,0.72)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    if (this._inLocalView(22, -78, 1.4)) {
+      const harbor = this._worldToMap(22, -78);
+      const waterRx = this._isOverview() ? 13 : 18 * this._localScale() * 0.12;
+      const waterRy = this._isOverview() ? 10 : 14 * this._localScale() * 0.12;
+      ctx.fillStyle = MAP.water;
+      ctx.beginPath();
+      ctx.ellipse(harbor.mx, harbor.my, waterRx, waterRy, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = MAP.waterEdge;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 5]);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    this._drawRoad(ctx);
 
-    // Side paths — lighter strokes
-    if (this.walkableCurves?.length) {
-      for (const curve of this.walkableCurves) {
-        if (curve === this.path) continue;
-        ctx.strokeStyle = 'rgba(130,124,112,0.55)';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        for (let i = 0; i <= 40; i++) {
-          const p = curve.getPointAt(i / 40);
-          const { mx, my } = this._worldToMap(p.x, p.z);
-          if (i === 0) ctx.moveTo(mx, my);
-          else ctx.lineTo(mx, my);
-        }
-        ctx.stroke();
+    for (const prop of this.worldProps) {
+      const pos = prop.mesh.position;
+      if (!this._inLocalView(pos.x, pos.z)) continue;
+      const id = prop.definition?.id ?? '';
+      const { mx, my } = this._worldToMap(pos.x, pos.z);
+      if (id.startsWith('shop') || id === 'home' || id === 'shrine') {
+        const scale = this._isOverview() ? 1 : Math.max(0.85, this._localScale() * 0.55);
+        const bw = (id === 'shrine' ? 9 : id === 'home' ? 7 : 6) * scale;
+        const bh = (id === 'shrine' ? 7 : 5) * scale;
+        drawBuilding(ctx, mx, my, bw, bh);
       }
     }
 
     for (const prop of this.worldProps) {
       const pos = prop.mesh.position;
+      if (!this._inLocalView(pos.x, pos.z)) continue;
       const { mx, my } = this._worldToMap(pos.x, pos.z);
       const id = prop.definition?.id ?? '';
-
-      if (id === 'home') {
-        ctx.strokeStyle = 'rgba(232,200,120,0.5)';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([2, 3]);
-        ctx.beginPath();
-        ctx.arc(mx, my, 8.5, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        homeIcon(ctx, mx, my, INTERACTION_COLORS.home);
-      } else if (id === 'shrine') {
-        starIcon(ctx, mx, my, INTERACTION_COLORS.shrine);
-      } else if (id === 'torii') {
-        toriiIcon(ctx, mx, my, INTERACTION_COLORS.torii);
-      } else if (id === 'vending') {
-        dot(ctx, mx, my, 2.6, INTERACTION_COLORS.vending, '#ffffff', 1);
-      } else if (id.startsWith('shop')) {
-        shopIcon(ctx, mx, my, INTERACTION_COLORS.shop);
-      } else if (id === 'bench') {
-        dot(ctx, mx, my, 2, INTERACTION_COLORS.bench);
-      } else if (id === 'cherry_tree' || id === 'shrine_tree') {
-        dot(ctx, mx, my, 2, INTERACTION_COLORS.tree);
-      }
+      if (id === 'home') drawPoiBadge(ctx, mx, my, whiteHomeIcon);
+      else if (id === 'shrine') drawPoiBadge(ctx, mx, my, whiteShrineIcon);
+      else if (id === 'torii') drawPoiBadge(ctx, mx, my, whiteToriiIcon);
+      else if (id.startsWith('shop')) drawPoiBadge(ctx, mx, my, whiteShopIcon);
+      else if (id === 'vending') drawPoiBadge(ctx, mx, my, whiteDotIcon);
     }
 
     for (const animal of this.animals) {
       if (animal === this.petCompanion) continue;
       const pos = animal.mesh.position;
+      if (!this._inLocalView(pos.x, pos.z)) continue;
       const { mx, my } = this._worldToMap(pos.x, pos.z);
-      pawIcon(ctx, mx, my, INTERACTION_COLORS.animal);
+      drawPoiBadge(ctx, mx, my, whitePawIcon);
     }
 
     if (this.petCompanion) {
       const pos = this.petCompanion.mesh.position;
-      const { mx, my } = this._worldToMap(pos.x, pos.z);
-      const pr = 5 + Math.sin(this._pulse) * 2;
-      dot(ctx, mx, my, pr, 'rgba(208,96,200,0.25)');
-      pawIcon(ctx, mx, my, '#ff80f0');
-      ctx.strokeStyle = '#ff80f0';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(mx, my, pr, 0, Math.PI * 2);
-      ctx.stroke();
+      if (this._inLocalView(pos.x, pos.z)) {
+        const { mx, my } = this._worldToMap(pos.x, pos.z);
+        ctx.strokeStyle = 'rgba(208,96,200,0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(mx, my, 8 + Math.sin(this._pulse) * 2, 0, Math.PI * 2);
+        ctx.stroke();
+        drawPoiBadge(ctx, mx, my, whitePawIcon);
+      }
     }
 
     for (const npc of this.npcs) {
       if (npc === this.companion) continue;
-      const { mx, my } = this._worldToMap(npc.mesh.position.x, npc.mesh.position.z);
-      if (npc.profile?.isAmbient) {
-        dot(ctx, mx, my, 2, 'rgba(200,160,100,0.65)');
-      } else {
-        personIcon(ctx, mx, my, INTERACTION_COLORS.npc, '#f8d0a0');
-      }
+      const pos = npc.mesh.position;
+      if (!this._inLocalView(pos.x, pos.z)) continue;
+      const { mx, my } = this._worldToMap(pos.x, pos.z);
+      if (!npc.profile?.isAmbient) drawPoiBadge(ctx, mx, my, whiteNpcIcon);
     }
 
     if (this.companion) {
-      const { mx, my } = this._worldToMap(
-        this.companion.mesh.position.x,
-        this.companion.mesh.position.z,
-      );
-      const pr = 6 + Math.sin(this._pulse) * 2;
-      dot(ctx, mx, my, pr, 'rgba(96,232,216,0.22)');
-      personIcon(ctx, mx, my, INTERACTION_COLORS.companion, '#c0fff8');
-      ctx.strokeStyle = INTERACTION_COLORS.companion;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(mx, my, pr, 0, Math.PI * 2);
-      ctx.stroke();
+      const pos = this.companion.mesh.position;
+      if (this._inLocalView(pos.x, pos.z)) {
+        const { mx, my } = this._worldToMap(pos.x, pos.z);
+        ctx.strokeStyle = INTERACTION_COLORS.companion;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(mx, my, 8, 0, Math.PI * 2);
+        ctx.stroke();
+        drawPoiBadge(ctx, mx, my, whiteNpcIcon);
+      }
     }
 
     for (const { item, dist } of this.nearbyInteractables) {
       const pos = getInteractablePosition(item);
-      if (!pos) continue;
+      if (!pos || !this._inLocalView(pos.x, pos.z)) continue;
       const { mx, my } = this._worldToMap(pos.x, pos.z);
       const color = getInteractableColor(item);
-      const intensity = 1 - Math.min(dist / 20, 0.75);
-      const pr = 8 + Math.sin(this._pulse + dist) * 2.5 * intensity;
-      const rgb = color.match(/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i);
-      if (rgb) {
-        const [, r, g, b] = rgb;
-        dot(ctx, mx, my, pr, `rgba(${parseInt(r, 16)},${parseInt(g, 16)},${parseInt(b, 16)},${0.15 + intensity * 0.2})`);
-      }
       ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(mx, my, pr, 0, Math.PI * 2);
+      ctx.arc(mx, my, 7 + Math.sin(this._pulse + dist) * 2, 0, Math.PI * 2);
       ctx.stroke();
-      diamondIcon(ctx, mx, my, color, 3.5);
     }
 
     if (this.player) {
-      const pos = this.player.position;
-      const { mx, my } = this._worldToMap(pos.x, pos.z);
-
-      dot(ctx, mx, my, 11, 'rgba(74,144,232,0.22)');
-
-      ctx.fillStyle = INTERACTION_COLORS.player;
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(mx, my, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      const f = this.player.facing ?? 0;
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.moveTo(mx + Math.sin(f) * 11, my + Math.cos(f) * 11);
-      ctx.lineTo(mx + Math.sin(f + 2.5) * 6, my + Math.cos(f + 2.5) * 6);
-      ctx.lineTo(mx + Math.sin(f - 2.5) * 6, my + Math.cos(f - 2.5) * 6);
-      ctx.closePath();
-      ctx.fill();
+      if (this._isOverview()) {
+        const pos = this.player.position;
+        const { mx, my } = this._worldToMap(pos.x, pos.z);
+        drawPlayerMarker(ctx, mx, my, this._playerFacing(), true);
+      } else {
+        drawPlayerMarker(ctx, cx, cy, 0);
+      }
     }
 
     ctx.restore();
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
-    ctx.lineWidth = 3;
+    const ring = ctx.createRadialGradient(cx, cy, size / 2 - 16, cx, cy, size / 2);
+    ring.addColorStop(0, 'rgba(255,255,255,0)');
+    ring.addColorStop(0.8, 'rgba(255,255,255,0.1)');
+    ring.addColorStop(1, 'rgba(255,255,255,0.38)');
+    ctx.fillStyle = ring;
     ctx.beginPath();
-    ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+    ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, size / 2 - 1.5, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(80,180,160,0.55)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(size / 2, size / 2, size / 2 - 6, 0, Math.PI * 2);
-    ctx.stroke();
+    if (this._isOverview()) {
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('N', cx, 11);
+    }
   }
 }

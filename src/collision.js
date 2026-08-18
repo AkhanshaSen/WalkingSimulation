@@ -53,7 +53,7 @@ export class ColliderWorld {
   }
 
   /** Push player position out of colliders. Mutates pos (Vector3). */
-  resolve(pos, playerRadius = 0.45, iterations = 2) {
+  resolve(pos, playerRadius = 0.45, iterations = 3) {
     let px = pos.x;
     let pz = pos.z;
 

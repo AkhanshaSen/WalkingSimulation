@@ -59,6 +59,7 @@ export const STREET_LAYOUT = [
   { t: 0.63, side: 'L', band: 'landmarkNear', type: 'landmark', id: 'garden_shrine', label: 'Rock garden' },
   { t: 0.64, side: 'R', band: 'sidewalk', type: 'prop', id: 'infoBoard', label: 'Community notice board' },
   { t: 0.66, side: 'R', band: 'landmarkDeep', type: 'landmark', id: 'shrine', label: 'Elevated shrine' },
+  { t: 0.66, side: 'R', band: 'landmarkDeep', type: 'landmark', id: 'torii_shrine', label: 'Shrine torii gate' },
   { t: 0.76, side: 'R', band: 'landmarkNear', type: 'landmark', id: 'garden_approach', label: 'Shrub garden' },
   { t: 0.74, side: 'L', band: 'sidewalk', type: 'prop', id: 'utility_1', label: 'Utility pole' },
   { t: 0.80, side: 'L', band: 'sidewalk', type: 'prop', id: 'utility_2', label: 'Utility pole' },

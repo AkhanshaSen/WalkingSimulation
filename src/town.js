@@ -92,7 +92,7 @@ function isTooCloseSolid(pos, placed, radius = 1) {
 }
 
 /** Try primary placement, then nudge along path / outward before giving up. */
-function tryPlaceWithClearance(group, path, t, side, offset, placed, radius, face = 'street') {
+function tryPlaceWithClearance(group, path, t, side, offset, placed, radius, face = 'street', tangentShift = 0) {
   const attempts = [];
   for (const dt of [0, 0.03, -0.03, 0.06, -0.06, 0.09, -0.09, 0.12, -0.12]) {
     for (const dOff of [0, 0.35, 0.7]) {
@@ -103,6 +103,12 @@ function tryPlaceWithClearance(group, path, t, side, offset, placed, radius, fac
     const clampedT = THREE.MathUtils.clamp(tryT, 0.02, 0.98);
     if (tryOffset < SIDWALK_PROP_OFFSET - 0.2) continue;
     placeAlongPath(group, path, clampedT, side, tryOffset, 0, face);
+    if (tangentShift) {
+      const tangent = path.getTangentAt(clampedT).normalize();
+      group.position.x += tangent.x * tangentShift;
+      group.position.z += tangent.z * tangentShift;
+      snapGroupToGround(group);
+    }
     if (!isTooCloseSolid(group.position, placed, radius)) {
       return { t: clampedT, offset: tryOffset };
     }
@@ -2743,13 +2749,25 @@ export class Town {
         halfW: 2.4, halfD: 2.6, spawn: 'shrine',
         make: () => createElevatedShrine(), face: 'street',
       },
+      {
+        id: 'torii_shrine',
+        t: 0.66,
+        side: 1,
+        offset: LANDMARK_DEEP_OFFSET,
+        tangentShift: 2.85,
+        halfW: 1.6,
+        halfD: 0.45,
+        make: () => createTorii(),
+        face: 'street',
+        spawn: 'torii',
+      },
     ];
 
     landmarkDefs.forEach((def) => {
       const item = def.make();
       const solidR = def.radius ?? measureSolidRadius(item, 2.2);
       const placement = tryPlaceWithClearance(
-        item, this.path, def.t, def.side, def.offset, this._placedPositions, solidR, def.face ?? 'street',
+        item, this.path, def.t, def.side, def.offset, this._placedPositions, solidR, def.face ?? 'street', def.tangentShift ?? 0,
       );
       if (!placement) return;
 

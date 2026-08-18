@@ -645,7 +645,7 @@ export class Game {
         this.interactables.findAllInRange(this.player.position, 20),
       );
     }
-    this.minimap?.update();
+    this.minimap?.update(dt);
     this.dayNight?.update(dt);
     this.town.update(this.clock.elapsedTime);
 
