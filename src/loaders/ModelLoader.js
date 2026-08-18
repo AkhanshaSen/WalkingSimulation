@@ -82,6 +82,31 @@ export function snapToGround(object, y = 0) {
 /** Ground speed (m/s) that matches one walk/sprint cycle at timeScale 1 for 1.72 m rigs. */
 const WALK_GROUND_SPEED = 2.4;
 const SPRINT_GROUND_SPEED = 5.0;
+const ROOT_BONE_PATTERN = /(^|\/)(root|hips|pelvis)(_\d+)?$/i;
+const ROOT_POSITION_TRACK = /(^|\/)(root|hips|pelvis)(_\d+)?\.position$/i;
+
+/** Kenney walk clips translate the root bone — strip XZ so gameplay drives position. */
+function stripHorizontalRootMotion(clips = []) {
+  for (const clip of clips) {
+    for (const track of clip.tracks) {
+      if (!ROOT_POSITION_TRACK.test(track.name)) continue;
+      const values = track.values;
+      for (let i = 0; i < values.length; i += 3) {
+        values[i] = 0;
+        values[i + 2] = 0;
+      }
+    }
+  }
+}
+
+function findRootBone(object) {
+  let rootBone = null;
+  object.traverse((node) => {
+    if (!node.isBone || rootBone) return;
+    if (ROOT_BONE_PATTERN.test(node.name)) rootBone = node;
+  });
+  return rootBone;
+}
 
 function buildActionMap(mixer, animations) {
   const actions = {};
@@ -191,9 +216,12 @@ export class ModelLoader {
           root.traverse((c) => { c.userData.modelKey = key; });
 
           if (def.rigged) {
+            const animations = (gltf.animations ?? []).map((clip) => clip.clone());
+            stripHorizontalRootMotion(animations);
             this.characterTemplates.set(key, {
               scene: root,
-              animations: gltf.animations ?? [],
+              animations,
+              rootBone: findRootBone(root),
             });
           } else {
             this.templates.set(key, root);
@@ -248,6 +276,8 @@ export class ModelLoader {
 
     wrapper.userData.isRiggedCharacter = true;
     wrapper.userData.mixer = mixer;
+    wrapper.userData.rigModel = model;
+    wrapper.userData.rootBone = template.rootBone ?? findRootBone(model);
     wrapper.userData.actions = actions;
     wrapper.userData.currentAnim = null;
     wrapper.userData.legs = null;
@@ -306,6 +336,13 @@ export class ModelLoader {
     const mixer = character.userData.mixer;
     if (!mixer) return;
     mixer.update(dt);
+
+    const rootBone = character.userData.rootBone;
+    if (rootBone) {
+      rootBone.position.x = 0;
+      rootBone.position.z = 0;
+    }
+    character.userData.rigModel?.position.set(0, character.userData.rigModel.position.y, 0);
 
     const isSitting = character.userData.isSitting;
     const isJumping = character.userData.isJumping;

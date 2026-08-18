@@ -70,9 +70,34 @@ export const STREET_LAYOUT = [
 ];
 
 export const TREE_LAYOUT = [
-  { t: 0.08, side: 'R', dist: 13.5, variant: 'cherry' },
-  { t: 0.42, side: 'L', dist: 14.0, variant: 'cherry' },
-  { t: 0.72, side: 'R', dist: 13.5, variant: 'pine', shrineTree: true },
+  { t: 0.04, side: 'L', dist: 14.0, variant: 'sakura' },
+  { t: 0.05, side: 'R', dist: 13.8, variant: 'blush' },
+  { t: 0.08, side: 'R', dist: 13.5, variant: 'cherry', cherryTree: true },
+  { t: 0.11, side: 'L', dist: 14.2, variant: 'sakura' },
+  { t: 0.15, side: 'R', dist: 13.6, variant: 'cherry' },
+  { t: 0.19, side: 'L', dist: 14.5, variant: 'blush' },
+  { t: 0.23, side: 'R', dist: 13.9, variant: 'sakura' },
+  { t: 0.28, side: 'L', dist: 14.0, variant: 'cherry' },
+  { t: 0.32, side: 'R', dist: 13.7, variant: 'sakura' },
+  { t: 0.36, side: 'L', dist: 14.3, variant: 'blush' },
+  { t: 0.40, side: 'R', dist: 13.5, variant: 'cherry' },
+  { t: 0.42, side: 'L', dist: 14.0, variant: 'sakura' },
+  { t: 0.45, side: 'R', dist: 14.8, variant: 'cherry' },
+  { t: 0.49, side: 'L', dist: 13.8, variant: 'blush' },
+  { t: 0.53, side: 'R', dist: 14.2, variant: 'sakura' },
+  { t: 0.57, side: 'L', dist: 13.6, variant: 'cherry' },
+  { t: 0.61, side: 'R', dist: 14.6, variant: 'sakura' },
+  { t: 0.65, side: 'L', dist: 13.9, variant: 'blush' },
+  { t: 0.68, side: 'R', dist: 14.1, variant: 'cherry' },
+  { t: 0.72, side: 'R', dist: 13.5, variant: 'sakura', shrineTree: true },
+  { t: 0.75, side: 'L', dist: 14.4, variant: 'cherry' },
+  { t: 0.79, side: 'R', dist: 13.7, variant: 'blush' },
+  { t: 0.83, side: 'L', dist: 14.8, variant: 'sakura' },
+  { t: 0.87, side: 'R', dist: 13.8, variant: 'cherry' },
+  { t: 0.91, side: 'L', dist: 14.2, variant: 'sakura' },
+  { t: 0.95, side: 'R', dist: 13.6, variant: 'blush' },
+  { t: 0.97, side: 'L', dist: 14.3, variant: 'cherry' },
+  { t: 0.99, side: 'R', dist: 14.5, variant: 'sakura' },
 ];
 
 export const BUILDING_LAYOUT = [];

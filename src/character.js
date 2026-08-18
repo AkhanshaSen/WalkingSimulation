@@ -12,6 +12,11 @@ function hashProfileId(id = '') {
   return [...id].reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
 }
 
+function lerpAngle(from, to, t) {
+  const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from));
+  return from + delta * t;
+}
+
 export function resolveNpcPathSide(profile, index = 0) {
   if (profile.pathSide != null) return profile.pathSide;
   return hashProfileId(profile.id) % 2 === 0 ? -1 : 1;
@@ -631,6 +636,7 @@ export class Player {
     this.isGrounded = true;
     this.colliderWorld = null;
     this.walkableCurves = null;
+    this._animSpeed = 0;
   }
 
   applySpeedBoost(amount, duration) {
@@ -713,6 +719,7 @@ export class Player {
 
     this._applyHorizontalMovement(dt);
     this._clampToWalkableArea();
+    this._syncVelocityFromMotion(prevX, prevZ, dt, hasMoveInput);
 
     const groundY = this._sampleGround(this.mesh.position, groundMeshes);
 
@@ -729,19 +736,22 @@ export class Player {
       this.mesh.position.y = groundY;
     }
 
-    this.mesh.rotation.y = THREE.MathUtils.lerp(this.mesh.rotation.y, this.facing, 0.15);
+    const turnT = hasMoveInput ? Math.min(1, dt * 16) : Math.min(1, dt * 8);
+    this.mesh.rotation.y = lerpAngle(this.mesh.rotation.y, this.facing, turnT);
 
     const safeDt = Math.max(dt, 1e-5);
     const actualSpeed = Math.hypot(
       this.mesh.position.x - prevX,
       this.mesh.position.z - prevZ,
     ) / safeDt;
-    animateCharacter(this.mesh, actualSpeed < 0.08 ? 0 : actualSpeed, dt);
+    const targetAnimSpeed = actualSpeed < 0.08 ? 0 : actualSpeed;
+    this._animSpeed = THREE.MathUtils.lerp(this._animSpeed, targetAnimSpeed, hasMoveInput ? 0.35 : 0.5);
+    animateCharacter(this.mesh, this._animSpeed < 0.08 ? 0 : this._animSpeed, dt);
 
     this.pathT = this.path.getClosestPointT?.(this.mesh.position) ?? 0;
   }
 
-  /** Move on XZ with axis-separated collision so walls don't cause diagonal drift. */
+  /** Move on XZ, resolve once, then drop stale velocity into walls. */
   _applyHorizontalMovement(dt) {
     if (this.velocity.lengthSq() < 1e-8) return;
 
@@ -749,14 +759,29 @@ export class Player {
     const velX = this.velocity.x * dt;
     const velZ = this.velocity.z * dt;
 
+    pos.x += velX;
+    pos.z += velZ;
     if (this.colliderWorld) {
-      pos.x += velX;
       this.colliderWorld.resolve(pos, 0.45);
-      pos.z += velZ;
-      this.colliderWorld.resolve(pos, 0.45);
-    } else {
-      pos.x += velX;
-      pos.z += velZ;
+    }
+  }
+
+  _syncVelocityFromMotion(prevX, prevZ, dt, hasMoveInput) {
+    const dx = this.mesh.position.x - prevX;
+    const dz = this.mesh.position.z - prevZ;
+    const safeDt = Math.max(dt, 1e-5);
+    const actualSpeed = Math.hypot(dx, dz) / safeDt;
+
+    if (!hasMoveInput || actualSpeed < 0.05) {
+      this.velocity.set(0, 0, 0);
+      return;
+    }
+
+    const intentSpeed = this.velocity.length();
+    if (intentSpeed < 1e-6) return;
+
+    if (actualSpeed < intentSpeed * 0.45) {
+      this.velocity.set(dx / safeDt, 0, dz / safeDt);
     }
   }
 
@@ -796,8 +821,13 @@ export class Player {
       }
     }
 
-    pos.x = THREE.MathUtils.clamp(pos.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX);
-    pos.z = THREE.MathUtils.clamp(pos.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ);
+    const clampedX = THREE.MathUtils.clamp(pos.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX);
+    const clampedZ = THREE.MathUtils.clamp(pos.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ);
+    if (Math.abs(clampedX - pos.x) > 0.001 || Math.abs(clampedZ - pos.z) > 0.001) {
+      this.velocity.set(0, 0, 0);
+    }
+    pos.x = clampedX;
+    pos.z = clampedZ;
   }
 
   _sampleGround(pos, groundMeshes) {

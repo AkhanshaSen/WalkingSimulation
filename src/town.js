@@ -6,6 +6,7 @@ import {
 } from './materials.js';
 import { snapToGround } from './loaders/ModelLoader.js';
 import { ColliderWorld } from './collision.js';
+import { TREE_LAYOUT } from './data/streetMap.js';
 
 let _modelLoader = null;
 
@@ -34,6 +35,23 @@ const SHOP_OFFSET = 6.6;
 const LANDMARK_NEAR_OFFSET = 5.0;
 const LANDMARK_DEEP_OFFSET = 7.4;
 const TREE_OFFSET = 13.5;
+
+const TREE_VARIANTS = {
+  cherry: { glb: 'tree_cherry', height: 4.8, tint: 0xf0a0b8, tintStrength: 0.55, isCherry: true },
+  sakura: { glb: 'tree_cherry', height: 5.15, tint: 0xffc8d8, tintStrength: 0.42, isCherry: true },
+  blush: { glb: 'tree_cherry', height: 4.95, tint: 0xffa0c0, tintStrength: 0.58, isCherry: true },
+  normal: { glb: 'tree_normal', height: 5.5, tint: null, tintStrength: 0.28 },
+  maple: { glb: 'tree_normal', height: 5.05, tint: 0xc87830, tintStrength: 0.4 },
+  lime: { glb: 'tree_normal', height: 5.75, tint: 0x88b848, tintStrength: 0.34 },
+  forest: { glb: 'tree_normal', height: 6.05, tint: 0x3a6848, tintStrength: 0.46 },
+  golden: { glb: 'tree_normal', height: 5.35, tint: 0xc0a840, tintStrength: 0.36 },
+  pine: { glb: 'tree_normal', height: 6.35, tint: 0x2a5838, tintStrength: 0.52 },
+};
+
+function treeScaleFromSeed(seed = 0) {
+  const x = Math.sin(seed * 127.1) * 43758.5453;
+  return 0.9 + (x - Math.floor(x)) * 0.22;
+}
 
 function placeAlongPath(group, path, t, side, offset, y = 0, face = 'street') {
   const pos = path.getPointAt(t);
@@ -1249,20 +1267,66 @@ function createGardenFenceSegment(size = 0.5) {
   return group;
 }
 
-function createTree(variant = 'normal') {
-  const treeHeights = { cherry: 4.8, normal: 5.5, pine: 6.0 };
-  if (variant !== 'pine') {
-    const key = variant === 'cherry' ? 'tree_cherry' : 'tree_normal';
-    const model = _modelLoader?.createInstance(key, {
-      targetHeight: treeHeights[variant] ?? 5.5,
-      tint: variant === 'cherry' ? 0xf0a0b8 : null,
-      tintStrength: variant === 'cherry' ? 0.55 : 0.28,
-      rotationY: Math.random() * Math.PI * 2,
-    });
-    if (model) {
-      if (variant === 'cherry') model.userData.isCherry = true;
-      return model;
-    }
+function createProceduralCherryTree(variant = 'cherry', scaleMul = 1, rotationY = null) {
+  const palette = {
+    cherry: { main: 0xf090a8, light: 0xf8b0c8, accent: 0xffc8dc },
+    sakura: { main: 0xffb8d0, light: 0xffd0e4, accent: 0xffe8f2 },
+    blush: { main: 0xff78a8, light: 0xff98bc, accent: 0xffb8d0 },
+  };
+  const c = palette[variant] ?? palette.cherry;
+
+  const tree = new THREE.Group();
+  tree.rotation.y = rotationY ?? Math.random() * Math.PI * 2;
+
+  const trunk = createSoftOutlinedMesh(
+    new THREE.CylinderGeometry(0.11, 0.15, 1.05, 6),
+    createToonMaterial(0x6a5040),
+  );
+  trunk.position.y = 0.52;
+  tree.add(trunk);
+
+  const puffs = [
+    [0, 1.42, 0, 0.74, c.main],
+    [-0.44, 1.26, 0.16, 0.54, c.light],
+    [0.42, 1.3, -0.18, 0.56, c.main],
+    [0.1, 1.74, 0.12, 0.46, c.accent],
+    [-0.3, 1.56, -0.24, 0.42, c.light],
+    [0.36, 1.52, 0.3, 0.4, c.accent],
+    [0, 1.12, 0.34, 0.36, c.main],
+    [-0.18, 1.38, 0.38, 0.32, c.accent],
+    [0.22, 1.22, -0.36, 0.34, c.light],
+  ];
+  puffs.forEach(([x, y, z, s, col]) => {
+    const puff = createSoftOutlinedMesh(new THREE.SphereGeometry(s, 10, 8), createToonMaterial(col));
+    puff.position.set(x, y, z);
+    tree.add(puff);
+  });
+
+  tree.scale.setScalar(2.05 * scaleMul);
+  tree.userData.isCherry = true;
+  tree.userData.treeVariant = variant;
+  tree.userData.isProceduralTree = true;
+  return tree;
+}
+
+function createTree(variant = 'normal', options = {}) {
+  const preset = TREE_VARIANTS[variant] ?? TREE_VARIANTS.normal;
+  const scaleMul = options.scale ?? 1;
+
+  // Kenney tree_cherry GLB is still green — use procedural blossom canopies for pink variants.
+  if (preset.isCherry) {
+    return createProceduralCherryTree(variant, scaleMul, options.rotationY);
+  }
+
+  const model = _modelLoader?.createInstance(preset.glb, {
+    targetHeight: preset.height * scaleMul,
+    tint: preset.tint,
+    tintStrength: preset.tintStrength,
+    rotationY: options.rotationY ?? Math.random() * Math.PI * 2,
+  });
+  if (model) {
+    model.userData.treeVariant = variant;
+    return model;
   }
 
   const tree = new THREE.Group();
@@ -1273,20 +1337,7 @@ function createTree(variant = 'normal') {
   trunk.position.y = 0.5;
   tree.add(trunk);
 
-  if (variant === 'cherry') {
-    const puffs = [
-      [0, 1.4, 0, 0.65, 0xf0a0b8],
-      [-0.35, 1.25, 0.15, 0.48, 0xf8b8cc],
-      [0.35, 1.3, -0.15, 0.5, 0xf0a0c0],
-      [0, 1.65, 0.2, 0.42, 0xffc0d0],
-    ];
-    puffs.forEach(([x, y, z, s, c]) => {
-      const puff = createSoftOutlinedMesh(new THREE.SphereGeometry(s, 9, 7), createToonMaterial(c));
-      puff.position.set(x, y, z);
-      tree.add(puff);
-    });
-    tree.userData.isCherry = true;
-  } else if (variant === 'pine') {
+  if (variant === 'pine') {
     [0.65, 0.48, 0.32].forEach((r, i) => {
       const layer = createSoftOutlinedMesh(
         new THREE.ConeGeometry(r, 0.55, 6),
@@ -1296,11 +1347,12 @@ function createTree(variant = 'normal') {
       tree.add(layer);
     });
   } else {
+    const leaf = preset.tint ?? (0x5a9a5a + Math.floor(Math.random() * 0x050505));
     [[0, 1.35, 0, 0.55], [-0.28, 1.2, 0.2, 0.4], [0.3, 1.25, -0.18, 0.42], [0, 1.55, 0.1, 0.35]].forEach(
       ([x, y, z, s]) => {
         const foliage = createSoftOutlinedMesh(
           new THREE.SphereGeometry(s, 8, 6),
-          createToonMaterial(0x5a9a5a + Math.floor(Math.random() * 0x050505)),
+          createToonMaterial(typeof leaf === 'number' ? leaf : 0x5a9a5a),
         );
         foliage.position.set(x, y, z);
         tree.add(foliage);
@@ -1308,8 +1360,9 @@ function createTree(variant = 'normal') {
     );
   }
 
-  const fallbackScale = variant === 'pine' ? 2.3 : variant === 'cherry' ? 1.9 : 2.1;
+  const fallbackScale = (variant === 'pine' ? 2.3 : 2.1) * scaleMul;
   tree.scale.setScalar(fallbackScale);
+  tree.userData.treeVariant = variant;
   return tree;
 }
 
@@ -2439,11 +2492,11 @@ export class Town {
     onProgress?.('Adding details…');
     this._createProps();
     this._createStreetFurniture();
+    this._createStreetLamps();
     this._createVegetation();
     this._createEnvironmentDetails();
     this._createClouds();
     this._createLighting();
-    this._createStreetLamps();
     onProgress?.('Ready');
   }
 
@@ -2976,29 +3029,35 @@ export class Town {
   }
 
   _createVegetation() {
-    const treeSpots = [
-      { t: 0.08, side: 1, dist: TREE_OFFSET, variant: 'cherry', cherryTree: true },
-      { t: 0.42, side: -1, dist: TREE_OFFSET + 0.5, variant: 'cherry' },
-      { t: 0.72, side: 1, dist: TREE_OFFSET, variant: 'pine', shrineTree: true },
-    ];
+    let placed = 0;
+    for (const spot of TREE_LAYOUT) {
+      if (this._placeStreetTree(spot)) placed += 1;
+    }
+    if (placed < TREE_LAYOUT.length) {
+      console.info(`Town: placed ${placed}/${TREE_LAYOUT.length} street trees (others skipped for clearance).`);
+    }
+  }
 
-    treeSpots.forEach(({ t, side, dist, variant, shrineTree, cherryTree }) => {
-      const tree = createTree(variant);
-      const solidR = measureSolidRadius(tree, 2.0);
-      const placement = tryPlaceWithClearance(
-        tree, this.path, t, side, dist, this._placedPositions, solidR,
-      );
-      if (!placement) return;
+  _placeStreetTree(spot) {
+    const side = spot.side === 'L' ? -1 : 1;
+    const dist = spot.dist ?? TREE_OFFSET;
+    const scale = treeScaleFromSeed(spot.t * 1000 + side * 17);
+    const tree = createTree(spot.variant ?? 'normal', { scale });
+    const solidR = measureSolidRadius(tree, 1.8);
+    const placement = tryPlaceWithClearance(
+      tree, this.path, spot.t, side, dist, this._placedPositions, solidR,
+    );
+    if (!placement) return false;
 
-      this.scene.add(tree);
-      this._addCircleCollider(tree.position.x, tree.position.z, Math.min(solidR, 1.2));
-      registerSolid(this._placedPositions, tree.position, solidR);
-      if (cherryTree) {
-        this._recordSpawn('cherry_tree', tree.position);
-      } else if (shrineTree) {
-        this._recordSpawn('shrine_tree', tree.position);
-      }
-    });
+    this.scene.add(tree);
+    this._addCircleCollider(tree.position.x, tree.position.z, Math.min(solidR * 0.55, 1.0));
+    registerSolid(this._placedPositions, tree.position, solidR);
+    if (spot.cherryTree) {
+      this._recordSpawn('cherry_tree', tree.position);
+    } else if (spot.shrineTree) {
+      this._recordSpawn('shrine_tree', tree.position);
+    }
+    return true;
   }
 
   _createEnvironmentDetails() {
