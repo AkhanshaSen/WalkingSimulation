@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import {
-  createToonMaterial, createOutlinedMesh, createSoftOutlinedMesh,
+  createToonMaterial, createOutlinedMesh, createSoftOutlinedMesh, createFastMesh,
   createGrassTexture, createSoilTexture, createMulchTexture,
   createVendingDisplayTexture, createWaterMaterial, PALETTE, nextFrame,
 } from './materials.js';
 import { snapToGround } from './loaders/ModelLoader.js';
 import { ColliderWorld } from './collision.js';
 import { TREE_LAYOUT } from './data/streetMap.js';
+import { PERF } from './performance.js';
 
 let _modelLoader = null;
 
@@ -1278,7 +1279,7 @@ function createProceduralCherryTree(variant = 'cherry', scaleMul = 1, rotationY 
   const tree = new THREE.Group();
   tree.rotation.y = rotationY ?? Math.random() * Math.PI * 2;
 
-  const trunk = createSoftOutlinedMesh(
+  const trunk = createFastMesh(
     new THREE.CylinderGeometry(0.11, 0.15, 1.05, 6),
     createToonMaterial(0x6a5040),
   );
@@ -1293,11 +1294,9 @@ function createProceduralCherryTree(variant = 'cherry', scaleMul = 1, rotationY 
     [-0.3, 1.56, -0.24, 0.42, c.light],
     [0.36, 1.52, 0.3, 0.4, c.accent],
     [0, 1.12, 0.34, 0.36, c.main],
-    [-0.18, 1.38, 0.38, 0.32, c.accent],
-    [0.22, 1.22, -0.36, 0.34, c.light],
   ];
   puffs.forEach(([x, y, z, s, col]) => {
-    const puff = createSoftOutlinedMesh(new THREE.SphereGeometry(s, 10, 8), createToonMaterial(col));
+    const puff = createFastMesh(new THREE.SphereGeometry(s, 8, 6), createToonMaterial(col));
     puff.position.set(x, y, z);
     tree.add(puff);
   });
@@ -2337,6 +2336,7 @@ export class Town {
     this.walkableCurves = [];
     this._butterflies = null;
     this._fireflies = null;
+    this._instancedDummy = new THREE.Object3D();
     this.path = this._createPath();
     this.walkableCurves = [this.path];
   }
@@ -2555,7 +2555,7 @@ export class Town {
 
     // Instanced cherry petals
     if (this._petalMesh && this._petalData) {
-      const dummy = new THREE.Object3D();
+      const dummy = this._instancedDummy;
       this._petalData.forEach((p, i) => {
         p.x += (p.vx + Math.sin(elapsed * 0.7 + p.z) * 0.12) * dt;
         p.y += p.vy * dt;
@@ -2576,7 +2576,7 @@ export class Town {
 
     // Butterflies
     if (this._butterflies) {
-      const dummy = new THREE.Object3D();
+      const dummy = this._instancedDummy;
       this._butterflyData.forEach((b, i) => {
         b.phase += dt * b.speed;
         b.x += Math.sin(b.phase) * 0.4 * dt;
@@ -2593,7 +2593,7 @@ export class Town {
 
     // Fireflies near shrine
     if (this._fireflies) {
-      const dummy = new THREE.Object3D();
+      const dummy = this._instancedDummy;
       this._fireflyData.forEach((f, i) => {
         f.phase += dt * f.speed;
         f.x = f.baseX + Math.sin(f.phase) * 1.2;
@@ -3132,7 +3132,7 @@ export class Town {
     const sun = new THREE.DirectionalLight(0xfff4e8, 0.65);
     sun.position.set(18, 28, 12);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(PERF.shadowMapSize, PERF.shadowMapSize);
     sun.shadow.camera.near = 0.5;
     sun.shadow.camera.far = 100;
     sun.shadow.camera.left   = -22;

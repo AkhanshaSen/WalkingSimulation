@@ -61,6 +61,8 @@ function computeNightBlend(hour) {
   return 0;
 }
 
+export { computeNightBlend };
+
 export class DayNightCycle {
   constructor(game, town) {
     this.game = game;
@@ -70,6 +72,8 @@ export class DayNightCycle {
     this.dayIndex = 1;
     this.clockPaused = false;
     this._lastSkyBucket = null;
+    this._lightingKey = null;
+    this._lastHudMinute = -1;
     this.timeEl = document.getElementById('time-display');
     this.periodEl = document.getElementById('period-display');
   }
@@ -104,7 +108,8 @@ export class DayNightCycle {
 
   setTimeMinutes(totalMinutes) {
     this.timeMinutes = ((Math.round(totalMinutes) % (24 * 60)) + 24 * 60) % (24 * 60);
-    this._applyLighting();
+    this._lightingKey = null;
+    this._applyLighting(this.hourFloat, computeNightBlend(this.hourFloat));
     this._updateHUD();
     this._syncControls?.();
     this._notifySkyIfNeeded();
@@ -192,9 +197,43 @@ export class DayNightCycle {
       if (this.timeMinutes < prev) this.dayIndex += 1;
       this._notifySkyIfNeeded();
     }
-    this._applyLighting();
-    this._updateHUD();
+
+    const hour = this.hourFloat;
+    const nightBlend = computeNightBlend(hour);
+    this._updateSunFollow(hour, nightBlend);
+
+    const minuteKey = Math.floor(this.timeMinutes);
+    const lightingKey = `${minuteKey}:${Math.round(nightBlend * 25)}`;
+    if (lightingKey !== this._lightingKey) {
+      this._lightingKey = lightingKey;
+      this._applyLighting(hour, nightBlend);
+    }
+
+    if (minuteKey !== this._lastHudMinute) {
+      this._lastHudMinute = minuteKey;
+      this._updateHUD();
+    }
+
     if (!this.clockPaused) this._syncControls?.();
+  }
+
+  _updateSunFollow(hour, nightBlend) {
+    const lights = this.town?.lights;
+    if (!lights?.sun) return;
+
+    const sample = sampleSkyKeys(hour);
+    lights.sun.color.setHex(sample.sun);
+    lights.sun.intensity = sample.sunI;
+    const sunAngle = ((hour - 6) / 12) * Math.PI;
+    const sunHeight = Math.max(0.08, Math.sin(sunAngle));
+    const pp = this.game.player?.position ?? { x: 0, z: -40 };
+    lights.sun.position.set(
+      pp.x + 14 * Math.cos(sunAngle * 0.5),
+      8 + sunHeight * 24,
+      pp.z + 10 + sunHeight * 8,
+    );
+
+    if (this.town) this.town._nightBlend = nightBlend;
   }
 
   _updateHUD() {
@@ -213,15 +252,13 @@ export class DayNightCycle {
     this.game?.quests?.onTimeChange(this.hourFloat);
   }
 
-  _applyLighting() {
+  _applyLighting(hour = this.hourFloat, nightBlend = computeNightBlend(hour)) {
     const { scene, renderer } = this.game;
     const town = this.town;
     const lights = town?.lights;
     if (!scene || !lights) return;
 
-    const hour = this.hourFloat;
     const sample = sampleSkyKeys(hour);
-    const nightBlend = computeNightBlend(hour);
     if (town) town._nightBlend = nightBlend;
 
     scene.background.setHex(sample.sky);
@@ -232,18 +269,6 @@ export class DayNightCycle {
       lights.hemi.groundColor.setHex(sample.hemiGround);
       lights.hemi.intensity = lerpNum(0.9, 1.35, sample.sunI / 0.72);
     }
-    if (lights.sun) {
-      lights.sun.color.setHex(sample.sun);
-      lights.sun.intensity = sample.sunI;
-      const sunAngle = ((hour - 6) / 12) * Math.PI;
-      const sunHeight = Math.max(0.08, Math.sin(sunAngle));
-      const pp = this.game.player?.position ?? { x: 0, z: -40 };
-      lights.sun.position.set(
-        pp.x + 14 * Math.cos(sunAngle * 0.5),
-        8 + sunHeight * 24,
-        pp.z + 10 + sunHeight * 8,
-      );
-    }
     if (lights.ambient) {
       lights.ambient.color.setHex(sample.ambient);
       lights.ambient.intensity = sample.ambientI;
@@ -252,18 +277,18 @@ export class DayNightCycle {
       lights.fill.intensity = lerpNum(0.22, 0.5, sample.sunI / 0.72);
     }
 
+    const usePointLights = this.game?.perf?.usePointLights ?? false;
+    const streetIntensity = usePointLights ? lerpNum(0.18, 0.42, nightBlend) : 0;
     lights.street?.forEach((pl) => {
-      pl.intensity = lerpNum(0.18, 0.42, nightBlend);
+      pl.intensity = streetIntensity;
     });
 
     town?.streetLampLights?.forEach((pl) => {
-      pl.intensity = lerpNum(0, 2.4, nightBlend);
+      pl.intensity = usePointLights ? lerpNum(0, 2.4, nightBlend) : 0;
     });
 
-    town?.shopLights?.forEach((pl, i) => {
-      const role = i % 3;
-      const peak = role === 0 ? 1.35 : role === 1 ? 1.05 : 0.85;
-      pl.intensity = lerpNum(0, peak, nightBlend);
+    town?.shopLights?.forEach((pl) => {
+      pl.intensity = 0;
     });
 
     town?.shopWindowMaterials?.forEach((mat) => {
@@ -273,7 +298,7 @@ export class DayNightCycle {
       }
       mat.emissiveIntensity = lerpNum(
         mat.userData.baseEmissiveIntensity * 0.25,
-        mat.userData.baseEmissiveIntensity * 1.35,
+        mat.userData.baseEmissiveIntensity * 1.55,
         nightBlend,
       );
     });
@@ -286,11 +311,11 @@ export class DayNightCycle {
       if (mesh.userData.baseEmissiveIntensity == null) {
         mesh.userData.baseEmissiveIntensity = mesh.material.emissiveIntensity || 0.35;
       }
-      mesh.material.emissiveIntensity = lerpNum(0.12, 1.35, nightBlend);
+      mesh.material.emissiveIntensity = lerpNum(0.15, 1.65, nightBlend);
     });
 
     if (lights.shrine) {
-      lights.shrine.intensity = lerpNum(0.22, 0.85, nightBlend);
+      lights.shrine.intensity = usePointLights ? lerpNum(0.22, 0.85, nightBlend) : 0;
     }
 
     if (renderer) {

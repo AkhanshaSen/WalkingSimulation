@@ -14,7 +14,7 @@ import { InteractableRegistry } from './interaction/InteractableRegistry.js';
 import { Minimap } from './minimap.js';
 import { ModelLoader } from './loaders/ModelLoader.js';
 import { MoodSystem } from './MoodSystem.js';
-import { DayNightCycle } from './DayNightCycle.js';
+import { DayNightCycle, computeNightBlend } from './DayNightCycle.js';
 import { DayJournal } from './DayJournal.js';
 import { QuestSystem } from './QuestSystem.js';
 import { setExpression } from './character.js';
@@ -32,6 +32,7 @@ import { SHOP_CATALOG } from './data/shopData.js';
 import { ANIMAL_DEFINITIONS } from './data/animalData.js';
 import { resolveNpcSpawnPositions, applyNpcGroupSeparation } from './npcSeparation.js';
 import { MusicManager } from './audio/MusicManager.js';
+import { PERF } from './performance.js';
 
 function closestPointOnPath(path, point, samples = 100) {
   let closestT = 0;
@@ -68,19 +69,26 @@ export class Game {
     this.clock = new THREE.Clock();
     this.raycaster = new THREE.Raycaster();
     this.ready = false;
+    this.perf = PERF;
+    this._minimapAccum = 0;
 
+    const dpr = Math.min(window.devicePixelRatio || 1, this.perf.dprMax);
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: false,
       powerPreference: 'high-performance',
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = this.perf.softShadows
+      ? THREE.PCFSoftShadowMap
+      : THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.08;
+
+    this.usePostProcessing = this.perf.usePostProcessing;
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x91d3c8);
@@ -98,17 +106,17 @@ export class Game {
     this.outfitOpen = false;
     this.music = new MusicManager();
 
-    // Post-processing: FXAA anti-aliasing only — no bloom (bloom washes out labels)
-    this.composer = new EffectComposer(this.renderer);
-    this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.composer.addPass(new OutputPass());
-    // FXAA must come after OutputPass so it reads the final sRGB buffer
-    this._fxaaPass = new ShaderPass(FXAAShader);
-    this._fxaaPass.material.uniforms.resolution.value.set(
-      1 / (window.innerWidth  * Math.min(window.devicePixelRatio, 2)),
-      1 / (window.innerHeight * Math.min(window.devicePixelRatio, 2)),
-    );
-    this.composer.addPass(this._fxaaPass);
+    if (this.usePostProcessing) {
+      this.composer = new EffectComposer(this.renderer);
+      this.composer.addPass(new RenderPass(this.scene, this.camera));
+      this.composer.addPass(new OutputPass());
+      this._fxaaPass = new ShaderPass(FXAAShader);
+      this._fxaaPass.material.uniforms.resolution.value.set(
+        1 / (window.innerWidth * dpr),
+        1 / (window.innerHeight * dpr),
+      );
+      this.composer.addPass(this._fxaaPass);
+    }
 
     window.addEventListener('resize', () => this._onResize());
   }
@@ -229,7 +237,7 @@ export class Game {
     this.yen = 1000;
     this.offeringTokens = 5;
     this.dayNight = new DayNightCycle(this, this.town);
-    this.dayNight._applyLighting();
+    this.dayNight._applyLighting(this.dayNight.hourFloat, computeNightBlend(this.dayNight.hourFloat));
     this.dayNight._updateHUD();
     this.dayNight.bindControls({
       panel: document.getElementById('time-panel'),
@@ -509,7 +517,7 @@ export class Game {
 
   _updateLocationTag() {
     if (!this.locationTag || !this.path) return;
-    const t = this.path.getClosestPointT(this.player.position);
+    const t = this.player?.pathT ?? this.path.getClosestPointT(this.player.position);
     const zone = LOCATION_ZONES.find((z) => t <= z.tMax) ?? LOCATION_ZONES[LOCATION_ZONES.length - 1];
     this.locationTag.textContent = zone.label;
     if (zone.label !== this._lastZoneLabel) {
@@ -522,13 +530,16 @@ export class Game {
   _onResize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const dpr = Math.min(window.devicePixelRatio, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, this.perf.dprMax);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h);
-    this.composer.setSize(w, h);
-    if (this._fxaaPass) {
-      this._fxaaPass.material.uniforms.resolution.value.set(1 / (w * dpr), 1 / (h * dpr));
+    if (this.usePostProcessing) {
+      this.composer.setSize(w, h);
+      if (this._fxaaPass) {
+        this._fxaaPass.material.uniforms.resolution.value.set(1 / (w * dpr), 1 / (h * dpr));
+      }
     }
     const minimapWrap = document.getElementById('minimap-wrap');
     if (this.minimap?.resize && minimapWrap) {
@@ -645,7 +656,11 @@ export class Game {
         this.interactables.findAllInRange(this.player.position, 20),
       );
     }
-    this.minimap?.update(dt);
+    this._minimapAccum += dt;
+    if (this._minimapAccum >= this.perf.minimapUpdateInterval) {
+      this._minimapAccum = 0;
+      this.minimap?.update(dt);
+    }
     this.dayNight?.update(dt);
     this.town.update(this.clock.elapsedTime);
 
@@ -661,7 +676,11 @@ export class Game {
   }
 
   render() {
-    this.composer.render();
+    if (this.usePostProcessing) {
+      this.composer.render();
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 
   start() {

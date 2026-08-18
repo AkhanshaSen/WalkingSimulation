@@ -95,6 +95,11 @@ export function createSoftOutlinedMesh(geometry, material, outlineScale = 1.042)
   return createOutlinedMesh(geometry, material, outlineScale);
 }
 
+/** Mesh without outline — use for repeated props (trees, petals) to halve draw calls. */
+export function createFastMesh(geometry, material) {
+  return new THREE.Mesh(geometry, material);
+}
+
 export function applyCelShading(object, outlineScale = 1.04) {
   object.traverse((child) => {
     if (!child.isMesh || child.userData.isOutline) return;

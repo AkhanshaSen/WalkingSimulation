@@ -3,6 +3,7 @@ import { createToonMaterial, createOutlinedMesh, PALETTE } from './materials.js'
 import { setupNpcRoutine, updateNpcRoutine } from './npcRoutines.js';
 import { followPlayer, moveToward } from './entities/FollowerBehavior.js';
 import { attachAccessory } from './accessories.js';
+import { PERF } from './performance.js';
 
 const NPC_SIDEWALK_OFFSET = 2.75;
 const NPC_JOG_OFFSET = 1.55;
@@ -791,18 +792,39 @@ export class Player {
 
     let bestDist = Infinity;
     let bestNearest = null;
-    let bestT = 0;
+    let bestT = this.pathT ?? 0.5;
+
+    const steps = PERF.pathLocalSearchSteps;
+    const span = PERF.pathLocalSearchSpan;
 
     for (const curve of curves) {
       if (!curve?.getPointAt) continue;
-      for (let i = 0; i <= 80; i++) {
-        const t = i / 80;
+      const centerT = THREE.MathUtils.clamp(this.pathT ?? 0.5, 0, 1);
+      for (let i = 0; i <= steps; i++) {
+        const t = THREE.MathUtils.clamp(centerT + ((i / steps) - 0.5) * 2 * span, 0, 1);
         const p = curve.getPointAt(t);
         const d = Math.hypot(pos.x - p.x, pos.z - p.z);
         if (d < bestDist) {
           bestDist = d;
           bestNearest = p;
           bestT = t;
+        }
+      }
+    }
+
+    // Fallback: coarse global search if player teleported / is far off-path
+    if (bestDist > MAX_DIST_FROM_PATH * 0.85) {
+      for (const curve of curves) {
+        if (!curve?.getPointAt) continue;
+        for (let i = 0; i <= 32; i++) {
+          const t = i / 32;
+          const p = curve.getPointAt(t);
+          const d = Math.hypot(pos.x - p.x, pos.z - p.z);
+          if (d < bestDist) {
+            bestDist = d;
+            bestNearest = p;
+            bestT = t;
+          }
         }
       }
     }
