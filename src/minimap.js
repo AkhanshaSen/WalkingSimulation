@@ -74,11 +74,48 @@ function shopIcon(ctx, mx, my, color) {
   ctx.fillRect(mx - 3.5, my - 0.5, 7, 5.5);
 }
 
+/** Tiny house with roof — player home */
+function homeIcon(ctx, mx, my, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(mx, my - 5.5);
+  ctx.lineTo(mx + 5.5, my - 1);
+  ctx.lineTo(mx - 5.5, my - 1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillRect(mx - 4, my - 1, 8, 5.5);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillRect(mx - 1.2, my + 1.2, 2.4, 2.8);
+}
+
+/** Torii gate — two posts and lintels */
+function toriiIcon(ctx, mx, my, color) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  [-3.5, 3.5].forEach((dx) => {
+    ctx.beginPath();
+    ctx.moveTo(mx + dx, my + 2);
+    ctx.lineTo(mx + dx, my - 4);
+    ctx.stroke();
+  });
+  ctx.beginPath();
+  ctx.moveTo(mx - 5, my - 2.2);
+  ctx.lineTo(mx + 5, my - 2.2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(mx - 5.5, my - 4.5);
+  ctx.lineTo(mx + 5.5, my - 4.5);
+  ctx.stroke();
+}
+
 export const INTERACTION_COLORS = {
   npc: '#f09030',
   animal: '#d060c8',
   shop: '#f0c030',
   shrine: '#50d0a0',
+  torii: '#e86050',
+  home: '#e8c878',
   vending: '#40c8d0',
   bench: '#a07050',
   tree: '#c090b0',
@@ -91,7 +128,9 @@ function getInteractableColor(item) {
   if (item.type === 'animal') return INTERACTION_COLORS.animal;
   const id = item.definition?.id ?? '';
   if (item.definition?.shopId || id.startsWith('shop')) return INTERACTION_COLORS.shop;
+  if (id === 'home') return INTERACTION_COLORS.home;
   if (id === 'shrine') return INTERACTION_COLORS.shrine;
+  if (id === 'torii') return INTERACTION_COLORS.torii;
   if (id === 'vending') return INTERACTION_COLORS.vending;
   if (id === 'bench') return INTERACTION_COLORS.bench;
   if (id === 'cherry_tree' || id === 'shrine_tree') return INTERACTION_COLORS.tree;
@@ -242,17 +281,20 @@ export class Minimap {
     ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
     ctx.clip();
 
-    ctx.fillStyle = '#243c24';
+    const bgGrad = ctx.createRadialGradient(size / 2, size / 2, 8, size / 2, size / 2, size / 2);
+    bgGrad.addColorStop(0, '#2f5230');
+    bgGrad.addColorStop(1, '#1e3420');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, size, size);
 
     const harbor = this._worldToMap(22, -78);
-    ctx.fillStyle = '#3a6890';
+    ctx.fillStyle = 'rgba(58,104,144,0.75)';
     ctx.beginPath();
-    ctx.arc(harbor.mx, harbor.my, 18, 0, Math.PI * 2);
+    ctx.arc(harbor.mx, harbor.my, 14, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = '#1a1a1a';
-    ctx.lineWidth = 7;
+    ctx.strokeStyle = '#3a3830';
+    ctx.lineWidth = 8;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.beginPath();
@@ -264,16 +306,22 @@ export class Minimap {
     }
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(220,210,180,0.55)';
-    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = 'rgba(245,240,225,0.72)';
+    ctx.lineWidth = 2;
     ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
 
     // Side paths — lighter strokes
     if (this.walkableCurves?.length) {
       for (const curve of this.walkableCurves) {
         if (curve === this.path) continue;
-        ctx.strokeStyle = 'rgba(138,132,120,0.7)';
-        ctx.lineWidth = 5;
+        ctx.strokeStyle = 'rgba(130,124,112,0.55)';
+        ctx.lineWidth = 4;
         ctx.beginPath();
         for (let i = 0; i <= 40; i++) {
           const p = curve.getPointAt(i / 40);
@@ -290,10 +338,21 @@ export class Minimap {
       const { mx, my } = this._worldToMap(pos.x, pos.z);
       const id = prop.definition?.id ?? '';
 
-      if (id === 'shrine') {
+      if (id === 'home') {
+        ctx.strokeStyle = 'rgba(232,200,120,0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath();
+        ctx.arc(mx, my, 8.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        homeIcon(ctx, mx, my, INTERACTION_COLORS.home);
+      } else if (id === 'shrine') {
         starIcon(ctx, mx, my, INTERACTION_COLORS.shrine);
+      } else if (id === 'torii') {
+        toriiIcon(ctx, mx, my, INTERACTION_COLORS.torii);
       } else if (id === 'vending') {
-        dot(ctx, mx, my, 2.8, INTERACTION_COLORS.vending, '#ffffff', 1);
+        dot(ctx, mx, my, 2.6, INTERACTION_COLORS.vending, '#ffffff', 1);
       } else if (id.startsWith('shop')) {
         shopIcon(ctx, mx, my, INTERACTION_COLORS.shop);
       } else if (id === 'bench') {

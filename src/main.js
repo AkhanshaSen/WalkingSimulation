@@ -169,6 +169,15 @@ function setupUI(game) {
     outfitUI.toggle();
   });
 
+  const questPanel = document.getElementById('quest-panel');
+  const questBtn = document.getElementById('quest-btn');
+  const closeQuestBtn = document.getElementById('close-quest');
+  questBtn?.addEventListener('click', () => {
+    game.quests?.render(document.getElementById('quest-list'));
+    questPanel?.classList.remove('hidden');
+  });
+  closeQuestBtn?.addEventListener('click', () => questPanel?.classList.add('hidden'));
+
   document.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') {
       const timePanel = document.getElementById('time-panel');
@@ -187,6 +196,8 @@ function setupUI(game) {
         game.dialogue._onIgnoreClicked();
       } else if (!document.getElementById('journal-panel').classList.contains('hidden')) {
         document.getElementById('journal-panel').classList.add('hidden');
+      } else if (questPanel && !questPanel.classList.contains('hidden')) {
+        questPanel.classList.add('hidden');
       } else {
         menuPanel.classList.toggle('hidden');
       }

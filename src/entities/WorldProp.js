@@ -60,6 +60,13 @@ export class WorldProp {
       );
       context.game?.mood?.boost(18, 'Blessed ⛩️');
       context.game?._updateMoodHUD?.();
+      context.game?.quests?.notify('prop', { propId: 'shrine' });
+      return;
+    }
+
+    // Home — rest and start the next day
+    if (def.id === 'home') {
+      context.game?.restAtHome?.();
       return;
     }
 
@@ -115,6 +122,11 @@ export function createShrineProp(scene, position, rotationY = 0) {
 
 export function createToriiProp(scene, position, rotationY = 0) {
   const def = { ...PROP_DEFINITIONS.torii };
+  return new WorldProp(scene, def, position, rotationY);
+}
+
+export function createHomeProp(scene, position, rotationY = 0) {
+  const def = { ...PROP_DEFINITIONS.home };
   return new WorldProp(scene, def, position, rotationY);
 }
 

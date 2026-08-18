@@ -42,6 +42,10 @@ export function convertMaterialToToon(material) {
     toon.map.colorSpace = THREE.SRGBColorSpace;
     toon.map.anisotropy = 8;
   }
+  if (material.emissive) {
+    toon.emissive = material.emissive.clone();
+    toon.emissiveIntensity = material.emissiveIntensity ?? 0;
+  }
   return toon;
 }
 

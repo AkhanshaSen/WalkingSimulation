@@ -16,6 +16,7 @@ import { ModelLoader } from './loaders/ModelLoader.js';
 import { MoodSystem } from './MoodSystem.js';
 import { DayNightCycle } from './DayNightCycle.js';
 import { DayJournal } from './DayJournal.js';
+import { QuestSystem } from './QuestSystem.js';
 import { setExpression } from './character.js';
 import { Animal } from './entities/Animal.js';
 import { setAnimalModelLoader } from './entities/animalMeshes.js';
@@ -23,6 +24,7 @@ import {
   createTreeProp,
   createShrineProp,
   createToriiProp,
+  createHomeProp,
   createShopProp,
   createVendingProp,
 } from './entities/WorldProp.js';
@@ -167,6 +169,8 @@ export class Game {
           game.worldProps.push(createShrineProp(game.scene, position, rotationY));
         } else if (propId === 'torii') {
           game.worldProps.push(createToriiProp(game.scene, position, rotationY));
+        } else if (propId === 'home') {
+          game.worldProps.push(createHomeProp(game.scene, position, rotationY));
         } else if (propId === 'vending') {
           game.worldProps.push(createVendingProp(game.scene, position, rotationY));
         } else if (propId.startsWith('shop_')) {
@@ -248,6 +252,8 @@ export class Game {
     }
     this.dayJournal.onChange = () => dialogue._updateJournalUI();
     dialogue._updateJournalUI();
+    this.quests = new QuestSystem(this);
+    this.quests._updateHUD();
     this._lastZoneLabel = null;
     this._journalWalkStarted = false;
 
@@ -362,6 +368,27 @@ export class Game {
     if (this.shopUI && shopId) this.shopUI.open(shopId);
   }
 
+  restAtHome() {
+    if (!this.dayNight) return;
+    const nextDay = this.dayNight.dayIndex + 1;
+    this.dayNight.dayIndex = nextDay;
+    this.dayNight.clockPaused = false;
+    this.dayNight.setTime(8, 15);
+    const pauseCheckbox = document.getElementById('time-pause');
+    if (pauseCheckbox) pauseCheckbox.checked = false;
+
+    this.offeringTokens = 5;
+    this._updateTokenHUD();
+    this.mood?.boost(25, 'Well rested!');
+    this._updateMoodHUD();
+    this.dayJournal?.addLegacyEntry?.(
+      'A Good Night\'s Rest',
+      `I slept at home and woke on Day ${nextDay}. The town feels fresh in the morning light.`,
+      'Home',
+    );
+    this.dialogue?.showToast?.(`🌅 Day ${nextDay} begins · offering tokens restored`);
+  }
+
   _handlePetAction(animal, action) {
     const result = animal.applyAction(action);
     if (result.message) {
@@ -391,6 +418,9 @@ export class Game {
     this.dialogue.setCompanionTag(npc);
     this.minimap?.setCompanion(npc);
     this.dialogue._updateDialogueWalkButtons?.();
+    if (npc?.profile?.id) {
+      this.quests?.notify('companion', { npcId: npc.profile.id });
+    }
   }
 
   clearCompanion() {
@@ -472,6 +502,8 @@ export class Game {
     } else if (reward.type === 'journal') {
       this.dayJournal?.addLegacyEntry(reward.title, reward.body, 'Purchase');
       this.mood?.boost(8, 'Memory made');
+    } else if (reward.type === 'xp') {
+      this.quests?.grantXP(reward.amount, reward.message);
     }
   }
 
@@ -483,6 +515,7 @@ export class Game {
     if (zone.label !== this._lastZoneLabel) {
       this._lastZoneLabel = zone.label;
       this.dayJournal?.logZoneVisit(zone.label);
+      this.quests?.onZoneVisit(zone.label);
     }
   }
 

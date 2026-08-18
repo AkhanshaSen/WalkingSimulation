@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { skyBucket } from './data/questData.js';
 
 const PERIOD_LABELS = {
   morning: 'Morning',
@@ -68,6 +69,7 @@ export class DayNightCycle {
     this.timeMinutes = 8 * 60 + 15;
     this.dayIndex = 1;
     this.clockPaused = false;
+    this._lastSkyBucket = null;
     this.timeEl = document.getElementById('time-display');
     this.periodEl = document.getElementById('period-display');
   }
@@ -105,6 +107,7 @@ export class DayNightCycle {
     this._applyLighting();
     this._updateHUD();
     this._syncControls?.();
+    this._notifySkyIfNeeded();
   }
 
   setTime(hour, minute = 0) {
@@ -145,12 +148,23 @@ export class DayNightCycle {
       e.stopPropagation();
       const open = panel?.classList.toggle('hidden') === false;
       toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) {
+        this.clockPaused = true;
+        if (pauseCheckbox) pauseCheckbox.checked = true;
+      }
       this._syncControls();
     });
 
     panel?.addEventListener('click', (e) => e.stopPropagation());
 
+    slider?.addEventListener('pointerdown', () => {
+      this.clockPaused = true;
+      if (pauseCheckbox) pauseCheckbox.checked = true;
+    });
+
     slider?.addEventListener('input', () => {
+      this.clockPaused = true;
+      if (pauseCheckbox) pauseCheckbox.checked = true;
       this.setTimeMinutes(Number(slider.value));
     });
 
@@ -160,6 +174,8 @@ export class DayNightCycle {
 
     presetButtons?.forEach((btn) => {
       btn.addEventListener('click', () => {
+        this.clockPaused = true;
+        if (pauseCheckbox) pauseCheckbox.checked = true;
         const preset = btn.dataset.timePreset;
         if (preset) this.setPreset(preset);
         this._syncControls();
@@ -174,6 +190,7 @@ export class DayNightCycle {
       const prev = this.timeMinutes;
       this.timeMinutes = (this.timeMinutes + dt * this.minutesPerSecond) % (24 * 60);
       if (this.timeMinutes < prev) this.dayIndex += 1;
+      this._notifySkyIfNeeded();
     }
     this._applyLighting();
     this._updateHUD();
@@ -187,6 +204,13 @@ export class DayNightCycle {
       this.periodEl.textContent = PERIOD_LABELS[period];
       this.periodEl.dataset.period = period;
     }
+  }
+
+  _notifySkyIfNeeded() {
+    const bucket = skyBucket(this.hourFloat);
+    if (!bucket || bucket === this._lastSkyBucket) return;
+    this._lastSkyBucket = bucket;
+    this.game?.quests?.onTimeChange(this.hourFloat);
   }
 
   _applyLighting() {
@@ -233,12 +257,12 @@ export class DayNightCycle {
     });
 
     town?.streetLampLights?.forEach((pl) => {
-      pl.intensity = lerpNum(0, 1.18, nightBlend);
+      pl.intensity = lerpNum(0, 2.4, nightBlend);
     });
 
     town?.shopLights?.forEach((pl, i) => {
       const role = i % 3;
-      const peak = role === 0 ? 0.95 : role === 1 ? 0.72 : 0.55;
+      const peak = role === 0 ? 1.35 : role === 1 ? 1.05 : 0.85;
       pl.intensity = lerpNum(0, peak, nightBlend);
     });
 
@@ -256,14 +280,17 @@ export class DayNightCycle {
 
     town?.lanterns?.forEach((mesh) => {
       if (!mesh?.material) return;
-      if (mesh.userData.baseEmissiveIntensity == null) {
-        mesh.userData.baseEmissiveIntensity = mesh.material.emissiveIntensity ?? 0.35;
+      if (!mesh.material.emissive || mesh.material.emissive.getHex() === 0x000000) {
+        mesh.material.emissive = new THREE.Color(0xffc868);
       }
-      mesh.material.emissiveIntensity = lerpNum(0.08, 0.9, nightBlend);
+      if (mesh.userData.baseEmissiveIntensity == null) {
+        mesh.userData.baseEmissiveIntensity = mesh.material.emissiveIntensity || 0.35;
+      }
+      mesh.material.emissiveIntensity = lerpNum(0.12, 1.35, nightBlend);
     });
 
     if (lights.shrine) {
-      lights.shrine.intensity = lerpNum(0.22, 0.55, nightBlend);
+      lights.shrine.intensity = lerpNum(0.22, 0.85, nightBlend);
     }
 
     if (renderer) {

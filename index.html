@@ -63,10 +63,12 @@
         </div>
         <div id="minimap-legend" aria-label="Minimap legend">
           <span class="legend-item" data-type="player"><i></i>You</span>
-          <span class="legend-item" data-type="npc"><i></i>NPC</span>
-          <span class="legend-item" data-type="animal"><i></i>Pet</span>
+          <span class="legend-item" data-type="home"><i></i>Home</span>
           <span class="legend-item" data-type="shop"><i></i>Shop</span>
           <span class="legend-item" data-type="shrine"><i></i>Shrine</span>
+          <span class="legend-item" data-type="torii"><i></i>Gate</span>
+          <span class="legend-item" data-type="npc"><i></i>NPC</span>
+          <span class="legend-item" data-type="animal"><i></i>Pet</span>
           <span class="legend-item" data-type="prop"><i></i>Spot</span>
         </div>
         <div id="minimap-info">
@@ -77,6 +79,7 @@
           </div>
           <div id="time-panel" class="hidden" aria-label="Time of day controls">
             <label class="time-panel-label" for="time-slider">Time of day</label>
+            <p class="time-panel-hint">Drag the slider or pick a preset to preview skies. The clock pauses while you adjust.</p>
             <input id="time-slider" type="range" min="0" max="1439" step="15" value="495" />
             <div id="time-presets">
               <button type="button" class="time-preset-btn" data-time-preset="dawn">Dawn</button>
@@ -94,6 +97,11 @@
           <div id="token-display">🪙 5</div>
           <div id="mood-display" aria-label="Player mood">🙂 content</div>
           <div id="mood-bar"><div id="mood-bar-fill"></div></div>
+          <div id="xp-row">
+            <span id="level-display">Lv 1</span>
+            <span id="xp-display">0 XP</span>
+          </div>
+          <div id="xp-bar"><div id="xp-bar-fill"></div></div>
         </div>
       </div>
 
@@ -223,46 +231,68 @@
       </div>
 
       <div id="journal-panel" class="hidden">
-        <h2>📓 Journal</h2>
-        <p class="journal-subtitle">Your walk, written as the day unfolds.</p>
-        <div id="journal-list"></div>
-        <button id="close-journal" class="panel-btn">Close</button>
+        <div class="panel-header">
+          <h2>📓 Journal</h2>
+          <button id="close-journal" class="panel-close-btn" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="panel-scroll-body">
+          <p class="journal-subtitle">Your walk, written as the day unfolds.</p>
+          <div id="journal-list"></div>
+        </div>
+      </div>
+
+      <div id="quest-panel" class="hidden">
+        <div class="panel-header">
+          <h2>📜 Quests</h2>
+          <button id="close-quest" class="panel-close-btn" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="panel-scroll-body">
+          <p class="quest-subtitle">Five storylines to explore the town. Earn XP as you go.</p>
+          <div id="quest-list"></div>
+        </div>
       </div>
 
       <div id="bottom-right">
+        <button id="quest-btn" class="hud-btn hud-btn-icon" aria-label="Quests">📜</button>
         <button id="journal-btn" class="hud-btn hud-btn-icon" aria-label="Journal">📓</button>
         <button id="music-btn" class="hud-btn hud-btn-icon" aria-label="Toggle music">♪</button>
         <button id="custom-btn" class="hud-btn hud-btn-icon" aria-label="Change outfit">👕</button>
       </div>
 
       <div id="menu-panel" class="hidden">
-        <h2>Menu</h2>
-        <p>Explore the winding streets of a small Japanese town.</p>
-        <ul>
-          <li><kbd>W A S D</kbd> — Move</li>
-          <li><kbd>Shift</kbd> — Run</li>
-          <li><kbd>Space</kbd> — Jump</li>
-          <li>Walk near NPCs — choose Chat, Walk together, or Ignore</li>
-          <li>While chatting — Make friends, Argue, or Flirt</li>
-          <li>Minimap (top-left) — colored dots show nearby interactions</li>
-          <li><kbd>E</kbd> — Interact with benches, trees, animals</li>
-          <li>Build affinity with animals to befriend them</li>
-          <li><kbd>1 2 3</kbd> — Pick dialogue options</li>
-          <li><kbd>Esc</kbd> — Close dialogue</li>
-          <li>Mouse drag — Rotate camera</li>
-        </ul>
-        <div class="menu-time-section">
-          <h3>Time of day</h3>
-          <p class="menu-time-hint">Tap the clock on the map panel, or use the controls below.</p>
-          <div id="menu-time-presets" class="menu-time-presets">
-            <button type="button" class="time-preset-btn" data-time-preset="dawn">Dawn</button>
-            <button type="button" class="time-preset-btn" data-time-preset="morning">Morning</button>
-            <button type="button" class="time-preset-btn" data-time-preset="noon">Noon</button>
-            <button type="button" class="time-preset-btn" data-time-preset="evening">Evening</button>
-            <button type="button" class="time-preset-btn" data-time-preset="night">Night</button>
+        <div class="panel-header">
+          <h2>Menu</h2>
+          <button id="close-menu" class="panel-close-btn" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="menu-panel-body">
+          <p>Explore the winding streets of a small Japanese town.</p>
+          <ul>
+            <li><kbd>W A S D</kbd> — Move</li>
+            <li><kbd>Shift</kbd> — Run</li>
+            <li><kbd>Space</kbd> — Jump</li>
+            <li>Walk near NPCs — choose Chat, Walk together, or Ignore</li>
+            <li>While chatting — Make friends, Argue, or Flirt</li>
+            <li>Minimap (top-left) — colored dots show nearby interactions</li>
+            <li><kbd>E</kbd> — Interact with benches, trees, animals</li>
+            <li>Build affinity with animals to befriend them</li>
+            <li><kbd>1 2 3</kbd> — Pick dialogue options</li>
+            <li><kbd>Esc</kbd> — Close dialogue</li>
+            <li>Tap the clock (top-left) to preview dawn, noon, and night skies</li>
+            <li><kbd>📜</kbd> — View quests and earn XP</li>
+            <li>Mouse drag — Rotate camera</li>
+          </ul>
+          <div class="menu-time-section">
+            <h3>Time of day</h3>
+            <p class="menu-time-hint">Tap the clock on the map panel to drag through dawn, noon, and night skies. The clock pauses while you adjust.</p>
+            <div id="menu-time-presets" class="menu-time-presets">
+              <button type="button" class="time-preset-btn" data-time-preset="dawn">Dawn</button>
+              <button type="button" class="time-preset-btn" data-time-preset="morning">Morning</button>
+              <button type="button" class="time-preset-btn" data-time-preset="noon">Noon</button>
+              <button type="button" class="time-preset-btn" data-time-preset="evening">Evening</button>
+              <button type="button" class="time-preset-btn" data-time-preset="night">Night</button>
+            </div>
           </div>
         </div>
-        <button id="close-menu" class="panel-btn">Close</button>
       </div>
     </div>
 

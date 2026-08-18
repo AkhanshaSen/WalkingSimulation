@@ -408,22 +408,26 @@ function createBuilding(width, depth, height, wallColor, roofColor, style = 'hou
 
 function createTorii() {
   const group = new THREE.Group();
-  const red = createToonMaterial(0xc03030);
+  const red = createToonMaterial(0xc03030, { emissive: 0x601010, emissiveIntensity: 0.12 });
   const postGeo = new THREE.CylinderGeometry(0.12, 0.14, 2.8, 6);
+  const glowMeshes = [];
 
   [-1.1, 1.1].forEach((x) => {
     const post = createOutlinedMesh(postGeo, red);
     post.position.set(x, 1.4, 0);
     group.add(post);
+    glowMeshes.push(post);
   });
 
   const lintel = createOutlinedMesh(new THREE.BoxGeometry(2.8, 0.18, 0.18), red);
   lintel.position.y = 2.55;
   group.add(lintel);
+  glowMeshes.push(lintel);
 
   const topLintel = createOutlinedMesh(new THREE.BoxGeometry(3.0, 0.12, 0.22), red);
   topLintel.position.y = 2.85;
   group.add(topLintel);
+  glowMeshes.push(topLintel);
 
   const plaque = createOutlinedMesh(
     new THREE.BoxGeometry(0.5, 0.25, 0.06),
@@ -431,6 +435,24 @@ function createTorii() {
   );
   plaque.position.set(0, 2.35, 0.12);
   group.add(plaque);
+
+  [-0.55, 0.55].forEach((x) => {
+    const chochin = createOutlinedMesh(
+      new THREE.SphereGeometry(0.11, 8, 6),
+      createToonMaterial(0xfff0c8, { emissive: 0xff9020, emissiveIntensity: 0.35 }),
+    );
+    chochin.position.set(x, 2.32, 0.1);
+    group.add(chochin);
+    glowMeshes.push(chochin);
+    addLandmarkGlowOrb(group, x, 2.32, 0.12, 0xffd090, 0.1);
+  });
+
+  glowMeshes.forEach((mesh) => registerLandmarkGlowMesh(group, mesh, 0xff5818));
+  addLandmarkLight(group, 0, 2.55, 0.35, 0xffb060, 22);
+  addLandmarkLight(group, 0, 1.2, 0.85, 0xffc878, 16);
+  addLandmarkLight(group, -1.1, 0.6, 0.55, 0xffc070, 14);
+  addLandmarkLight(group, 1.1, 0.6, 0.55, 0xffc070, 14);
+  addLandmarkGlowOrb(group, 0, 2.58, 0.18, 0xffc888, 0.16);
 
   return group;
 }
@@ -441,8 +463,9 @@ function createLantern() {
 
   if (model) {
     group.add(model);
-    const lanternMesh = findLanternGlowMesh(model) ?? findFirstMesh(model);
-    if (lanternMesh) group.userData.lanternMesh = lanternMesh;
+    const glowMeshes = collectLanternGlowMeshes(model);
+    group.userData.lanternMeshes = glowMeshes;
+    group.userData.lanternMesh = glowMeshes[0] ?? findFirstMesh(model);
   } else {
     const post = createOutlinedMesh(
       new THREE.CylinderGeometry(0.05, 0.07, 2.35, 8),
@@ -474,12 +497,107 @@ function createLantern() {
     group.userData.lanternMesh = paper;
   }
 
-  const lampLight = new THREE.PointLight(0xffd898, 0, 16, 1.6);
+  const lampLight = new THREE.PointLight(0xffd898, 0, 22, 1.35);
   lampLight.position.set(0, 2.65, 0.15);
   group.add(lampLight);
   group.userData.streetLampLight = lampLight;
 
+  const glowOrb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.14, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffe8a8, transparent: true, opacity: 0 }),
+  );
+  glowOrb.position.copy(lampLight.position);
+  group.add(glowOrb);
+  group.userData.lampGlowOrb = glowOrb;
+
   return group;
+}
+
+function prepareGlowMaterial(material, warm = 0xffd080) {
+  if (!material) return;
+  if (!material.emissive) material.emissive = new THREE.Color(warm);
+  else if (material.emissive.getHex() === 0x000000) material.emissive.setHex(warm);
+  if (material.emissiveIntensity == null || material.emissiveIntensity <= 0) {
+    material.emissiveIntensity = 0.22;
+  }
+}
+
+function addLandmarkLight(group, x, y, z, color = 0xffc878, distance = 18) {
+  const pl = new THREE.PointLight(color, 0, distance, 1.35);
+  pl.position.set(x, y, z);
+  group.add(pl);
+  if (!group.userData.landmarkLights) group.userData.landmarkLights = [];
+  group.userData.landmarkLights.push(pl);
+  return pl;
+}
+
+function addLandmarkGlowOrb(group, x, y, z, color = 0xffe8a8, size = 0.12) {
+  const orb = new THREE.Mesh(
+    new THREE.SphereGeometry(size, 8, 8),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 }),
+  );
+  orb.position.set(x, y, z);
+  group.add(orb);
+  if (!group.userData.landmarkGlowOrbs) group.userData.landmarkGlowOrbs = [];
+  group.userData.landmarkGlowOrbs.push(orb);
+  return orb;
+}
+
+function registerLandmarkGlowMesh(group, mesh, warm = 0xff9040) {
+  if (!mesh?.material) return;
+  prepareGlowMaterial(mesh.material, warm);
+  if (!group.userData.landmarkGlowMeshes) group.userData.landmarkGlowMeshes = [];
+  group.userData.landmarkGlowMeshes.push(mesh);
+}
+
+function createMiniShrineLantern() {
+  const group = new THREE.Group();
+  const post = createOutlinedMesh(
+    new THREE.CylinderGeometry(0.035, 0.045, 0.42, 6),
+    createToonMaterial(PALETTE.metal),
+  );
+  post.position.y = 0.21;
+  group.add(post);
+
+  const shade = createOutlinedMesh(
+    new THREE.BoxGeometry(0.14, 0.18, 0.14),
+    createToonMaterial(0xfff0c8, { emissive: 0xffa040, emissiveIntensity: 0.35 }),
+  );
+  shade.position.y = 0.52;
+  group.add(shade);
+
+  const pl = new THREE.PointLight(0xffc878, 0, 16, 1.45);
+  pl.position.set(0, 0.55, 0.08);
+  group.add(pl);
+  group.userData.landmarkLight = pl;
+  group.userData.landmarkGlowMesh = shade;
+
+  const orb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.1, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffe0a0, transparent: true, opacity: 0 }),
+  );
+  orb.position.copy(pl.position);
+  group.add(orb);
+  group.userData.landmarkGlowOrb = orb;
+
+  return group;
+}
+
+function collectLanternGlowMeshes(object) {
+  const meshes = [];
+  object.traverse((child) => {
+    if (!child.isMesh || child.userData.isOutline) return;
+    const n = child.name.toLowerCase();
+    if (/lamp|light|lantern|glass|paper|shade|emiss|bulb|glow|lantern/.test(n)) {
+      meshes.push(child);
+    }
+  });
+  if (meshes.length === 0) {
+    const fallback = findLanternGlowMesh(object);
+    if (fallback) meshes.push(fallback);
+  }
+  meshes.forEach((mesh) => prepareGlowMaterial(mesh.material));
+  return meshes;
 }
 
 function findLanternGlowMesh(object) {
@@ -1009,7 +1127,6 @@ function createBollard() {
 }
 
 function createPottedPlant() {
-  return withModel('bush', 0.75, () => {
   const group = new THREE.Group();
   const pot = createOutlinedMesh(
     new THREE.CylinderGeometry(0.15, 0.12, 0.25, 6),
@@ -1018,15 +1135,112 @@ function createPottedPlant() {
   pot.position.y = 0.13;
   group.add(pot);
 
-  const leaves = createOutlinedMesh(
+  const leaves = createSoftOutlinedMesh(
     new THREE.SphereGeometry(0.22, 8, 6),
     createToonMaterial(0x4a9a4a),
   );
   leaves.position.y = 0.38;
+  leaves.scale.set(1.1, 0.9, 1.1);
   group.add(leaves);
 
+  const puff = createSoftOutlinedMesh(
+    new THREE.SphereGeometry(0.14, 8, 6),
+    createToonMaterial(0x5aaa5a),
+  );
+  puff.position.set(0.1, 0.44, 0.06);
+  group.add(puff);
+
   return group;
+}
+
+function createGardenBush(size = 0.5) {
+  const group = new THREE.Group();
+  const greens = [0x4a8a52, 0x5a9a5a, 0x3a7a48];
+  const puffs = [
+    [0, 0.55, 0, 0.36],
+    [-0.2, 0.42, 0.12, 0.24],
+    [0.18, 0.44, -0.1, 0.26],
+    [0.02, 0.68, 0.06, 0.2],
+  ];
+  puffs.forEach(([x, y, z, r], i) => {
+    const puff = createSoftOutlinedMesh(
+      new THREE.SphereGeometry(r * size, 8, 6),
+      createToonMaterial(greens[i % greens.length]),
+    );
+    puff.position.set(x * size, y * size, z * size);
+    puff.scale.set(1.08, 0.82, 1.08);
+    group.add(puff);
   });
+  return group;
+}
+
+function createGardenRock(size = 0.28) {
+  const group = new THREE.Group();
+  const rock = createSoftOutlinedMesh(
+    new THREE.DodecahedronGeometry(size, 0),
+    createToonMaterial(0x8a8880),
+  );
+  rock.position.y = size * 0.55;
+  rock.rotation.set(0.18, 0.4, 0.12);
+  group.add(rock);
+  const pebble = createSoftOutlinedMesh(
+    new THREE.DodecahedronGeometry(size * 0.45, 0),
+    createToonMaterial(0x9a9590),
+  );
+  pebble.position.set(size * 0.7, size * 0.22, size * 0.35);
+  pebble.rotation.set(-0.2, 1.1, 0.15);
+  group.add(pebble);
+  return group;
+}
+
+function createGardenDecoration(size = 0.32) {
+  const group = new THREE.Group();
+  const stone = createToonMaterial(0x9a9088);
+  const base = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(size * 0.9, size * 0.35, size * 0.9),
+    stone,
+  );
+  base.position.y = size * 0.18;
+  group.add(base);
+  const post = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(size * 0.42, size * 0.95, size * 0.42),
+    stone,
+  );
+  post.position.y = size * 0.82;
+  group.add(post);
+  const cap = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(size * 1.05, size * 0.22, size * 1.05),
+    stone,
+  );
+  cap.position.y = size * 1.35;
+  group.add(cap);
+  const window = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(size * 0.55, size * 0.42, size * 0.55),
+    createToonMaterial(0xf0e8d0, { emissive: 0xffe0a0, emissiveIntensity: 0.18 }),
+  );
+  window.position.y = size * 0.88;
+  group.add(window);
+  return group;
+}
+
+function createGardenFenceSegment(size = 0.5) {
+  const group = new THREE.Group();
+  const wood = createToonMaterial(0x8a7060);
+  const rail = createSoftOutlinedMesh(
+    new THREE.BoxGeometry(size * 1.7, size * 0.84, size * 0.14),
+    wood,
+  );
+  rail.position.y = size * 0.42;
+  group.add(rail);
+  [-0.64, 0.64].forEach((x) => {
+    const post = createSoftOutlinedMesh(
+      new THREE.BoxGeometry(size * 0.12, size * 0.96, size * 0.12),
+      wood,
+    );
+    post.position.set(x * size, size * 0.48, 0);
+    group.add(post);
+  });
+  return group;
 }
 
 function createTree(variant = 'normal') {
@@ -1245,19 +1459,27 @@ function createElevatedShrine() {
   });
   shrineHall.position.set(0, platformY + 0.3, -1.05);
   group.add(shrineHall);
+  collectLanternGlowMeshes(shrineHall).forEach((mesh) => registerLandmarkGlowMesh(group, mesh, 0xffc060));
+  shrineHall.traverse((child) => {
+    if (!child.isMesh || child.userData.isOutline) return;
+    const n = child.name.toLowerCase();
+    if (/window|door|light|lantern|paper|screen|lamp|emiss/.test(n)) {
+      registerLandmarkGlowMesh(group, child, 0xffc060);
+    }
+  });
 
   [-1.05, 1.05].forEach((x) => {
-    const lantern = withModel('street_lamp', 0.55, () => {
-      const post = createOutlinedMesh(
-        new THREE.CylinderGeometry(0.035, 0.045, 0.5, 6),
-        createToonMaterial(PALETTE.metal),
-      );
-      post.position.y = 0.25;
-      return post;
-    });
+    const lantern = createMiniShrineLantern();
     lantern.position.set(x, platformY, 0.35);
     group.add(lantern);
   });
+
+  addLandmarkLight(group, 0, platformY + 1.55, -0.15, 0xffd8a0, 20);
+  addLandmarkLight(group, 0, platformY + 0.85, 0.75, 0xffc878, 16);
+  addLandmarkLight(group, -1.05, platformY + 0.7, 0.45, 0xffc070, 14);
+  addLandmarkLight(group, 1.05, platformY + 0.7, 0.45, 0xffc070, 14);
+  addLandmarkLight(group, 0, platformY + 0.45, 1.05, 0xffe8b8, 18);
+  addLandmarkGlowOrb(group, 0, platformY + 1.5, -0.35, 0xffe8c0, 0.18);
 
   return group;
 }
@@ -1271,41 +1493,12 @@ function seededRandom(seed) {
 }
 
 function addGardenModel(group, key, x, z, targetHeight, rotY = 0, scale = 1) {
-  const prop = withModel(key, targetHeight, () => {
-    if (key === 'bush') {
-      const fallback = new THREE.Group();
-      const blob = createOutlinedMesh(
-        new THREE.SphereGeometry(0.38, 8, 6),
-        createToonMaterial(0x4a8a52),
-      );
-      blob.position.y = 0.28;
-      blob.scale.set(1.1, 0.72, 1.1);
-      fallback.add(blob);
-      return fallback;
-    }
-    if (key === 'rock') {
-      const fallback = new THREE.Group();
-      const rock = createOutlinedMesh(
-        new THREE.DodecahedronGeometry(0.22, 0),
-        createToonMaterial(0x8a8880),
-      );
-      rock.position.y = 0.16;
-      rock.rotation.set(0.2, rotY, 0.1);
-      fallback.add(rock);
-      return fallback;
-    }
-    if (key === 'fence_low') {
-      const fallback = new THREE.Group();
-      const rail = createOutlinedMesh(
-        new THREE.BoxGeometry(0.85, 0.42, 0.07),
-        createToonMaterial(0x8a7060),
-      );
-      rail.position.y = 0.21;
-      fallback.add(rail);
-      return fallback;
-    }
-    return null;
-  }, { scale });
+  const size = targetHeight * scale;
+  let prop = null;
+  if (key === 'bush') prop = createGardenBush(size);
+  else if (key === 'rock') prop = createGardenRock(size);
+  else if (key === 'decoration') prop = createGardenDecoration(size);
+  else if (key === 'fence_low') prop = createGardenFenceSegment(size);
   if (!prop) return;
   prop.position.set(x, 0, z);
   prop.rotation.y = rotY;
@@ -1506,6 +1699,50 @@ function createModelShop(targetHeight, labelJa, labelEn, signColor, signDepth = 
   });
 }
 
+function createPlayerHome() {
+  const group = new THREE.Group();
+  const h = 3.25;
+  const w = 3.6;
+  const d = 3.1;
+  const wall = 0xf2ebe3;
+  const roof = 0x8a6848;
+
+  const house = createPathBuilding('building_b', h, w, d, h, wall, roof, 'house');
+  group.add(house);
+
+  const faceZ = d / 2;
+  const sign = createShopSign('我が家', 'My Home', 0x8a7060, h * 0.76);
+  sign.position.set(0.15, 0, faceZ + 0.42);
+  group.add(sign);
+
+  const winMat = createToonMaterial(0xfff4dc, { emissive: 0xffc878, emissiveIntensity: 0.48 });
+  const homeWindows = [];
+  [[0.62, 1.38], [-0.48, 1.38], [0.62, 2.05]].forEach(([x, y]) => {
+    const win = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.58), winMat);
+    win.position.set(x, y, faceZ + 0.08);
+    group.add(win);
+    homeWindows.push(win);
+  });
+
+  const doorLight = new THREE.PointLight(0xffe0b0, 0, 14, 1.5);
+  doorLight.position.set(0, 1.05, faceZ + 0.55);
+  group.add(doorLight);
+
+  attachShopNightLights(group, {
+    signColor: 0xc8a878,
+    faceZ,
+    h,
+    w,
+    windowOverlay: homeWindows[0],
+    signBoard: sign.children.find((c) => c.isMesh && !c.userData?.isOutline) ?? null,
+  });
+
+  if (!group.userData.landmarkLights) group.userData.landmarkLights = [];
+  group.userData.landmarkLights.push(doorLight);
+  group.userData.placementRadius = 3.2;
+  return group;
+}
+
 /** Canvas texture for shop display windows */
 function createShopWindowTexture(goodsLabel = 'OPEN', goodsEmoji = '🛍️', bgColor = '#283038') {
   const canvas = document.createElement('canvas');
@@ -1555,7 +1792,7 @@ function attachShopNightLights(group, { signColor, faceZ, h, w, windowOverlay, s
 
 /**
  * Procedural storefront: full shop building + sign + display + goods.
- * Kenney shop GLBs are narrow 0.5 m props — not used as the main body.
+ * Kenney shop_a–d GLBs are narrow facade props (~0.5 m), not full buildings.
  */
 function createStorefront({
   targetHeight = 2.8,
@@ -1635,6 +1872,29 @@ function createStorefront({
     const crate = createOutlinedMesh(new THREE.BoxGeometry(0.5, 0.35, 0.4), createToonMaterial(0x806040));
     crate.position.set(0.9, 0.18, faceZ + 0.92);
     group.add(crate);
+    const loaf2 = createOutlinedMesh(new THREE.BoxGeometry(0.28, 0.12, 0.14), createToonMaterial(0xd8b868));
+    loaf2.position.set(0.9, 0.38, faceZ + 0.92);
+    group.add(loaf2);
+  } else if (goodsType === 'sweets') {
+    [-0.85, 0.85].forEach((x) => {
+      const tray = createOutlinedMesh(new THREE.BoxGeometry(0.42, 0.08, 0.32), createToonMaterial(0x806050));
+      tray.position.set(x, 0.12, faceZ + 0.9);
+      group.add(tray);
+      [[-0.08, 0xf0a0b0], [0, 0xffffff], [0.08, 0xf0c0a0]].forEach(([dx, col]) => {
+        const dango = createOutlinedMesh(new THREE.SphereGeometry(0.09, 8, 6), createToonMaterial(col));
+        dango.position.set(x + dx, 0.24, faceZ + 0.9);
+        group.add(dango);
+      });
+    });
+  } else if (goodsType === 'tea') {
+    [-0.75, 0.75].forEach((x) => {
+      const cup = createOutlinedMesh(new THREE.CylinderGeometry(0.14, 0.11, 0.22, 8), createToonMaterial(0xf0ece4));
+      cup.position.set(x, 0.15, faceZ + 0.9);
+      group.add(cup);
+      const tea = createOutlinedMesh(new THREE.CylinderGeometry(0.11, 0.11, 0.04, 8), createToonMaterial(0x508050));
+      tea.position.set(x, 0.24, faceZ + 0.9);
+      group.add(tea);
+    });
   }
 
   return group;
@@ -1931,8 +2191,8 @@ function createMarketStalls() {
 
   const marketLights = [];
   stalls.forEach(({ x, awning }) => {
-    const stallLight = new THREE.PointLight(new THREE.Color(awning).lerp(new THREE.Color(0xfff0d0), 0.5), 0, 8, 1.8);
-    stallLight.position.set(x, 1.45, 0.65);
+    const stallLight = new THREE.PointLight(new THREE.Color(awning).lerp(new THREE.Color(0xfff0d0), 0.5), 0, 11, 1.6);
+    stallLight.position.set(x, 1.65, 0.85);
     group.add(stallLight);
     marketLights.push(stallLight);
   });
@@ -2005,6 +2265,7 @@ export class Town {
     this.animatedClouds = [];
     this.lanterns = [];
     this.streetLampLights = [];
+    this.lampGlowOrbs = [];
     this.shopLights = [];
     this.shopWindowMaterials = [];
     this.vendingMachines = [];
@@ -2093,6 +2354,29 @@ export class Town {
     });
   }
 
+  _registerLandmarkLighting(root) {
+    if (root.userData.landmarkLights?.length) {
+      this.streetLampLights.push(...root.userData.landmarkLights);
+    }
+    if (root.userData.landmarkGlowMeshes?.length) {
+      this.lanterns.push(...root.userData.landmarkGlowMeshes);
+    }
+    if (root.userData.landmarkGlowOrbs?.length) {
+      this.lampGlowOrbs.push(...root.userData.landmarkGlowOrbs);
+    }
+    root.traverse((obj) => {
+      if (obj.userData?.landmarkLight) {
+        this.streetLampLights.push(obj.userData.landmarkLight);
+      }
+      if (obj.userData?.landmarkGlowMesh) {
+        this.lanterns.push(obj.userData.landmarkGlowMesh);
+      }
+      if (obj.userData?.landmarkGlowOrb) {
+        this.lampGlowOrbs.push(obj.userData.landmarkGlowOrb);
+      }
+    });
+  }
+
   _createStreetLamps() {
     const lampSpots = [];
     for (let i = 0; i < 22; i++) {
@@ -2117,7 +2401,13 @@ export class Town {
       if (lamp.userData.streetLampLight) {
         this.streetLampLights.push(lamp.userData.streetLampLight);
       }
-      if (lamp.userData.lanternMesh) {
+      if (lamp.userData.lampGlowOrb) {
+        this.lampGlowOrbs.push(lamp.userData.lampGlowOrb);
+      }
+      if (lamp.userData.lanternMeshes?.length) {
+        this.lanterns.push(...lamp.userData.lanternMeshes);
+      } else if (lamp.userData.lanternMesh) {
+        prepareGlowMaterial(lamp.userData.lanternMesh.material);
         this.lanterns.push(lamp.userData.lanternMesh);
       }
     });
@@ -2166,6 +2456,14 @@ export class Town {
         lantern.userData.baseColor = lantern.material.color.clone();
       }
       lantern.material.color.copy(lantern.userData.baseColor).multiplyScalar(pulse);
+    });
+
+    const night = this._nightBlend ?? 0;
+    this.lampGlowOrbs.forEach((orb, i) => {
+      if (!orb?.material) return;
+      const pulse = 0.82 + Math.sin(elapsed * 2.4 + i) * 0.18;
+      orb.material.opacity = night * 0.72 * pulse;
+      orb.scale.setScalar(0.85 + night * 0.35 * pulse);
     });
 
     this.vendingMachines.forEach((vm, i) => {
@@ -2434,6 +2732,11 @@ export class Town {
 
   _createLandmarks() {
     const landmarkDefs = [
+      {
+        id: 'home', t: 0.055, side: -1, offset: SHOP_OFFSET,
+        halfW: 2.3, halfD: 2.5, spawn: 'home',
+        make: () => createPlayerHome(), face: 'street',
+      },
       { id: 'torii',  t: 0.34, side: -1, offset: LANDMARK_NEAR_OFFSET, halfW: 1.6, halfD: 0.45, make: () => createTorii(), face: 'street', spawn: 'torii' },
       {
         id: 'shrine', t: 0.66, side: 1, offset: LANDMARK_DEEP_OFFSET,
@@ -2454,6 +2757,8 @@ export class Town {
       if (def.extraRot) item.rotation.y += def.extraRot;
 
       this.scene.add(item);
+      this._registerLandmarkLighting(item);
+      this._registerShopLights(item);
       const { halfW, halfD } = measureBoxHalfExtents(item, def.halfW ?? solidR, def.halfD ?? solidR);
       if (def.radius != null) {
         this._addCircleCollider(item.position.x, item.position.z, def.radius);
@@ -2486,6 +2791,34 @@ export class Town {
       {
         t: 0.58, side: -1, offset: SHOP_OFFSET + 0.5, spawn: 'shop_market',
         make: () => createMarketStalls(),
+      },
+      {
+        t: 0.602, side: 1, offset: SHOP_OFFSET, spawn: 'shop_teahouse',
+        make: () => createModelShop(
+          2.7, '茶屋 静', 'Shizuka Tea', 0x508060, 1.7,
+          0xf4f0e8, 0x4a6848, 3.0, 2.8, 'tea', 'TEA', '🍵',
+        ),
+      },
+      {
+        t: 0.628, side: -1, offset: SHOP_OFFSET, spawn: 'shop_bakery',
+        make: () => createModelShop(
+          2.75, 'パン屋 小麦', 'Komugi Bakery', 0xd09040, 1.7,
+          0xfff4ec, 0x8a5030, 3.1, 2.8, 'bread', 'BREAD', '🍞',
+        ),
+      },
+      {
+        t: 0.652, side: 1, offset: SHOP_OFFSET - 0.35, spawn: 'shop_konbini',
+        make: () => createModelShop(
+          2.55, 'コンビニ', 'Mini Mart', 0x4080c0, 1.6,
+          0xf0f4f8, 0x3060a0, 3.0, 2.7, 'crates', 'OPEN', '🏪',
+        ),
+      },
+      {
+        t: 0.638, side: -1, offset: SHOP_OFFSET + 0.25, spawn: 'shop_sweets',
+        make: () => createModelShop(
+          2.65, '和菓子 花', 'Hana Sweets', 0xe08090, 1.6,
+          0xfaf0f2, 0xc06080, 2.9, 2.6, 'sweets', 'SWEETS', '🍡',
+        ),
       },
       {
         t: 0.92, side: -1, offset: SHOP_OFFSET + 0.5, spawn: 'shop_fishmarket',

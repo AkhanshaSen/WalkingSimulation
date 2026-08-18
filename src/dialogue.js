@@ -104,6 +104,8 @@ export class DialogueManager {
         const tokens = this.game?.offeringTokens ?? 0;
         const cost = def.tokenCost ?? 1;
         label = `<kbd>E</kbd> 🪙 Pray (${cost} token${cost > 1 ? 's' : ''}) · ${tokens} left`;
+      } else if (def.id === 'home') {
+        label = `<kbd>E</kbd> 🏠 Rest · start Day ${(this.game?.dayNight?.dayIndex ?? 1) + 1}`;
       } else if (def.id === 'cherry_tree') {
         label = `<kbd>E</kbd> 🌸 Admire Cherry Tree`;
       } else if (def.id === 'shrine_tree') {
@@ -284,6 +286,7 @@ export class DialogueManager {
 
     npc.startConversation();
     npc.markMet();
+    this.game?.quests?.notify('npc_talk', { npcId: npc.profile.id });
     this._showGreeting();
   }
 
@@ -379,6 +382,9 @@ export class DialogueManager {
     if (reward.type === 'journal') {
       this.game?.dayJournal?.addLegacyEntry(reward.title, reward.body, this.npc?.profile?.name);
       this._showToast(`📓 Saved to journal: ${reward.title}`);
+      if (this.npc?.profile?.id) {
+        this.game?.quests?.notify('journal_from_npc', { npcId: this.npc.profile.id });
+      }
     } else if (reward.type === 'speedBoost') {
       this._rewardHandler?.({ type: 'speedBoost', amount: reward.amount, duration: reward.duration });
       this._showToast(reward.message);

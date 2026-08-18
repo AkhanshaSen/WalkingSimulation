@@ -53,6 +53,13 @@ export const PROP_DEFINITIONS = {
     tokenCost: 1,
   },
 
+  home: {
+    id: 'home',
+    label: '我が家 · My Home',
+    range: 5.5,
+    hitRadius: 2.4,
+  },
+
   vending: {
     id: 'vending',
     label: 'Vending Machine',
