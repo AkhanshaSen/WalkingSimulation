@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { PERF } from './performance.js';
 
 const materialCache = new Map();
 let grassTexture = null;
@@ -137,8 +138,8 @@ export function createGrassTexture() {
     ctx.fillStyle = Math.random() > 0.5 ? 'rgba(100,180,150,0.32)' : 'rgba(120,200,170,0.25)';
     ctx.fill();
   }
-  // Fine blade detail
-  for (let i = 0; i < 6000; i++) {
+  const bladeCount = PERF.grassBladeCount ?? 350;
+  for (let i = 0; i < bladeCount; i++) {
     const x = Math.random() * size;
     const y = Math.random() * size;
     const g = 140 + Math.floor(Math.random() * 40);

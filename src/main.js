@@ -45,15 +45,18 @@ async function boot() {
 
   try {
     setProgress('Starting…', 15);
-    game = await Game.create(canvas, (label) => setProgress(label, 40 + Math.random() * 40));
+    game = await Game.create(canvas, (label) => setProgress(label, 20 + Math.random() * 55));
+    setProgress('Warming up…', 92);
+    setupUI(game);
+    game.warmUpGPU();
     setProgress('Ready!', 100);
     window.__gameBooted = true;
 
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     loading.classList.add('hidden');
     try {
-      setupUI(game);
       game.start();
+      game.loadDeferredContent();
     } catch (error) {
       console.error('Failed to start UI:', error);
       showLoadError(`UI failed: ${error.message}. Check the browser console (F12).`);

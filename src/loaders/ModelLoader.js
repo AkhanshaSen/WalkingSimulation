@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { convertMaterialToToon, addOutline } from '../materials.js';
 import { MODEL_CATALOG } from '../data/modelCatalog.js';
+import { PERF } from '../performance.js';
 
 function resolveModelUrl(filename) {
   const base = import.meta.env.BASE_URL ?? '/';
@@ -37,11 +38,12 @@ function hideAccessories(object) {
   });
 }
 
-function enhanceMeshMaterials(object, { outlineScale = 1.055 } = {}) {
+function enhanceMeshMaterials(object, { outlineScale = 1.055, rigged = false } = {}) {
+  const useOutline = !rigged && !PERF.skipStaticOutlines && outlineScale > 1;
   object.traverse((child) => {
     if (!child.isMesh || child.userData.isOutline) return;
     child.castShadow = true;
-    child.receiveShadow = true;
+    child.receiveShadow = !PERF.receiveShadowGroundOnly;
     child.frustumCulled = true;
 
     if (Array.isArray(child.material)) {
@@ -50,7 +52,7 @@ function enhanceMeshMaterials(object, { outlineScale = 1.055 } = {}) {
       child.material = convertMaterialToToon(child.material);
     }
 
-    if (child.geometry && !child.userData.hasOutline && outlineScale > 1) {
+    if (useOutline && child.geometry && !child.userData.hasOutline) {
       addOutline(child, outlineScale, 0x0a0a10);
     }
   });
@@ -195,8 +197,26 @@ export class ModelLoader {
   }
 
   async loadAll(catalog = MODEL_CATALOG, onProgress) {
-    const entries = Object.entries(catalog);
+    await this._loadEntries(Object.entries(catalog), onProgress);
+  }
+
+  async loadKeys(keys, catalog = MODEL_CATALOG, onProgress) {
+    const wanted = keys instanceof Set ? keys : new Set(keys);
+    const entries = Object.entries(catalog).filter(([key]) => wanted.has(key));
+    await this._loadEntries(entries, onProgress);
+  }
+
+  async loadRemaining(catalog = MODEL_CATALOG, onProgress) {
+    const entries = Object.entries(catalog).filter(
+      ([key]) => !this.templates.has(key) && !this.characterTemplates.has(key) && !this.failed.has(key),
+    );
+    if (entries.length === 0) return;
+    await this._loadEntries(entries, onProgress);
+  }
+
+  async _loadEntries(entries, onProgress) {
     let loaded = 0;
+    const total = entries.length;
     const resourcePath = resolveModelUrl('');
 
     await Promise.all(
@@ -207,7 +227,7 @@ export class ModelLoader {
           const gltf = await this.loader.loadAsync(url);
           const root = gltf.scene;
           if (def.rigged) hideAccessories(root);
-          enhanceMeshMaterials(root, { outlineScale: def.rigged ? 1 : 1.055 });
+          enhanceMeshMaterials(root, { outlineScale: def.rigged ? 1 : 1.055, rigged: !!def.rigged });
           normalizeModel(root, {
             targetHeight: def.targetHeight,
             maxFootprint: def.rigged ? null : def.maxFootprint,
@@ -233,7 +253,7 @@ export class ModelLoader {
           this.failed.set(key, { file: def.file, url, error: msg });
         } finally {
           loaded += 1;
-          onProgress?.(`Loading 3D models… (${loaded}/${entries.length})`);
+          if (total > 0) onProgress?.(`Loading 3D models… (${loaded}/${total})`);
         }
       }),
     );

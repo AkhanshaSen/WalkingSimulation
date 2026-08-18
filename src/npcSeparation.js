@@ -1,4 +1,5 @@
 import { setupNpcRoutine } from './npcRoutines.js';
+import { PERF } from './performance.js';
 
 /** Minimum horizontal clearance between NPC bodies (~1 m footprint + margin). */
 export const MIN_NPC_DISTANCE = 1.2;
@@ -71,7 +72,7 @@ function pushPairApart(a, b, minDist, strength) {
 /** Keep NPCs apart every frame — idle, patrol, talk, approach, and notice pauses. */
 export function applyNpcGroupSeparation(npcs, dt) {
   const strength = Math.min(1, 6 * dt + 0.35);
-  const passes = 3;
+  const passes = PERF.npcSeparationPasses ?? 2;
 
   for (let pass = 0; pass < passes; pass++) {
     for (let i = 0; i < npcs.length; i++) {

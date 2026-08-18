@@ -80,20 +80,24 @@ export class InteractionSystem {
     this.dialogue.showInteractHints(this._hintTargets, this._hintIndex);
   }
 
-  update(input, camera, canvas) {
+  update(input, camera, canvas, dt = 0.016) {
     if (this.isBlocking()) {
       this.dialogue.hideInteractHint();
       this._hintTargets = [];
       return;
     }
 
-    const npcs = this.registry.getNpcs();
-
-    for (const npc of npcs) {
-      if (npc.isCompanion) continue;
-      const dist = npc.distanceTo(this.player.position);
-      const inTalkRange = dist < this.approachRange;
-      npc.setPlayerNearby(inTalkRange, this.player.position);
+    this._npcScanAccum = (this._npcScanAccum ?? 0) + dt;
+    const scanInterval = this.game?.perf?.interactionUpdateInterval ?? 0.1;
+    if (this._npcScanAccum >= scanInterval) {
+      this._npcScanAccum = 0;
+      const npcs = this.registry.getNpcs();
+      for (const npc of npcs) {
+        if (npc.isCompanion) continue;
+        const dist = npc.distanceTo(this.player.position);
+        const inTalkRange = dist < this.approachRange;
+        npc.setPlayerNearby(inTalkRange, this.player.position);
+      }
     }
 
     const closestNpc = this.registry.findNearest(this.player.position, this.approachRange, {

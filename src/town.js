@@ -2491,9 +2491,12 @@ export class Town {
 
     onProgress?.('Adding details…');
     this._createProps();
+    await nextFrame();
     this._createStreetFurniture();
     this._createStreetLamps();
+    await nextFrame();
     this._createVegetation();
+    await nextFrame();
     this._createEnvironmentDetails();
     this._createClouds();
     this._createLighting();
@@ -2736,32 +2739,33 @@ export class Town {
     const roadHalf = roadWidth / 2;
     const sidewalkHalf = sidewalkWidth / 2;
     const sidewalkOffset = roadHalf + sidewalkHalf + 0.15;
+    const divisions = PERF.pathRibbonDivisions ?? 140;
 
     const road = createPathRibbon(
-      this.path, roadHalf, 0.08, createToonMaterial(PALETTE.road), 0, 200,
+      this.path, roadHalf, 0.08, createToonMaterial(PALETTE.road), 0, divisions,
     );
     this.scene.add(road);
     this.groundMeshes.push(road);
 
     const sidewalkMat = createToonMaterial(PALETTE.sidewalk);
-    const leftWalk = createPathRibbon(this.path, sidewalkHalf, 0.09, sidewalkMat, -sidewalkOffset, 200);
-    const rightWalk = createPathRibbon(this.path, sidewalkHalf, 0.09, sidewalkMat, sidewalkOffset, 200);
+    const leftWalk = createPathRibbon(this.path, sidewalkHalf, 0.09, sidewalkMat, -sidewalkOffset, divisions);
+    const rightWalk = createPathRibbon(this.path, sidewalkHalf, 0.09, sidewalkMat, sidewalkOffset, divisions);
     this.scene.add(leftWalk, rightWalk);
     this.groundMeshes.push(leftWalk, rightWalk);
 
     const curbMat = createToonMaterial(PALETTE.curb);
-    const leftCurb = createPathRibbon(this.path, 0.06, 0.1, curbMat, -(roadHalf + 0.12), 200);
-    const rightCurb = createPathRibbon(this.path, 0.06, 0.1, curbMat, roadHalf + 0.12, 200);
+    const leftCurb = createPathRibbon(this.path, 0.06, 0.1, curbMat, -(roadHalf + 0.12), divisions);
+    const rightCurb = createPathRibbon(this.path, 0.06, 0.1, curbMat, roadHalf + 0.12, divisions);
     this.scene.add(leftCurb, rightCurb);
 
     const lineMat = createToonMaterial(PALETTE.roadLine);
     const edgeHalf = 0.03;
-    const leftEdge = createPathRibbon(this.path, edgeHalf, 0.066, lineMat, -(roadHalf - 0.15), 200);
-    const rightEdge = createPathRibbon(this.path, edgeHalf, 0.066, lineMat, roadHalf - 0.15, 200);
+    const leftEdge = createPathRibbon(this.path, edgeHalf, 0.066, lineMat, -(roadHalf - 0.15), divisions);
+    const rightEdge = createPathRibbon(this.path, edgeHalf, 0.066, lineMat, roadHalf - 0.15, divisions);
     this.scene.add(leftEdge, rightEdge);
 
-    const points = this.path.getSpacedPoints(200);
-    for (let i = 0; i < points.length - 1; i += 6) {
+    const points = this.path.getSpacedPoints(divisions);
+    for (let i = 0; i < points.length - 1; i += 10) {
       const t = i / (points.length - 1);
       const p = points[i];
       const tangent = this.path.getTangentAt(t).normalize();
